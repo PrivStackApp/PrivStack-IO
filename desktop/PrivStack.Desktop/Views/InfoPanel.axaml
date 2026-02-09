@@ -1,0 +1,989 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PrivStack.Desktop.ViewModels"
+             xmlns:controls="using:PrivStack.Desktop.Controls"
+             xmlns:services="using:PrivStack.Desktop.Services"
+             xmlns:converters="using:PrivStack.Desktop.Converters"
+             xmlns:models="using:PrivStack.Desktop.Models"
+             xmlns:sdk="using:PrivStack.Sdk"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="PrivStack.Desktop.Views.InfoPanel"
+             x:DataType="vm:InfoPanelViewModel"
+             x:Name="InfoPanelRoot">
+
+    <UserControl.Styles>
+        <!-- Fix TextBox inner background on dark themes — elevated bg for contrast -->
+        <Style Selector="TextBox /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        </Style>
+        <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        </Style>
+        <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border>
+
+        <Grid RowDefinitions="Auto,*">
+            <!-- Header: Tab buttons + Close (mirrors nav sidebar dark style) -->
+            <Border Grid.Row="0" Padding="12,8"
+                    Background="{DynamicResource ThemeNavBackgroundBrush}"
+                    BorderBrush="{DynamicResource ThemeNavBorderBrush}"
+                    BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="*,Auto">
+                    <!-- Tab buttons -->
+                    <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                        <Button x:Name="InfoTabButton"
+                                Content="Info"
+                                Command="{Binding SwitchTabCommand}"
+                                CommandParameter="Info"
+                                Padding="8,4"
+                                CornerRadius="4"
+                                FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                FontWeight="Medium"
+                                Cursor="Hand">
+                            <Button.Styles>
+                                <Style Selector="Button">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextBrush}"/>
+                                </Style>
+                                <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+                                </Style>
+                            </Button.Styles>
+                        </Button>
+                        <Button x:Name="GraphTabButton"
+                                Content="Graph"
+                                Command="{Binding SwitchTabCommand}"
+                                CommandParameter="Graph"
+                                IsVisible="{Binding ShowGraphTab}"
+                                Padding="8,4"
+                                CornerRadius="4"
+                                FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                FontWeight="Medium"
+                                Cursor="Hand">
+                            <Button.Styles>
+                                <Style Selector="Button">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextBrush}"/>
+                                </Style>
+                                <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+                                </Style>
+                            </Button.Styles>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Close button -->
+                    <Button Grid.Column="1"
+                            Content="×"
+                            Command="{Binding CloseCommand}"
+                            Background="Transparent"
+                            Foreground="{DynamicResource ThemeNavTextBrush}"
+                            FontSize="{DynamicResource ThemeFontSizeXl}"
+                            Padding="8,2"
+                            VerticalAlignment="Center"
+                            Cursor="Hand">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Content area -->
+            <Panel Grid.Row="1">
+                <!-- Loading indicator -->
+                <Border IsVisible="{Binding IsLoading}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Top"
+                        Margin="0,16,0,0">
+                    <TextBlock Text="Loading..."
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                               FontSize="{DynamicResource ThemeFontSizeSmMd}"/>
+                </Border>
+
+                <!-- Empty state: No item selected -->
+                <Border IsVisible="{Binding !HasActiveItem}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="16">
+                    <StackPanel Spacing="8" HorizontalAlignment="Center">
+                        <controls:IconControl Icon="Link" Size="24" StrokeThickness="1.5"
+                                              Stroke="{DynamicResource ThemeTextMutedBrush}"
+                                              HorizontalAlignment="Center"/>
+                        <TextBlock Text="Select an item to see details"
+                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                   FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                   TextAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Info tab content -->
+                <ScrollViewer x:Name="InfoScrollPanel"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="0">
+                    <StackPanel Spacing="0">
+
+                        <!-- ═══ Metadata Section ═══ -->
+                        <StackPanel Spacing="8" Margin="12,10,12,0" IsVisible="{Binding HasActiveItem}">
+
+                            <!-- Title (clickable — navigates to item) -->
+                            <Button Command="{Binding NavigateToActiveItemCommand}"
+                                    Background="Transparent"
+                                    Padding="0"
+                                    HorizontalAlignment="Left"
+                                    HorizontalContentAlignment="Left"
+                                    Cursor="Hand"
+                                    CornerRadius="4">
+                                <Button.Styles>
+                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                    </Style>
+                                    <Style Selector="Button TextBlock.title-text">
+                                        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                    </Style>
+                                    <Style Selector="Button:pointerover TextBlock.title-text">
+                                        <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryBrush}"/>
+                                        <Setter Property="TextDecorations" Value="Underline"/>
+                                    </Style>
+                                </Button.Styles>
+                                <TextBlock Classes="title-text"
+                                           Text="{Binding ActiveItemTitle}"
+                                           FontWeight="SemiBold"
+                                           FontSize="{DynamicResource ThemeFontSizeMd}"
+                                           TextWrapping="Wrap"
+                                           MaxLines="3"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </Button>
+
+                            <!-- Content preview -->
+                            <TextBlock Text="{Binding ActiveItemPreview}"
+                                       IsVisible="{Binding ActiveItemPreview, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                       TextWrapping="Wrap"
+                                       MaxLines="3"
+                                       TextTrimming="CharacterEllipsis"/>
+
+                            <!-- Type Badge -->
+                            <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                    CornerRadius="4"
+                                    Padding="8,4"
+                                    HorizontalAlignment="Left"
+                                    IsVisible="{Binding ActiveEntityTypeDisplay, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <controls:IconControl Icon="{Binding ActiveEntityTypeIcon}"
+                                                          Size="14"
+                                                          StrokeThickness="1.5"
+                                                          Stroke="{DynamicResource ThemeTextMutedBrush}"/>
+                                    <TextBlock Text="{Binding ActiveEntityTypeDisplay}"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Timestamps -->
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,2,0,0">
+                                <TextBlock Grid.Row="0" Grid.Column="0"
+                                           Text="Created"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           Margin="0,0,12,2"
+                                           IsVisible="{Binding ActiveItemCreatedAt, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1"
+                                           Text="{Binding ActiveItemCreatedAt, Converter={x:Static converters:UtcToLocalConverter.Instance}, StringFormat='{}{0:MMM d, yyyy h:mm tt}'}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                           IsVisible="{Binding ActiveItemCreatedAt, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Text="Modified"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           Margin="0,0,12,0"
+                                           IsVisible="{Binding ActiveItemModifiedAt, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                           Text="{Binding ActiveItemModifiedAt, Converter={x:Static converters:UtcToLocalConverter.Instance}, StringFormat='{}{0:MMM d, yyyy h:mm tt}'}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                           IsVisible="{Binding ActiveItemModifiedAt, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                            </Grid>
+
+                            <!-- Parent / Subpage of -->
+                            <TextBlock FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                       IsVisible="{Binding HasParent}">
+                                <Run Text="Subpage of "/>
+                                <Run Text="{Binding ActiveItemParentTitle}" FontWeight="SemiBold"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                            </TextBlock>
+                        </StackPanel>
+
+                        <!-- ═══ Details Section (plugin-provided fields) ═══ -->
+                        <Border Margin="12,10,12,0"
+                                Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                CornerRadius="6" Padding="10,8"
+                                IsVisible="{Binding HasDetails}">
+                            <ItemsControl ItemsSource="{Binding ActiveItemDetails}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="sdk:InfoPanelDetailField">
+                                        <Grid ColumnDefinitions="Auto,*" Margin="0,2">
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{Binding Label}"
+                                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                       Margin="0,0,12,0"
+                                                       VerticalAlignment="Center"
+                                                       MinWidth="60"/>
+                                            <Panel Grid.Column="1">
+                                                <!-- Badge variant (when Color is set) -->
+                                                <Border Background="{Binding Color}"
+                                                        CornerRadius="4" Padding="6,2"
+                                                        HorizontalAlignment="Left"
+                                                        IsVisible="{Binding Color, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                                    <TextBlock Text="{Binding Value}"
+                                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                               Foreground="White"
+                                                               FontWeight="SemiBold"/>
+                                                </Border>
+                                                <!-- Plain text variant (when no Color) -->
+                                                <TextBlock Text="{Binding Value}"
+                                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                           VerticalAlignment="Center"
+                                                           TextWrapping="Wrap"
+                                                           IsVisible="{Binding Color, Converter={x:Static ObjectConverters.IsNull}}"/>
+                                            </Panel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+
+                        <!-- ═══ Tags Section ═══ -->
+                        <StackPanel Spacing="6" Margin="12,12,12,0" IsVisible="{Binding HasActiveItem}">
+                            <TextBlock Text="Tags"
+                                       FontWeight="SemiBold"
+                                       FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+                            <!-- Tag chips -->
+                            <ItemsControl ItemsSource="{Binding ActiveItemTags}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                                CornerRadius="10"
+                                                Padding="8,3,4,3"
+                                                Margin="0,0,4,4">
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <TextBlock Text="{Binding}"
+                                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                           VerticalAlignment="Center"/>
+                                                <Button Command="{Binding #InfoPanelRoot.((vm:InfoPanelViewModel)DataContext).RemoveTagCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Background="Transparent"
+                                                        Padding="2"
+                                                        CornerRadius="8"
+                                                        VerticalAlignment="Center"
+                                                        Cursor="Hand"
+                                                        MinWidth="0" MinHeight="0">
+                                                    <Button.Styles>
+                                                        <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                            <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                                        </Style>
+                                                    </Button.Styles>
+                                                    <TextBlock Text="×"
+                                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                               VerticalAlignment="Center"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- Tag input with autocomplete -->
+                            <AutoCompleteBox x:Name="TagAutoCompleteBox"
+                                             Watermark="Add tag..."
+                                             FilterMode="Contains"
+                                             MinimumPrefixLength="1"
+                                             ItemsSource="{Binding TagSuggestions}"
+                                             Text="{Binding TagInput, Mode=TwoWay}"
+                                             FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                             MaxDropDownHeight="150">
+                                <AutoCompleteBox.Styles>
+                                    <Style Selector="AutoCompleteBox">
+                                        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBrush}"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderSubtleBrush}"/>
+                                        <Setter Property="BorderThickness" Value="1"/>
+                                        <Setter Property="CornerRadius" Value="4"/>
+                                        <Setter Property="Padding" Value="8,5"/>
+                                    </Style>
+                                </AutoCompleteBox.Styles>
+                            </AutoCompleteBox>
+                        </StackPanel>
+
+                        <!-- ═══ Properties Section (collapsible) ═══ -->
+                        <StackPanel Spacing="0" Margin="0,4,0,0" IsVisible="{Binding HasActiveItem}">
+                            <!-- Collapse/expand header with add button -->
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Button Grid.Column="0"
+                                        Command="{Binding TogglePropertiesCommand}"
+                                        Background="Transparent"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left"
+                                        Padding="12,10"
+                                        CornerRadius="0"
+                                        Cursor="Hand">
+                                    <Button.Styles>
+                                        <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                            <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                        </Style>
+                                    </Button.Styles>
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <controls:IconControl x:Name="PropertiesChevron"
+                                                              Icon="ChevronDown"
+                                                              Size="12"
+                                                              StrokeThickness="2"
+                                                              Stroke="{DynamicResource ThemeTextMutedBrush}"
+                                                              VerticalAlignment="Center"/>
+                                        <TextBlock Text="Properties"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <!-- Header action buttons -->
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"
+                                            VerticalAlignment="Center" Margin="0,0,8,0">
+                                    <!-- Apply template button -->
+                                    <Button Command="{Binding ToggleApplyTemplateCommand}"
+                                            Background="Transparent"
+                                            Padding="6"
+                                            CornerRadius="4"
+                                            Cursor="Hand"
+                                            MinWidth="0" MinHeight="0"
+                                            ToolTip.Tip="Apply Template">
+                                        <Button.Styles>
+                                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                            </Style>
+                                        </Button.Styles>
+                                        <controls:IconControl Icon="Layout" Size="12" StrokeThickness="2"
+                                                              Stroke="{DynamicResource ThemeTextMutedBrush}"/>
+                                    </Button>
+                                    <!-- Add property button -->
+                                    <Button Command="{Binding ToggleAddPropertyCommand}"
+                                            Background="Transparent"
+                                            Padding="6"
+                                            CornerRadius="4"
+                                            Cursor="Hand"
+                                            MinWidth="0" MinHeight="0"
+                                            ToolTip.Tip="Add Property">
+                                        <Button.Styles>
+                                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                            </Style>
+                                        </Button.Styles>
+                                        <controls:IconControl Icon="Plus" Size="12" StrokeThickness="2"
+                                                              Stroke="{DynamicResource ThemeTextMutedBrush}"/>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Apply template dropdown -->
+                            <Border IsVisible="{Binding IsApplyTemplateOpen}"
+                                    Margin="12,0,12,4"
+                                    Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                    BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="8">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Apply a template"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                    <ItemsControl ItemsSource="{Binding AvailableTemplates}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="models:PropertyTemplate">
+                                                <Button Command="{Binding #InfoPanelRoot.((vm:InfoPanelViewModel)DataContext).ApplyTemplateCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Background="Transparent"
+                                                        HorizontalAlignment="Stretch"
+                                                        HorizontalContentAlignment="Left"
+                                                        Padding="6,4"
+                                                        CornerRadius="4"
+                                                        Cursor="Hand">
+                                                    <Button.Styles>
+                                                        <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                            <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                                        </Style>
+                                                    </Button.Styles>
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <controls:IconControl Icon="Layout" Size="12" StrokeThickness="1.5"
+                                                                              Stroke="{DynamicResource ThemeTextMutedBrush}"
+                                                                              VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding Name}"
+                                                                   FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                                        <TextBlock Text="{Binding Entries.Count, StringFormat='({0})'}"
+                                                                   FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                                   VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <!-- Empty state -->
+                                    <TextBlock Text="No templates available"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               FontStyle="Italic"
+                                               IsVisible="{Binding !AvailableTemplates.Count}"/>
+
+                                    <Border Height="1"
+                                            Background="{DynamicResource ThemeBorderSubtleBrush}"
+                                            Margin="0,2"/>
+
+                                    <!-- Manage templates link -->
+                                    <Button Command="{Binding OpenTemplateManagerCommand}"
+                                            Background="Transparent"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Left"
+                                            Padding="6,4"
+                                            CornerRadius="4"
+                                            Cursor="Hand">
+                                        <Button.Styles>
+                                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                            </Style>
+                                        </Button.Styles>
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <controls:IconControl Icon="Settings" Size="11" StrokeThickness="1.5"
+                                                                  Stroke="{DynamicResource ThemeTextMutedBrush}"
+                                                                  VerticalAlignment="Center"/>
+                                            <TextBlock Text="Manage Templates..."
+                                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Add property dropdown -->
+                            <Border IsVisible="{Binding IsAddPropertyOpen}"
+                                    Margin="12,0,12,4"
+                                    Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                    BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="8">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Add existing property"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               IsVisible="{Binding AvailablePropertyDefs.Count}"/>
+                                    <ItemsControl ItemsSource="{Binding AvailablePropertyDefs}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="models:PropertyDefinition">
+                                                <Button Command="{Binding #InfoPanelRoot.((vm:InfoPanelViewModel)DataContext).AddPropertyToItemCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Background="Transparent"
+                                                        HorizontalAlignment="Stretch"
+                                                        HorizontalContentAlignment="Left"
+                                                        Padding="6,4"
+                                                        CornerRadius="4"
+                                                        Cursor="Hand">
+                                                    <Button.Styles>
+                                                        <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                            <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                                        </Style>
+                                                    </Button.Styles>
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <Border Height="1"
+                                            Background="{DynamicResource ThemeBorderSubtleBrush}"
+                                            Margin="0,2"/>
+
+                                    <!-- Quick-create new property -->
+                                    <TextBlock Text="Create new property"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,2,0,0">
+                                        <TextBox x:Name="NewPropertyNameBox"
+                                                 Grid.Column="0"
+                                                 Watermark="Property name..."
+                                                 FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                 Background="{DynamicResource ThemeSurfaceBrush}"
+                                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                 BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+                                                 BorderThickness="1"
+                                                 CornerRadius="4"
+                                                 Padding="6,4"/>
+                                        <ComboBox Grid.Column="1"
+                                                  ItemsSource="{Binding AllPropertyTypes}"
+                                                  SelectedItem="{Binding NewPropertyType}"
+                                                  FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                  Background="{DynamicResource ThemeSurfaceBrush}"
+                                                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                  BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+                                                  BorderThickness="1"
+                                                  CornerRadius="4"
+                                                  Padding="4,3"
+                                                  Margin="4,0,0,0"
+                                                  MinWidth="80"
+                                                  MinHeight="0"
+                                                  VerticalAlignment="Center"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Property editors (collapsible, grouped) -->
+                            <StackPanel IsVisible="{Binding IsPropertiesExpanded}"
+                                        Margin="12,0,12,0"
+                                        Spacing="4">
+                                <ItemsControl ItemsSource="{Binding ActiveItemPropertyGroups}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:PropertyGroupViewModel">
+                                            <StackPanel Spacing="2">
+                                                <!-- Group header (hidden for single unnamed group) -->
+                                                <TextBlock Text="{Binding GroupName}"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                           Margin="0,6,0,2"
+                                                           IsVisible="{Binding GroupName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                                <!-- Properties in this group -->
+                                                <ItemsControl ItemsSource="{Binding Properties}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:PropertyValueViewModel">
+                                                            <controls:PropertyEditorControl DataContext="{Binding}"/>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Inline property definition editor -->
+                                <Border IsVisible="{Binding EditingPropertyDef, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                        Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                        BorderBrush="{DynamicResource ThemePrimaryBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="10"
+                                        Margin="0,4">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="Edit Property Definition"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                        <!-- Name -->
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Name"
+                                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                            <TextBox Text="{Binding EditingDefName, Mode=TwoWay}"
+                                                     FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                     Background="{DynamicResource ThemeSurfaceBrush}"
+                                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                     BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+                                                     BorderThickness="1"
+                                                     CornerRadius="4"
+                                                     Padding="6,4"/>
+                                        </StackPanel>
+                                        <!-- Type -->
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Type"
+                                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                            <ComboBox ItemsSource="{Binding AllPropertyTypes}"
+                                                      SelectedItem="{Binding EditingDefType}"
+                                                      FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                      Background="{DynamicResource ThemeSurfaceBrush}"
+                                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                      BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+                                                      BorderThickness="1"
+                                                      CornerRadius="4"
+                                                      Padding="6,4"
+                                                      HorizontalAlignment="Stretch"/>
+                                        </StackPanel>
+                                        <!-- Options (for Select/MultiSelect) -->
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Options (comma-separated)"
+                                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                            <TextBox Text="{Binding EditingDefOptions, Mode=TwoWay}"
+                                                     Watermark="Option1, Option2, Option3"
+                                                     FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                     Background="{DynamicResource ThemeSurfaceBrush}"
+                                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                     BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+                                                     BorderThickness="1"
+                                                     CornerRadius="4"
+                                                     Padding="6,4"/>
+                                        </StackPanel>
+                                        <!-- Action buttons -->
+                                        <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                                            <Button Content="Cancel"
+                                                    Command="{Binding CancelEditPropertyDefinitionCommand}"
+                                                    Background="Transparent"
+                                                    Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                    Padding="10,5"
+                                                    CornerRadius="4"
+                                                    FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                    Cursor="Hand">
+                                                <Button.Styles>
+                                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                                    </Style>
+                                                </Button.Styles>
+                                            </Button>
+                                            <Button Content="Save"
+                                                    Command="{Binding SavePropertyDefinitionCommand}"
+                                                    Background="{DynamicResource ThemePrimaryBrush}"
+                                                    Foreground="White"
+                                                    Padding="10,5"
+                                                    CornerRadius="4"
+                                                    FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                    Cursor="Hand">
+                                                <Button.Styles>
+                                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                        <Setter Property="Opacity" Value="0.9"/>
+                                                    </Style>
+                                                </Button.Styles>
+                                            </Button>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Empty state for properties -->
+                                <TextBlock Text="No properties set"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           FontStyle="Italic"
+                                           Margin="0,2,0,4"
+                                           IsVisible="{Binding !ActiveItemProperties.Count}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- ═══ Separator ═══ -->
+                        <Border Height="1"
+                                Background="{DynamicResource ThemeBorderSubtleBrush}"
+                                Margin="12,8,12,0"
+                                IsVisible="{Binding HasActiveItem}"/>
+
+                        <!-- ═══ Links Section (forward/outgoing links, collapsible) ═══ -->
+                        <StackPanel Spacing="0" Margin="0,0,0,0" IsVisible="{Binding HasActiveItem}">
+                            <!-- Collapse/expand header -->
+                            <Button Command="{Binding ToggleLinksCommand}"
+                                    Background="Transparent"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Left"
+                                    Padding="12,10"
+                                    CornerRadius="0"
+                                    Cursor="Hand">
+                                <Button.Styles>
+                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                    </Style>
+                                </Button.Styles>
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <controls:IconControl x:Name="LinksChevron"
+                                                          Icon="ChevronDown"
+                                                          Size="12"
+                                                          StrokeThickness="2"
+                                                          Stroke="{DynamicResource ThemeTextMutedBrush}"
+                                                          VerticalAlignment="Center"/>
+                                    <TextBlock Text="Links"
+                                               FontWeight="SemiBold"
+                                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding ForwardLinkCountText}"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding HasForwardLinks}"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Forward links list (collapsible) -->
+                            <StackPanel IsVisible="{Binding IsLinksExpanded}"
+                                        Margin="4,0">
+                                <!-- No forward links message -->
+                                <Border Padding="12,8"
+                                        IsVisible="{Binding !HasForwardLinks}">
+                                    <TextBlock Text="No links found"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               FontStyle="Italic"/>
+                                </Border>
+
+                                <!-- Forward links list -->
+                                <ItemsControl ItemsSource="{Binding ForwardLinks}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="services:BacklinkEntry">
+                                            <Button Command="{Binding #InfoPanelRoot.((vm:InfoPanelViewModel)DataContext).NavigateToForwardLinkCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Background="Transparent"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Left"
+                                                    Padding="8,6"
+                                                    CornerRadius="4"
+                                                    Margin="0,1">
+                                                <Button.Styles>
+                                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                                    </Style>
+                                                </Button.Styles>
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <!-- Type Icon -->
+                                                    <controls:IconControl Grid.Column="0"
+                                                                          Icon="{Binding SourceIcon}"
+                                                                          Size="16"
+                                                                          StrokeThickness="1.5"
+                                                                          Stroke="{DynamicResource ThemeTextMutedBrush}"
+                                                                          VerticalAlignment="Center"
+                                                                          Margin="0,0,8,0"/>
+                                                    <!-- Title -->
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding SourceTitle}"
+                                                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               MaxLines="1"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                                    <!-- Modified timestamp -->
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{Binding ModifiedAt, Converter={x:Static converters:UtcToLocalConverter.Instance}, StringFormat='{}{0:MMM d}'}"
+                                                               IsVisible="{Binding ModifiedAt, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                               VerticalAlignment="Center"
+                                                               Margin="8,0,0,0"/>
+                                                </Grid>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- ═══ Backlinks Section (collapsible) ═══ -->
+                        <StackPanel Spacing="0" Margin="0,0,0,8" IsVisible="{Binding HasActiveItem}">
+                            <!-- Collapse/expand header -->
+                            <Button Command="{Binding ToggleBacklinksCommand}"
+                                    Background="Transparent"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Left"
+                                    Padding="12,10"
+                                    CornerRadius="0"
+                                    Cursor="Hand">
+                                <Button.Styles>
+                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                    </Style>
+                                </Button.Styles>
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <controls:IconControl x:Name="BacklinksChevron"
+                                                          Icon="ChevronDown"
+                                                          Size="12"
+                                                          StrokeThickness="2"
+                                                          Stroke="{DynamicResource ThemeTextMutedBrush}"
+                                                          VerticalAlignment="Center"/>
+                                    <TextBlock Text="Backlinks"
+                                               FontWeight="SemiBold"
+                                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding BacklinkCountText}"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding HasBacklinks}"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Backlinks list (collapsible) -->
+                            <StackPanel x:Name="BacklinksContent"
+                                        IsVisible="{Binding IsBacklinksExpanded}"
+                                        Margin="4,0">
+                                <!-- No backlinks message -->
+                                <Border x:Name="NoBacklinksMessage"
+                                        Padding="12,8"
+                                        IsVisible="False">
+                                    <TextBlock Text="No backlinks found"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               FontStyle="Italic"/>
+                                </Border>
+
+                                <!-- Backlinks list -->
+                                <ItemsControl ItemsSource="{Binding Backlinks}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="services:BacklinkEntry">
+                                            <Button Command="{Binding #InfoPanelRoot.((vm:InfoPanelViewModel)DataContext).NavigateToBacklinkCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Background="Transparent"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Left"
+                                                    Padding="8,6"
+                                                    CornerRadius="4"
+                                                    Margin="0,1">
+                                                <Button.Styles>
+                                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                                    </Style>
+                                                </Button.Styles>
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <!-- Type Icon -->
+                                                    <controls:IconControl Grid.Column="0"
+                                                                          Icon="{Binding SourceIcon}"
+                                                                          Size="16"
+                                                                          StrokeThickness="1.5"
+                                                                          Stroke="{DynamicResource ThemeTextMutedBrush}"
+                                                                          VerticalAlignment="Center"
+                                                                          Margin="0,0,8,0"/>
+                                                    <!-- Title -->
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding SourceTitle}"
+                                                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               MaxLines="1"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                                    <!-- Modified timestamp -->
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{Binding ModifiedAt, Converter={x:Static converters:UtcToLocalConverter.Instance}, StringFormat='{}{0:MMM d}'}"
+                                                               IsVisible="{Binding ModifiedAt, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                               VerticalAlignment="Center"
+                                                               Margin="8,0,0,0"/>
+                                                </Grid>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Graph tab content -->
+                <Panel x:Name="GraphPanelHost">
+                    <!-- NeuronGraphControl container (added via code-behind) -->
+                    <Border x:Name="GraphPanel" Padding="0"/>
+
+                    <!-- Settings cog button (bottom-left) -->
+                    <Button x:Name="GraphSettingsButton"
+                            HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                            Margin="8,0,0,8" Padding="6" CornerRadius="6"
+                            Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                            Opacity="0.85" Cursor="Hand"
+                            Command="{Binding ToggleGraphSettingsCommand}">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                <Setter Property="Opacity" Value="1"/>
+                            </Style>
+                        </Button.Styles>
+                        <controls:IconControl Icon="Settings" Size="16" StrokeThickness="1.5"
+                                              Stroke="{DynamicResource ThemeTextMutedBrush}"/>
+                    </Button>
+
+                    <!-- Settings overlay (slides up from bottom-left) -->
+                    <Border x:Name="GraphSettingsOverlay"
+                            IsVisible="{Binding IsGraphSettingsOpen}"
+                            HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                            Margin="8,0,0,40" MaxWidth="240"
+                            Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                            BorderBrush="{DynamicResource ThemeBorderBrush}"
+                            BorderThickness="1" CornerRadius="8" Padding="12"
+                            BoxShadow="0 -2 8 0 #30000000">
+                        <StackPanel Spacing="12">
+                            <!-- Depth control -->
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Depth" FontWeight="SemiBold"
+                                           FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <Slider Minimum="1" Maximum="5"
+                                            TickFrequency="1" IsSnapToTickEnabled="True"
+                                            Value="{Binding GraphDepth}"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding GraphDepth}"
+                                               Margin="8,0,0,0"
+                                               VerticalAlignment="Center"
+                                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Link type filters -->
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Show types" FontWeight="SemiBold"
+                                           FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                <ItemsControl ItemsSource="{Binding GraphLinkTypeFilters}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:GraphLinkTypeFilter">
+                                            <CheckBox IsChecked="{Binding IsEnabled}"
+                                                      Margin="0,2,8,2"
+                                                      Cursor="Hand">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <controls:IconControl Icon="{Binding Icon}" Size="12"
+                                                                          StrokeThickness="1.5"
+                                                                          Stroke="{DynamicResource ThemeTextMutedBrush}"/>
+                                                    <TextBlock Text="{Binding DisplayName}"
+                                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </CheckBox>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Panel>
+            </Panel>
+        </Grid>
+    </Border>
+</UserControl>

@@ -1,0 +1,288 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PrivStack.Desktop.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="600"
+             x:Class="PrivStack.Desktop.Views.SyncPairingView"
+             x:DataType="vm:SyncPairingViewModel">
+
+    <Border Padding="16">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+            <!-- Header -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,16">
+                <TextBlock Text="Sync Pairing" FontSize="{DynamicResource ThemeFontSizeXl}" FontWeight="Bold"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                <TextBlock Text="{Binding StatusMessage}" FontSize="{DynamicResource ThemeFontSizeSm}"
+                           Foreground="{DynamicResource ThemeTextMutedBrush}" Margin="0,4,0,0"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <!-- Error Message -->
+            <Border Grid.Row="1" Background="{DynamicResource ThemeDangerBrush}" CornerRadius="6" Padding="12"
+                    Margin="0,0,0,12" Opacity="0.9"
+                    IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="White" FontSize="{DynamicResource ThemeFontSizeSm}" TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- Content Area -->
+            <ScrollViewer Grid.Row="2">
+                <StackPanel Spacing="16">
+                    <!-- ============================================================ -->
+                    <!-- STEP 1: Enter/Generate Code -->
+                    <!-- ============================================================ -->
+                    <StackPanel IsVisible="{Binding IsCodeStep}" Spacing="16">
+                        <!-- Device Name -->
+                        <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="8" Padding="12">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Your Device Name" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBox Grid.Column="0" Text="{Binding DeviceName}"
+                                             Watermark="e.g., Steven's MacBook"
+                                             Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                             BorderThickness="0" Padding="10,8" CornerRadius="4"/>
+                                    <Button Grid.Column="1" Content="Save" Command="{Binding SaveDeviceNameCommand}"
+                                            Background="{DynamicResource ThemePrimaryBrush}"
+                                            Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                            Padding="12,8" Margin="8,0,0,0" CornerRadius="4"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Generate New Code -->
+                        <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Create Sync Group" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                <TextBlock Text="Generate a code and share it with your other device"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           TextWrapping="Wrap"/>
+
+                                <!-- Current Code Display -->
+                                <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                        CornerRadius="6" Padding="16,12"
+                                        IsVisible="{Binding HasSyncCode}">
+                                    <StackPanel HorizontalAlignment="Center" Spacing="4">
+                                        <TextBlock Text="Your Sync Code" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding SyncCodeDisplay}"
+                                                   FontSize="{DynamicResource ThemeFontSizeLg}" FontWeight="Bold" FontFamily="monospace"
+                                                   Foreground="{DynamicResource ThemePrimaryBrush}"
+                                                   HorizontalAlignment="Center" TextAlignment="Center"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                    <Button Content="Generate Code" Command="{Binding GenerateCodeCommand}"
+                                            Background="{DynamicResource ThemePrimaryBrush}"
+                                            Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                            Padding="16,10" CornerRadius="6"/>
+                                    <Button Content="Start Pairing" Command="{Binding StartDiscoveryCommand}"
+                                            IsVisible="{Binding HasSyncCode}"
+                                            Background="{DynamicResource ThemeSuccessBrush}"
+                                            Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                            Padding="16,10" CornerRadius="6"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Join Existing Code -->
+                        <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Join Existing Sync Group" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                <TextBlock Text="Enter the code from your other device"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+
+                                <TextBox Text="{Binding SyncCodeInput}"
+                                         Watermark="WORD-WORD-WORD-WORD"
+                                         Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                         BorderThickness="0" Padding="12,10" CornerRadius="6"
+                                         FontFamily="monospace" FontSize="{DynamicResource ThemeFontSizeMd}"
+                                         HorizontalContentAlignment="Center"/>
+
+                                <Button Content="Join" Command="{Binding JoinWithCodeCommand}"
+                                        HorizontalAlignment="Stretch"
+                                        Background="{DynamicResource ThemeSuccessBrush}"
+                                        Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                        Padding="12,10" CornerRadius="6"
+                                        HorizontalContentAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- View Trusted Peers -->
+                        <Button Content="View Trusted Devices" Command="{Binding ShowTrustedPeersCommand}"
+                                HorizontalAlignment="Stretch"
+                                Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                Padding="12,10" CornerRadius="6"
+                                HorizontalContentAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- ============================================================ -->
+                    <!-- STEP 2: Discovery & Approval -->
+                    <!-- ============================================================ -->
+                    <StackPanel IsVisible="{Binding IsDiscoveryStep}" Spacing="16">
+                        <!-- Current Code -->
+                        <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="8" Padding="12">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel>
+                                    <TextBlock Text="Sync Code" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                    <TextBlock Text="{Binding SyncCodeDisplay}"
+                                               FontWeight="Bold" FontFamily="monospace"
+                                               Foreground="{DynamicResource ThemePrimaryBrush}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Change" Command="{Binding ClearCodeCommand}"
+                                        Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                        Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                        Padding="12,6" CornerRadius="4" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Discovered Peers List -->
+                        <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="8" Padding="12">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Discovered Devices" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+                                <!-- Empty State -->
+                                <StackPanel IsVisible="{Binding !DiscoveredPeers.Count}" HorizontalAlignment="Center"
+                                            Margin="0,20">
+                                    <TextBlock Text="Searching..." FontSize="{DynamicResource ThemeFontSizeMd}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Make sure your other device has the same sync code"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               HorizontalAlignment="Center" TextWrapping="Wrap"
+                                               TextAlignment="Center" Margin="0,8,0,0"/>
+                                </StackPanel>
+
+                                <!-- Peers List -->
+                                <ItemsControl ItemsSource="{Binding DiscoveredPeers}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                                    CornerRadius="6" Padding="12" Margin="0,4">
+                                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                                    <StackPanel Grid.Column="0">
+                                                        <TextBlock Text="{Binding DeviceName}"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                                        <TextBlock Text="{Binding ShortPeerId}"
+                                                                   FontSize="{DynamicResource ThemeFontSizeXs}" FontFamily="monospace"
+                                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                                    </StackPanel>
+                                                    <Button Grid.Column="1" Content="Approve"
+                                                            Command="{Binding $parent[ItemsControl].((vm:SyncPairingViewModel)DataContext).ApprovePeerCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            Background="{DynamicResource ThemeSuccessBrush}"
+                                                            Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                                            Padding="12,6" Margin="8,0" CornerRadius="4"/>
+                                                    <Button Grid.Column="2" Content="Reject"
+                                                            Command="{Binding $parent[ItemsControl].((vm:SyncPairingViewModel)DataContext).RejectPeerCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            Background="{DynamicResource ThemeDangerBrush}"
+                                                            Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                                            Padding="12,6" CornerRadius="4"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Back Button -->
+                        <Button Content="Back" Command="{Binding BackToCodeCommand}"
+                                HorizontalAlignment="Left"
+                                Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                Padding="16,8" CornerRadius="4"/>
+                    </StackPanel>
+
+                    <!-- ============================================================ -->
+                    <!-- STEP 3: Trusted Peers -->
+                    <!-- ============================================================ -->
+                    <StackPanel IsVisible="{Binding IsTrustedStep}" Spacing="16">
+                        <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="8" Padding="12">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Trusted Devices" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                <TextBlock Text="These devices will sync automatically"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+
+                                <!-- Empty State -->
+                                <StackPanel IsVisible="{Binding !TrustedPeers.Count}" HorizontalAlignment="Center"
+                                            Margin="0,20">
+                                    <TextBlock Text="No trusted devices yet"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Pair a device using a sync code"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                </StackPanel>
+
+                                <!-- Trusted Peers List -->
+                                <ItemsControl ItemsSource="{Binding TrustedPeers}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                                    CornerRadius="6" Padding="12" Margin="0,4">
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <!-- Online Indicator -->
+                                                    <Border Grid.Column="0" Width="8" Height="8" CornerRadius="4"
+                                                            Margin="0,0,12,0" VerticalAlignment="Center"
+                                                            Background="{DynamicResource ThemeSuccessBrush}"/>
+
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBlock Text="{Binding DeviceName}"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                                            <TextBlock Text="{Binding ShortPeerId}"
+                                                                       FontSize="{DynamicResource ThemeFontSizeXs}" FontFamily="monospace"
+                                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                                            <TextBlock FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                       Foreground="{DynamicResource ThemeTextMutedBrush}">
+                                                                <TextBlock.Text>
+                                                                    <MultiBinding StringFormat="Last sync: {0}">
+                                                                        <Binding Path="LastSyncedDisplay"/>
+                                                                    </MultiBinding>
+                                                                </TextBlock.Text>
+                                                            </TextBlock>
+                                                        </StackPanel>
+                                                    </StackPanel>
+
+                                                    <Button Grid.Column="2" Content="Remove"
+                                                            Command="{Binding $parent[ItemsControl].((vm:SyncPairingViewModel)DataContext).RemoveTrustedPeerCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                                            Foreground="{DynamicResource ThemeDangerBrush}"
+                                                            Padding="12,6" CornerRadius="4"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Back Button -->
+                        <Button Content="Back" Command="{Binding BackToCodeCommand}"
+                                HorizontalAlignment="Left"
+                                Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                Padding="16,8" CornerRadius="4"/>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>

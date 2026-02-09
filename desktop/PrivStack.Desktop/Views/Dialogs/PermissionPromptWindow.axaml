@@ -1,0 +1,53 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        x:Class="PrivStack.Desktop.Views.Dialogs.PermissionPromptWindow"
+        Title="Permission Request"
+        Width="460" Height="280"
+        MinWidth="400" MinHeight="260"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        SystemDecorations="Full"
+        Background="{DynamicResource ThemeBorderBrush}">
+
+    <StackPanel Spacing="16" Margin="24">
+        <TextBlock Text="Permission Request"
+                   FontSize="{DynamicResource ThemeFontSizeXl}"
+                   FontWeight="Bold"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+        <StackPanel Spacing="4">
+            <TextBlock x:Name="PluginNameText" Text="Plugin"
+                       FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                       FontWeight="Bold"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+            <TextBlock x:Name="CapabilityText" Text="Capability"
+                       FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+            <TextBlock x:Name="DescriptionText" Text="Description"
+                       FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                       TextWrapping="Wrap"
+                       Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <CheckBox x:Name="RememberCheckbox" Content="Remember this choice"
+                  Foreground="{DynamicResource ThemeTextMutedBrush}"
+                  FontSize="{DynamicResource ThemeFontSizeSmMd}"/>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,4,0,0">
+            <Button Content="Deny" Click="OnDeny"
+                    Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    Padding="16,10" CornerRadius="6"/>
+            <Button Content="Allow" Click="OnAllow"
+                    Background="{DynamicResource ThemeAccentBrush}"
+                    Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                    Padding="16,10" CornerRadius="6" FontWeight="SemiBold"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

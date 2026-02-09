@@ -1,0 +1,83 @@
+package privstack:plugin@0.1.0;
+
+/// Core SDK operations — always granted (Tier 1).
+/// CRUD scoped to the plugin's declared entity types only.
+interface sdk {
+    use types.{sdk-message, sdk-response};
+
+    send: func(message: sdk-message) -> sdk-response;
+    search: func(query: string, entity-types: option<list<string>>, limit: u32) -> sdk-response;
+}
+
+/// Encrypted vault operations — Tier 2 (JIT prompted).
+interface vault {
+    is-initialized: func(vault-id: string) -> bool;
+    initialize: func(vault-id: string, password: string);
+    unlock: func(vault-id: string, password: string);
+    lock: func(vault-id: string);
+    blob-store: func(vault-id: string, blob-id: string, data: list<u8>);
+    blob-read: func(vault-id: string, blob-id: string) -> list<u8>;
+    blob-delete: func(vault-id: string, blob-id: string);
+}
+
+/// Plugin-scoped settings — always granted (Tier 1).
+interface settings {
+    get: func(key: string, default-value: string) -> string;
+    set: func(key: string, value: string);
+    remove: func(key: string);
+}
+
+/// Structured logging with plugin context — always granted (Tier 1).
+interface logger {
+    debug: func(message: string);
+    info: func(message: string);
+    warn: func(message: string);
+    error: func(message: string);
+}
+
+/// Navigation between plugins — always granted (Tier 1).
+interface navigation {
+    navigate-to: func(plugin-id: string);
+    navigate-back: func();
+}
+
+/// Cross-plugin item linking — Tier 2 (JIT prompted).
+interface linking {
+    use types.{linkable-item, link-provider-info};
+
+    search-items: func(query: string, max-results: u32) -> list<linkable-item>;
+    get-item-by-id: func(item-id: string) -> option<linkable-item>;
+    get-all-providers: func() -> list<link-provider-info>;
+    query-all: func(query: string, max-results: u32) -> list<linkable-item>;
+}
+
+/// Dialog prompts — Tier 2 (JIT prompted).
+interface dialogs {
+    show-confirmation: func(title: string, message: string) -> bool;
+    show-open-file: func(title: string, filters: list<string>) -> option<string>;
+}
+
+/// Notify the host that plugin state changed (for ViewModelProxy).
+interface state-notify {
+    /// Notify host that view state has changed. Optional JSON Patch payload
+    /// for incremental updates instead of full state re-fetch.
+    notify-state-changed: func(json-patch: option<string>);
+}
+
+/// HTTP network access — Tier 3 (install-time permission).
+/// Host performs the actual request; plugin receives the response.
+interface network {
+    record http-header {
+        name: string,
+        value: string,
+    }
+
+    record http-response {
+        status: u16,
+        headers: list<http-header>,
+        body: list<u8>,
+    }
+
+    /// Fetch a URL. Host checks Permission::Network before executing.
+    fetch-url: func(url: string, method: string, headers: list<http-header>, body: option<list<u8>>) -> result<http-response, string>;
+}

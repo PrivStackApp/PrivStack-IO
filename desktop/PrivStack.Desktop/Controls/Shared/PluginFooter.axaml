@@ -1,0 +1,96 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="32"
+             x:Class="PrivStack.Desktop.Controls.Shared.PluginFooter"
+             x:Name="FooterRoot">
+
+    <Border Background="{DynamicResource ThemeSurfaceBrush}"
+            BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+            BorderThickness="0,1,0,0"
+            Padding="16,8"
+            IsVisible="{Binding IsVisible, ElementName=FooterRoot}">
+        <Grid ColumnDefinitions="*,Auto,Auto">
+            <!-- Left Section: Stats/Info -->
+            <StackPanel Grid.Column="0"
+                        Orientation="Horizontal"
+                        Spacing="16"
+                        VerticalAlignment="Center">
+                <!-- Primary stat -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="6"
+                            IsVisible="{Binding PrimaryLabel, ElementName=FooterRoot, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="{Binding PrimaryLabel, ElementName=FooterRoot}"
+                               FontSize="{DynamicResource ThemeFontSizeSm}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding PrimaryValue, ElementName=FooterRoot}"
+                               FontSize="{DynamicResource ThemeFontSizeSm}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Secondary stat -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="6"
+                            IsVisible="{Binding SecondaryLabel, ElementName=FooterRoot, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <Border Width="1"
+                            Height="12"
+                            Background="{DynamicResource ThemeBorderSubtleBrush}"
+                            VerticalAlignment="Center"
+                            Margin="0,0,8,0"/>
+                    <TextBlock Text="{Binding SecondaryLabel, ElementName=FooterRoot}"
+                               FontSize="{DynamicResource ThemeFontSizeSm}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding SecondaryValue, ElementName=FooterRoot}"
+                               FontSize="{DynamicResource ThemeFontSizeSm}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Custom left content -->
+                <ContentPresenter Content="{Binding LeftContent, ElementName=FooterRoot}"
+                                  VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Center Section: Status indicator -->
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="6"
+                        VerticalAlignment="Center"
+                        Margin="16,0"
+                        IsVisible="{Binding StatusText, ElementName=FooterRoot, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <Border Width="6"
+                        Height="6"
+                        CornerRadius="3"
+                        Background="{Binding StatusColor, ElementName=FooterRoot, FallbackValue={DynamicResource ThemeSuccessBrush}}"
+                        VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding StatusText, ElementName=FooterRoot}"
+                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Right Section: Timestamp/Actions -->
+            <StackPanel Grid.Column="2"
+                        Orientation="Horizontal"
+                        Spacing="12"
+                        VerticalAlignment="Center">
+                <!-- Timestamp -->
+                <TextBlock Text="{Binding Timestamp, ElementName=FooterRoot}"
+                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                           VerticalAlignment="Center"
+                           IsVisible="{Binding Timestamp, ElementName=FooterRoot, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                <!-- Custom right content -->
+                <ContentPresenter Content="{Binding RightContent, ElementName=FooterRoot}"
+                                  VerticalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

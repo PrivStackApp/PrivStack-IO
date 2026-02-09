@@ -1,0 +1,140 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PrivStack.Desktop.ViewModels"
+             xmlns:views="using:PrivStack.Desktop.Views"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="600"
+             x:Class="PrivStack.Desktop.Views.SyncPanel"
+             x:DataType="vm:SyncViewModel">
+
+    <Border Background="{DynamicResource ThemeBorderBrush}" Padding="0" CornerRadius="8">
+        <Grid RowDefinitions="Auto,*">
+            <!-- Tab Header -->
+            <Border Grid.Row="0" Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="8,8,0,0">
+                <Grid ColumnDefinitions="*,*" Margin="4">
+                    <Button Grid.Column="0" Content="Status"
+                            Command="{Binding ShowStatusTabCommand}"
+                            Background="{Binding IsStatusTab, Converter={StaticResource BoolToColorConverter}, ConverterParameter='ThemePrimary|Transparent'}"
+                            Foreground="{Binding IsStatusTab, Converter={StaticResource BoolToColorConverter}, ConverterParameter='ThemeBorder|ThemeTextPrimary'}"
+                            HorizontalAlignment="Stretch" Padding="16,10" Margin="2"
+                            CornerRadius="6" HorizontalContentAlignment="Center"/>
+                    <Button Grid.Column="1" Content="Pairing"
+                            Command="{Binding ShowPairingTabCommand}"
+                            Background="{Binding IsPairingTab, Converter={StaticResource BoolToColorConverter}, ConverterParameter='ThemePrimary|Transparent'}"
+                            Foreground="{Binding IsPairingTab, Converter={StaticResource BoolToColorConverter}, ConverterParameter='ThemeBorder|ThemeTextPrimary'}"
+                            HorizontalAlignment="Stretch" Padding="16,10" Margin="2"
+                            CornerRadius="6" HorizontalContentAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- Tab Content -->
+            <Grid Grid.Row="1">
+                <!-- Status Tab Content -->
+                <Border Padding="16" IsVisible="{Binding IsStatusTab}">
+                    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+                        <!-- Header -->
+                        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+                            <TextBlock Text="P2P Sync Status" FontSize="{DynamicResource ThemeFontSizeLgXl}" FontWeight="Bold" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                            <TextBlock Text="{Binding StatusMessage}" FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeTextMutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <!-- Local Peer Info -->
+                        <Border Grid.Row="1" Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="Your Device" FontWeight="SemiBold" Foreground="{DynamicResource ThemePrimaryBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding ShortPeerId}" Foreground="{DynamicResource ThemeTextPrimaryBrush}" FontFamily="monospace" FontSize="{DynamicResource ThemeFontSizeSm}" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Sync Status -->
+                        <Border Grid.Row="2" Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="6" Padding="12" Margin="0,0,0,12">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel>
+                                    <TextBlock Text="Status" FontWeight="SemiBold" Foreground="{DynamicResource ThemePrimaryBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}" Margin="0,0,0,4"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Border Width="8" Height="8" CornerRadius="4"
+                                                Background="{Binding StatusIndicatorColor}"/>
+                                        <TextBlock Text="{Binding SyncStatusText}" Foreground="{DynamicResource ThemeTextPrimaryBrush}" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                    <TextBlock Foreground="{DynamicResource ThemeSuccessBrush}" FontSize="{DynamicResource ThemeFontSizeXl}" FontWeight="Bold"
+                                               HorizontalAlignment="Center">
+                                        <TextBlock.Text>
+                                            <MultiBinding StringFormat="{}{0}">
+                                                <Binding Path="TrustedPeerCount"/>
+                                            </MultiBinding>
+                                        </TextBlock.Text>
+                                    </TextBlock>
+                                    <TextBlock Text="Trusted" FontSize="{DynamicResource ThemeFontSizeXs}" Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Connected Trusted Peers List -->
+                        <Border Grid.Row="3" Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="6" Padding="8">
+                            <Grid RowDefinitions="Auto,*">
+                                <TextBlock Grid.Row="0" Text="Connected Devices" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource ThemePrimaryBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}" Margin="4,0,0,8"/>
+
+                                <ItemsControl Grid.Row="1" ItemsSource="{Binding ConnectedTrustedPeers}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Padding="8,6" Margin="0,2" Background="{DynamicResource ThemeSurfaceElevatedBrush}" CornerRadius="4">
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <Border Grid.Column="0" Width="8" Height="8" CornerRadius="4" Margin="0,0,8,0"
+                                                            Background="{DynamicResource ThemeSuccessBrush}"/>
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBlock Text="{Binding DeviceName}"
+                                                                   FontWeight="SemiBold" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                                   FontSize="{DynamicResource ThemeFontSizeSm}" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding ShortPeerId}"
+                                                                   FontSize="{DynamicResource ThemeFontSizeXs}" FontFamily="monospace"
+                                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="2" Text="{Binding LastSyncedDisplay}"
+                                                               FontSize="{DynamicResource ThemeFontSizeXs}" Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                               VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- No Peers State -->
+                                <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            IsVisible="{Binding !TrustedPeerCount}">
+                                    <TextBlock Text="No trusted devices" FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               HorizontalAlignment="Center" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Go to Pairing tab to add devices"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}" Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               HorizontalAlignment="Center" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Action Buttons -->
+                        <StackPanel Grid.Row="4" Margin="0,12,0,0" Spacing="8">
+                            <Button Command="{Binding ToggleSyncCommand}"
+                                    Content="{Binding SyncButtonText}"
+                                    Background="{DynamicResource ThemeSuccessBrush}" Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                    HorizontalAlignment="Stretch" Padding="12,10" CornerRadius="4"
+                                    HorizontalContentAlignment="Center"/>
+                            <Button Content="Refresh" Command="{Binding RefreshStatusCommand}"
+                                    Background="{DynamicResource ThemeSurfaceElevatedBrush}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                    HorizontalAlignment="Stretch" Padding="12,8" CornerRadius="4"
+                                    HorizontalContentAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Pairing Tab Content -->
+                <Border IsVisible="{Binding IsPairingTab}">
+                    <views:SyncPairingView DataContext="{Binding PairingViewModel}"/>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

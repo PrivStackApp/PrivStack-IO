@@ -1,0 +1,167 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:PrivStack.Desktop.Controls"
+             xmlns:ae="using:AvaloniaEdit"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="PrivStack.Desktop.Controls.MarkdownEditor"
+             x:DataType="controls:MarkdownEditor"
+             Name="Root">
+
+    <UserControl.Resources>
+        <!-- Toolbar button style -->
+        <ControlTheme x:Key="ToolbarButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="MinWidth" Value="32"/>
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="FontFamily" Value="Segoe UI Symbol, Segoe UI, sans-serif"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover">
+                <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed">
+                <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+            </Style>
+        </ControlTheme>
+    </UserControl.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Toolbar - only visible when editing -->
+        <Border Grid.Row="0"
+                Padding="8,4"
+                Background="{DynamicResource ThemeSurfaceBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="0,0,0,1"
+                IsVisible="{Binding IsEditing, ElementName=Root}">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+                <!-- Text Formatting -->
+                <Button Theme="{StaticResource ToolbarButton}"
+                        Content="B" FontWeight="Bold"
+                        ToolTip.Tip="Bold (Ctrl+B)"
+                        Click="OnBoldClick"/>
+                <Button Theme="{StaticResource ToolbarButton}"
+                        Content="I" FontStyle="Italic"
+                        ToolTip.Tip="Italic (Ctrl+I)"
+                        Click="OnItalicClick"/>
+                <Button Theme="{StaticResource ToolbarButton}"
+                        ToolTip.Tip="Strikethrough"
+                        Click="OnStrikethroughClick">
+                    <TextBlock Text="S" TextDecorations="Strikethrough"/>
+                </Button>
+                <Button Theme="{StaticResource ToolbarButton}"
+                        Content="`" FontFamily="Consolas, monospace" FontSize="{DynamicResource ThemeFontSizeMd}"
+                        ToolTip.Tip="Inline Code"
+                        Click="OnInlineCodeClick"/>
+
+                <Border Width="1" Background="{DynamicResource ThemeBorderBrush}"
+                        Margin="6,4" VerticalAlignment="Stretch"/>
+
+                <!-- Headings -->
+                <Button Theme="{StaticResource ToolbarButton}"
+                        Content="H1" FontWeight="Bold" FontSize="{DynamicResource ThemeFontSizeSm}"
+                        ToolTip.Tip="Heading 1"
+                        Click="OnHeading1Click"/>
+                <Button Theme="{StaticResource ToolbarButton}"
+                        Content="H2" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                        ToolTip.Tip="Heading 2"
+                        Click="OnHeading2Click"/>
+                <Button Theme="{StaticResource ToolbarButton}"
+                        Content="H3" FontSize="{DynamicResource ThemeFontSizeXs}"
+                        ToolTip.Tip="Heading 3"
+                        Click="OnHeading3Click"/>
+
+                <Border Width="1" Background="{DynamicResource ThemeBorderBrush}"
+                        Margin="6,4" VerticalAlignment="Stretch"/>
+
+                <!-- Lists -->
+                <Button Theme="{StaticResource ToolbarButton}"
+                        ToolTip.Tip="Bullet List"
+                        Click="OnBulletListClick">
+                    <TextBlock Text="*" FontSize="{DynamicResource ThemeFontSizeLg}" FontWeight="Bold"/>
+                </Button>
+                <Button Theme="{StaticResource ToolbarButton}"
+                        ToolTip.Tip="Numbered List"
+                        Click="OnNumberedListClick">
+                    <TextBlock Text="1." FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                </Button>
+                <Button Theme="{StaticResource ToolbarButton}"
+                        ToolTip.Tip="Task List"
+                        Click="OnTaskListClick">
+                    <TextBlock Text="[]" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                </Button>
+
+                <Border Width="1" Background="{DynamicResource ThemeBorderBrush}"
+                        Margin="6,4" VerticalAlignment="Stretch"/>
+
+                <!-- Insert -->
+                <Button Theme="{StaticResource ToolbarButton}"
+                        ToolTip.Tip="Insert Link (Ctrl+K)"
+                        Click="OnLinkClick">
+                    <TextBlock Text="Link" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                </Button>
+                <Button Theme="{StaticResource ToolbarButton}"
+                        ToolTip.Tip="Insert Image"
+                        Click="OnImageClick">
+                    <TextBlock Text="Img" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                </Button>
+                <Button Theme="{StaticResource ToolbarButton}"
+                        ToolTip.Tip="Code Block"
+                        Click="OnCodeBlockClick">
+                    <TextBlock Text="{}{}" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                </Button>
+                <Button Theme="{StaticResource ToolbarButton}"
+                        ToolTip.Tip="Blockquote"
+                        Click="OnBlockquoteClick">
+                    <TextBlock Text=">" FontSize="{DynamicResource ThemeFontSizeMd}" FontWeight="Bold"/>
+                </Button>
+                <Button Theme="{StaticResource ToolbarButton}"
+                        ToolTip.Tip="Horizontal Rule"
+                        Click="OnHorizontalRuleClick">
+                    <TextBlock Text="---" FontSize="{DynamicResource ThemeFontSizeXs}"/>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Content Area -->
+        <Grid Grid.Row="1">
+            <!-- View Mode: Styled text display -->
+            <ScrollViewer IsVisible="{Binding !IsEditing, ElementName=Root}"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto"
+                          Padding="16">
+                <SelectableTextBlock Text="{Binding Markdown, ElementName=Root}"
+                                     TextWrapping="Wrap"
+                                     FontSize="{DynamicResource ThemeFontSizeMd}"
+                                     LineHeight="{DynamicResource ThemeLineHeightBase}"/>
+            </ScrollViewer>
+
+            <!-- Edit Mode: Full editor -->
+            <ae:TextEditor x:Name="Editor"
+                           IsVisible="{Binding IsEditing, ElementName=Root}"
+                           FontFamily="JetBrains Mono, Cascadia Code, Consolas, monospace"
+                           FontSize="{DynamicResource ThemeFontSizeMd}"
+                           ShowLineNumbers="False"
+                           WordWrap="True"
+                           Background="{DynamicResource ThemeBackgroundBrush}"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                           Padding="16"
+                           TextChanged="OnEditorTextChanged"/>
+        </Grid>
+    </Grid>
+</UserControl>

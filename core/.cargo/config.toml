@@ -1,0 +1,18 @@
+# Cargo configuration for cross-compilation
+
+# Windows GNU target (MinGW) - statically link GCC runtime to avoid DLL dependencies
+# Using -static-libgcc ensures libgcc_s_seh-1.dll is not required on target Windows
+# The -Wl,--subsystem,windows flag suppresses the console window for GUI apps
+[target.x86_64-pc-windows-gnu]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-args=-static-libgcc"]
+linker = "x86_64-w64-mingw32-gcc"
+
+# Uncomment if building on Windows with MSVC (preferred for native Windows builds)
+# [target.x86_64-pc-windows-msvc]
+# rustflags = []
+
+# Coverage exclusions
+# Generated code from wasmtime::component::bindgen! should not be included in coverage reports
+[build]
+# When using cargo-llvm-cov, files matching the pattern below will be excluded
+# Example usage: cargo llvm-cov --ignore-filename-regex 'bindings\.rs'

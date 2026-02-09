@@ -1,0 +1,54 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="56"
+             x:Class="PrivStack.Desktop.Controls.Shared.PluginCommandBar"
+             x:Name="CommandBarRoot">
+
+    <Border Background="{DynamicResource ThemeSurfaceBrush}"
+            BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+            BorderThickness="0,0,0,1"
+            Padding="16,0"
+            Height="56">
+        <!-- Use overlapping Grid to achieve true center alignment -->
+        <Grid>
+            <!-- Center Section: Absolutely centered, independent of left/right -->
+            <ContentPresenter x:Name="CenterPresenter"
+                              Content="{Binding CenterContent, ElementName=CommandBarRoot}"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"/>
+
+            <!-- Left Section: Title + Subtitle + Badge -->
+            <StackPanel Orientation="Horizontal"
+                        Spacing="12"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center">
+                <StackPanel VerticalAlignment="Center" Spacing="-2">
+                    <TextBlock x:Name="TitleBlock"
+                               Text="{Binding Title, ElementName=CommandBarRoot}"
+                               FontSize="{DynamicResource ThemeFontSizeLg}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                    <TextBlock x:Name="SubtitleBlock"
+                               Text="{Binding Subtitle, ElementName=CommandBarRoot}"
+                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                               IsVisible="{Binding Subtitle, ElementName=CommandBarRoot, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                </StackPanel>
+                <ContentPresenter x:Name="BadgePresenter"
+                                  Content="{Binding Badge, ElementName=CommandBarRoot}"
+                                  VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Right Section: Primary Actions -->
+            <StackPanel Orientation="Horizontal"
+                        Spacing="8"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center">
+                <ContentPresenter x:Name="ActionsPresenter"
+                                  Content="{Binding Actions, ElementName=CommandBarRoot}"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="40"
+             x:Class="PrivStack.Desktop.Controls.Shared.ViewToggleGroup"
+             x:Name="ToggleRoot">
+
+    <UserControl.Styles>
+        <!-- Toggle Button Style -->
+        <Style Selector="Button.view-toggle">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextSecondaryBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="FontSize" Value="{DynamicResource ThemeFontSizeSmMd}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.view-toggle:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+        </Style>
+        <Style Selector="Button.view-toggle.active">
+            <Setter Property="Background" Value="{DynamicResource ThemeSelectedBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+            CornerRadius="6"
+            Padding="4">
+        <ContentPresenter x:Name="TogglePresenter"
+                          Content="{Binding Toggles, ElementName=ToggleRoot}"/>
+    </Border>
+</UserControl>

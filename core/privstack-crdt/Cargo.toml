@@ -1,0 +1,22 @@
+[package]
+name = "privstack-crdt"
+description = "CRDT implementations for PrivStack"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+privstack-types.workspace = true
+serde.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+criterion.workspace = true
+serde_json.workspace = true
+pretty_assertions.workspace = true
+
+[[bench]]
+name = "crdt_bench"
+harness = false

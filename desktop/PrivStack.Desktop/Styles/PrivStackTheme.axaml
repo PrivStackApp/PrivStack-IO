@@ -1,0 +1,708 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ae="using:AvaloniaEdit"
+        xmlns:aeRendering="using:AvaloniaEdit.Rendering">
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- BUTTON STYLES                                                            -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="Button">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusSm}"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                <BrushTransition Property="Foreground" Duration="0:0:0.15"/>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.1"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+    </Style>
+
+    <Style Selector="Button:pressed">
+        <Setter Property="RenderTransform" Value="scale(0.98)"/>
+        <Setter Property="Background" Value="{DynamicResource ThemeSelectedBrush}"/>
+    </Style>
+
+    <Style Selector="Button:disabled">
+        <Setter Property="Opacity" Value="0.5"/>
+    </Style>
+
+    <!-- Primary/Accent button -->
+    <Style Selector="Button.accent">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeBackgroundBrush}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusSm}"/>
+    </Style>
+
+    <Style Selector="Button.accent:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryHoverBrush}"/>
+    </Style>
+
+    <Style Selector="Button.accent:pressed">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryMutedBrush}"/>
+    </Style>
+
+    <!-- Danger button -->
+    <Style Selector="Button.danger">
+        <Setter Property="Background" Value="{DynamicResource ThemeDangerBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeBackgroundBrush}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusSm}"/>
+    </Style>
+
+    <Style Selector="Button.danger:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ThemeDangerMutedBrush}"/>
+    </Style>
+
+    <!-- Success button -->
+    <Style Selector="Button.success">
+        <Setter Property="Background" Value="{DynamicResource ThemeSuccessBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeBackgroundBrush}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusSm}"/>
+    </Style>
+
+    <Style Selector="Button.success:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ThemeSuccessMutedBrush}"/>
+    </Style>
+
+    <!-- Ghost/Transparent button - starts transparent, gains subtle bg on hover -->
+    <Style Selector="Button.ghost">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="Button.ghost:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+    </Style>
+
+    <Style Selector="Button.ghost:pressed">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+    </Style>
+
+    <!-- Secondary button -->
+    <Style Selector="Button.secondary">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusSm}"/>
+    </Style>
+
+    <Style Selector="Button.secondary:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemePrimaryBrush}"/>
+    </Style>
+
+    <!-- Subtle button - for icon buttons and minimal UI -->
+    <Style Selector="Button.subtle">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextMutedBrush}"/>
+        <Setter Property="Padding" Value="6"/>
+    </Style>
+
+    <Style Selector="Button.subtle:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="Button.subtle:pressed">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TEXTBOX STYLES                                                           -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="TextBox">
+        <Setter Property="SelectionBrush" Value="{DynamicResource ThemeSelectionBrush}"/>
+        <Setter Property="SelectionForegroundBrush" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+        <Setter Property="CaretBrush" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusSm}"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="TextBox:focus">
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemePrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="TextBox:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeHoverBrush}"/>
+    </Style>
+
+    <!-- Force Fluent theme TextBox template to respect our Background in all states -->
+    <Style Selector="TextBox /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{TemplateBinding Background}"/>
+    </Style>
+    <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{TemplateBinding Background}"/>
+    </Style>
+    <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{TemplateBinding Background}"/>
+    </Style>
+
+    <Style Selector="TextBox /template/ TextBlock#PART_Watermark">
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextMutedBrush}"/>
+    </Style>
+
+    <!-- Code editor TextBox style (fallback when WebView unavailable) -->
+    <Style Selector="TextBox.code-editor">
+        <Setter Property="Background" Value="{DynamicResource ThemeBackgroundBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="FontFamily" Value="{DynamicResource ThemeFontMono}"/>
+        <Setter Property="FontSize" Value="{DynamicResource ThemeFontSizeSmMd}"/>
+        <Setter Property="Padding" Value="16"/>
+    </Style>
+
+    <Style Selector="TextBox.code-editor:readonly">
+        <Setter Property="Background" Value="{DynamicResource ThemeBackgroundBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- LISTBOX STYLES                                                           -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="ListBox">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="ListBoxItem">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="ListBoxItem:selected">
+        <Setter Property="Background" Value="{DynamicResource ThemeSelectedBrush}"/>
+    </Style>
+
+    <Style Selector="ListBoxItem:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+    </Style>
+
+    <!-- Sidebar ListBox - standardized for left sidebars -->
+    <Style Selector="ListBox.sidebar">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="ListBox.sidebar ListBoxItem">
+        <Setter Property="Padding" Value="2"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusSm}"/>
+    </Style>
+
+    <!-- Compact sidebar list items -->
+    <Style Selector="ListBox.sidebar-compact ListBoxItem">
+        <Setter Property="Padding" Value="2"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusXs}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SCROLLVIEWER & SCROLLBAR STYLES                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="ScrollViewer">
+        <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
+        <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+    </Style>
+
+    <Style Selector="ScrollBar">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="ScrollBar /template/ Thumb">
+        <Setter Property="Background" Value="{DynamicResource ThemeScrollThumbBrush}"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="ScrollBar /template/ Thumb:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ThemeScrollThumbHoverBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- BORDER STYLES                                                            -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Hoverable border effect -->
+    <Style Selector="Border.hoverable">
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Border.hoverable:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+    </Style>
+
+    <!-- Card style -->
+    <Style Selector="Border.card">
+        <Setter Property="Background" Value="{DynamicResource ThemeBackgroundBrush}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusMd}"/>
+        <Setter Property="Padding" Value="{DynamicResource ThemePaddingMd}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <!-- Surface card (elevated) -->
+    <Style Selector="Border.surface-card">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBrush}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusMd}"/>
+        <Setter Property="Padding" Value="{DynamicResource ThemePaddingMd}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- BADGE/TAG STYLES                                                         -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="Border.badge">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="8,2"/>
+    </Style>
+
+    <Style Selector="Border.badge-success">
+        <Setter Property="Background" Value="{DynamicResource ThemeSuccessMutedBrush}"/>
+    </Style>
+
+    <Style Selector="Border.badge-warning">
+        <Setter Property="Background" Value="{DynamicResource ThemeWarningMutedBrush}"/>
+    </Style>
+
+    <Style Selector="Border.badge-error">
+        <Setter Property="Background" Value="{DynamicResource ThemeDangerMutedBrush}"/>
+    </Style>
+
+    <Style Selector="Border.badge-info">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryMutedBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- STATUS INDICATOR STYLES                                                  -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="Border.status-indicator">
+        <Setter Property="Width" Value="8"/>
+        <Setter Property="Height" Value="8"/>
+        <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+
+    <Style Selector="Border.status-indicator.success">
+        <Setter Property="Background" Value="{DynamicResource ThemeSuccessBrush}"/>
+    </Style>
+
+    <Style Selector="Border.status-indicator.warning">
+        <Setter Property="Background" Value="{DynamicResource ThemeWarningBrush}"/>
+    </Style>
+
+    <Style Selector="Border.status-indicator.error">
+        <Setter Property="Background" Value="{DynamicResource ThemeDangerBrush}"/>
+    </Style>
+
+    <Style Selector="Border.status-indicator.info">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TOOLTIP STYLES                                                           -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="ToolTip">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusSm}"/>
+        <Setter Property="Padding" Value="8,4"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- WINDOW STYLES                                                            -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="Window">
+        <Setter Property="Background" Value="{DynamicResource ThemeBackgroundBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TEXT STYLES                                                              -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Panel header -->
+    <Style Selector="TextBlock.panel-header">
+        <Setter Property="FontSize" Value="{DynamicResource ThemeFontSizeLg}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <!-- Section header -->
+    <Style Selector="TextBlock.section-header">
+        <Setter Property="FontSize" Value="{DynamicResource ThemeFontSizeMd}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <!-- Subtext/muted text -->
+    <Style Selector="TextBlock.subtext">
+        <Setter Property="FontSize" Value="{DynamicResource ThemeFontSizeSm}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextMutedBrush}"/>
+    </Style>
+
+    <!-- Secondary text -->
+    <Style Selector="TextBlock.secondary">
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextSecondaryBrush}"/>
+    </Style>
+
+    <!-- Keyboard shortcut display -->
+    <Style Selector="TextBlock.kbd">
+        <Setter Property="FontFamily" Value="{DynamicResource ThemeFontMono}"/>
+        <Setter Property="FontSize" Value="{DynamicResource ThemeFontSizeXsSm}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FOCUS STYLES                                                             -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector=":is(Control):focus-visible">
+        <Setter Property="Opacity" Value="1"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- PROGRESSBAR STYLES                                                       -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="ProgressBar">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryBrush}"/>
+        <Setter Property="MinHeight" Value="4"/>
+        <Setter Property="CornerRadius" Value="2"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- COMBOBOX STYLES                                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="ComboBox">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusSm}"/>
+    </Style>
+
+    <Style Selector="ComboBox:pointerover /template/ Border#Background">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+    </Style>
+
+    <Style Selector="ComboBoxItem">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+    </Style>
+
+    <Style Selector="ComboBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ThemeSelectedBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- CHECKBOX STYLES                                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="CheckBox">
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="CheckBox /template/ Border#NormalRectangle">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+        <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+
+    <Style Selector="CheckBox:checked /template/ Border#NormalRectangle">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemePrimaryBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- EXPANDER STYLES                                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="Expander">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TABCONTROL STYLES                                                        -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="TabControl">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="TabItem">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextMutedBrush}"/>
+        <Setter Property="Padding" Value="16,8"/>
+    </Style>
+
+    <Style Selector="TabItem:selected">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="TabItem:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SEPARATOR STYLES                                                         -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="Separator">
+        <Setter Property="Background" Value="{DynamicResource ThemeBorderBrush}"/>
+        <Setter Property="Height" Value="1"/>
+        <Setter Property="Margin" Value="0,8"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MENU STYLES                                                              -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="Menu">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBrush}"/>
+    </Style>
+
+    <Style Selector="MenuItem">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="MinHeight" Value="36"/>
+        <Setter Property="FontSize" Value="{DynamicResource ThemeFontSizeSmMd}"/>
+    </Style>
+
+    <Style Selector="MenuItem:pointerover /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+    </Style>
+
+    <Style Selector="MenuItem:selected /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="{DynamicResource ThemeSelectedBrush}"/>
+    </Style>
+
+    <!-- MenuFlyoutPresenter (popup container for MenuFlyout) -->
+    <Style Selector="MenuFlyoutPresenter">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusMd}"/>
+        <Setter Property="Padding" Value="6"/>
+        <Setter Property="MinWidth" Value="180"/>
+    </Style>
+
+    <!-- Context Menu -->
+    <Style Selector="ContextMenu">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusSm}"/>
+        <Setter Property="Padding" Value="6"/>
+        <Setter Property="MinWidth" Value="180"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDER STYLES                                                            -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="Slider /template/ Track#PART_Track">
+        <Setter Property="Margin" Value="0"/>
+    </Style>
+
+    <Style Selector="Slider /template/ Thumb">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="Slider /template/ RepeatButton#PART_DecreaseButton">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="Slider /template/ RepeatButton#PART_IncreaseButton">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- RADIO BUTTON STYLES                                                      -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="RadioButton">
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="RadioButton /template/ Ellipse#OuterEllipse">
+        <Setter Property="Stroke" Value="{DynamicResource ThemeBorderBrush}"/>
+        <Setter Property="Fill" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+    </Style>
+
+    <Style Selector="RadioButton:checked /template/ Ellipse#OuterEllipse">
+        <Setter Property="Stroke" Value="{DynamicResource ThemePrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="RadioButton:checked /template/ Ellipse#CheckGlyph">
+        <Setter Property="Fill" Value="{DynamicResource ThemePrimaryBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TOGGLE SWITCH STYLES                                                     -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="ToggleSwitch /template/ Border#OuterBorder">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+    </Style>
+
+    <Style Selector="ToggleSwitch:checked /template/ Border#OuterBorder">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemePrimaryBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DATEPICKER / TIMEPICKER STYLES                                           -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="DatePicker">
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="DatePicker /template/ Button">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="TimePicker">
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="TimePicker /template/ Button">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- CALENDAR STYLES                                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="Calendar">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="CalendarDayButton">
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="CalendarDayButton:selected">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeBackgroundBrush}"/>
+    </Style>
+
+    <Style Selector="CalendarDayButton:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TREEVIEW STYLES                                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="TreeView">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="TreeViewItem">
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="TreeViewItem:selected /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="{DynamicResource ThemeSelectedBrush}"/>
+    </Style>
+
+    <Style Selector="TreeViewItem:pointerover /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+    </Style>
+
+    <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron">
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- NUMERICUPDOWN STYLES                                                     -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="NumericUpDown">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+    </Style>
+
+    <Style Selector="NumericUpDown:focus">
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemePrimaryBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- AVALONIAEDIT TEXT EDITOR STYLES                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="ae|TextEditor">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="ae|TextEditor aeRendering|TextView">
+        <Setter Property="CurrentLineBackground" Value="{DynamicResource ThemeHoverBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- FLYOUT / POPUP STYLES                                                    -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="FlyoutPresenter">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusMd}"/>
+        <Setter Property="Padding" Value="{DynamicResource ThemePaddingMd}"/>
+        <Setter Property="MinWidth" Value="200"/>
+    </Style>
+
+</Styles>

@@ -1,0 +1,355 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PrivStack.Desktop.ViewModels"
+             xmlns:models="using:PrivStack.Desktop.Models"
+             xmlns:controls="using:PrivStack.Desktop.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="PrivStack.Desktop.Views.PropertyTemplateDialog"
+             x:DataType="vm:PropertyTemplateDialogViewModel"
+             IsVisible="{Binding IsOpen}">
+
+    <UserControl.Styles>
+        <Style Selector="TextBox /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        </Style>
+        <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        </Style>
+        <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <!-- Full-screen overlay -->
+    <Panel>
+        <!-- Backdrop -->
+        <Border Background="#80000000"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"/>
+
+        <!-- Dialog card -->
+        <Border HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Width="560"
+                MaxHeight="550"
+                Background="{DynamicResource ThemeSurfaceBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                BoxShadow="0 8 32 0 #60000000"
+                ClipToBounds="True">
+            <Grid RowDefinitions="Auto,*,Auto">
+                <!-- Header -->
+                <Border Grid.Row="0" Padding="20,16"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}"
+                        BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <controls:IconControl Icon="Layout" Size="18" StrokeThickness="1.5"
+                                                  Stroke="{DynamicResource ThemeTextPrimaryBrush}"/>
+                            <TextBlock Text="Property Templates"
+                                       FontSize="{DynamicResource ThemeFontSizeLg}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Content="×"
+                                Command="{Binding CloseCommand}"
+                                Background="Transparent"
+                                Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                FontSize="{DynamicResource ThemeFontSizeXl}"
+                                Padding="8,2"
+                                Cursor="Hand">
+                            <Button.Styles>
+                                <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                </Style>
+                            </Button.Styles>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- Content -->
+                <Grid Grid.Row="1" ColumnDefinitions="200,*">
+                    <!-- Left: Template list -->
+                    <Border Grid.Column="0"
+                            BorderBrush="{DynamicResource ThemeBorderBrush}"
+                            BorderThickness="0,0,1,0"
+                            Padding="8">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Templates"
+                                       FontWeight="SemiBold"
+                                       FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                       Margin="4,4,0,0"/>
+
+                            <ItemsControl x:Name="TemplateList" ItemsSource="{Binding Templates}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:PropertyTemplate">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <Button Grid.Column="0"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Left"
+                                                    Background="Transparent"
+                                                    Padding="8,6"
+                                                    CornerRadius="4"
+                                                    Cursor="Hand"
+                                                    Margin="0,1">
+                                                <Button.Styles>
+                                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                                    </Style>
+                                                </Button.Styles>
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding Entries.Count, StringFormat='{}{0}'}"
+                                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                               VerticalAlignment="Center"
+                                                               Margin="4,0,0,0"/>
+                                                </Grid>
+                                            </Button>
+                                            <!-- Delete button -->
+                                            <Button Grid.Column="1"
+                                                    Command="{Binding $parent[ItemsControl].((vm:PropertyTemplateDialogViewModel)DataContext).DeleteTemplateCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Background="Transparent"
+                                                    Padding="4"
+                                                    CornerRadius="4"
+                                                    Cursor="Hand"
+                                                    MinWidth="0" MinHeight="0"
+                                                    VerticalAlignment="Center"
+                                                    Margin="2,0,0,0"
+                                                    ToolTip.Tip="Delete template">
+                                                <Button.Styles>
+                                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                                    </Style>
+                                                </Button.Styles>
+                                                <controls:IconControl Icon="Trash2" Size="12" StrokeThickness="1.5"
+                                                                      Stroke="{DynamicResource ThemeTextMutedBrush}"/>
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- Create new template -->
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                                <TextBox x:Name="NewTemplateNameBox"
+                                         Grid.Column="0"
+                                         Text="{Binding NewTemplateName, Mode=TwoWay}"
+                                         Watermark="New template..."
+                                         FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                         Background="{DynamicResource ThemeSurfaceBrush}"
+                                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                         BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+                                         BorderThickness="1"
+                                         CornerRadius="4"
+                                         Padding="6,4"/>
+                                <Button Grid.Column="1"
+                                        Command="{Binding CreateTemplateCommand}"
+                                        Background="Transparent"
+                                        Padding="6"
+                                        CornerRadius="4"
+                                        Margin="4,0,0,0"
+                                        Cursor="Hand">
+                                    <Button.Styles>
+                                        <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                            <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                        </Style>
+                                    </Button.Styles>
+                                    <controls:IconControl Icon="Plus" Size="14" StrokeThickness="2"
+                                                          Stroke="{DynamicResource ThemeTextMutedBrush}"/>
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Right: Selected template details -->
+                    <ScrollViewer Grid.Column="1" Padding="12">
+                        <StackPanel Spacing="12">
+                            <!-- No template selected -->
+                            <TextBlock Text="Select a template to edit"
+                                       FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                       FontStyle="Italic"
+                                       IsVisible="{Binding SelectedTemplate, Converter={x:Static ObjectConverters.IsNull}}"
+                                       Margin="0,20"/>
+
+                            <!-- Template properties list -->
+                            <StackPanel Spacing="8"
+                                        IsVisible="{Binding SelectedTemplate, Converter={x:Static ObjectConverters.IsNotNull}}">
+
+                                <!-- Editable template name -->
+                                <TextBox x:Name="TemplateNameBox"
+                                         Text="{Binding SelectedTemplateName, Mode=TwoWay}"
+                                         FontWeight="SemiBold"
+                                         FontSize="{DynamicResource ThemeFontSizeMd}"
+                                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                         BorderBrush="Transparent"
+                                         BorderThickness="0,0,0,1"
+                                         CornerRadius="0"
+                                         Padding="2,4">
+                                    <TextBox.Styles>
+                                        <Style Selector="TextBox">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                        </Style>
+                                        <Style Selector="TextBox:focus">
+                                            <Setter Property="BorderBrush" Value="{DynamicResource ThemePrimaryBrush}"/>
+                                        </Style>
+                                        <Style Selector="TextBox:pointerover">
+                                            <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderSubtleBrush}"/>
+                                        </Style>
+                                        <Style Selector="TextBox /template/ Border#PART_BorderElement">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                        </Style>
+                                    </TextBox.Styles>
+                                </TextBox>
+
+                                <TextBlock Text="Properties in template"
+                                           FontWeight="SemiBold"
+                                           FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                           Margin="0,4,0,0"/>
+
+                                <ItemsControl ItemsSource="{Binding SelectedTemplateEntries}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:TemplateEntryViewModel">
+                                            <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                                    CornerRadius="4"
+                                                    Padding="8,6"
+                                                    Margin="0,2">
+                                                <Grid RowDefinitions="Auto,Auto">
+                                                    <!-- Row 0: Name + type + remove -->
+                                                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto">
+                                                        <TextBlock Text="{Binding Definition.Name}"
+                                                                   FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                                   VerticalAlignment="Center"/>
+                                                        <Border Grid.Column="1"
+                                                                Background="{DynamicResource ThemeHoverBrush}"
+                                                                CornerRadius="3"
+                                                                Padding="4,1"
+                                                                VerticalAlignment="Center"
+                                                                Margin="6,0">
+                                                            <TextBlock Text="{Binding Definition.Type}"
+                                                                       FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                                        </Border>
+                                                        <Button Grid.Column="2"
+                                                                Command="{Binding $parent[ItemsControl].((vm:PropertyTemplateDialogViewModel)DataContext).RemoveEntryFromTemplateCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                Background="Transparent"
+                                                                Padding="4"
+                                                                Cursor="Hand"
+                                                                MinWidth="0" MinHeight="0">
+                                                            <controls:IconControl Icon="X" Size="10" StrokeThickness="2"
+                                                                                  Stroke="{DynamicResource ThemeTextMutedBrush}"/>
+                                                        </Button>
+                                                    </Grid>
+                                                    <!-- Row 1: Default value -->
+                                                    <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="0,4,0,0">
+                                                        <TextBlock Text="Default:"
+                                                                   FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                                   VerticalAlignment="Center"
+                                                                   Margin="0,0,6,0"/>
+                                                        <TextBox Grid.Column="1"
+                                                                 Text="{Binding DefaultValue, Mode=TwoWay}"
+                                                                 Watermark="No default"
+                                                                 FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                                 Background="{DynamicResource ThemeSurfaceBrush}"
+                                                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                                 BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+                                                                 BorderThickness="1"
+                                                                 CornerRadius="3"
+                                                                 Padding="4,2"
+                                                                 MinHeight="0"/>
+                                                    </Grid>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Empty entries state -->
+                                <TextBlock Text="No properties added yet"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           FontStyle="Italic"
+                                           IsVisible="{Binding !SelectedTemplateEntries.Count}"
+                                           Margin="0,2"/>
+
+                                <!-- Add property to template -->
+                                <TextBlock Text="Add property"
+                                           FontWeight="SemiBold"
+                                           FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           Margin="0,8,0,0"/>
+                                <ItemsControl ItemsSource="{Binding AllPropertyDefs}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="models:PropertyDefinition">
+                                            <Button Command="{Binding $parent[ItemsControl].((vm:PropertyTemplateDialogViewModel)DataContext).AddDefToTemplateCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Background="Transparent"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Left"
+                                                    Padding="8,4"
+                                                    CornerRadius="4"
+                                                    Cursor="Hand"
+                                                    Margin="0,1">
+                                                <Button.Styles>
+                                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                                    </Style>
+                                                </Button.Styles>
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <controls:IconControl Icon="Plus" Size="10" StrokeThickness="2"
+                                                                          Stroke="{DynamicResource ThemeTextMutedBrush}"
+                                                                          VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+
+                <!-- Footer -->
+                <Border Grid.Row="2" Padding="16,12"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}"
+                        BorderThickness="0,1,0,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                        <Button Content="Close"
+                                Command="{Binding CloseCommand}"
+                                Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                Padding="16,8"
+                                CornerRadius="6"
+                                Cursor="Hand"
+                                FontSize="{DynamicResource ThemeFontSizeSmMd}">
+                            <Button.Styles>
+                                <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                </Style>
+                            </Button.Styles>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+    </Panel>
+</UserControl>
