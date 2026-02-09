@@ -1,0 +1,15 @@
+namespace PrivStack.Desktop.Native;
+
+/// <summary>
+/// Handles app-level master password authentication.
+/// </summary>
+public interface IAuthService
+{
+    bool IsAuthInitialized();
+    bool IsAuthUnlocked();
+    void InitializeAuth(string masterPassword);
+    void UnlockApp(string masterPassword);
+    void LockApp();
+    void ChangeAppPassword(string oldPassword, string newPassword);
+    bool ValidateMasterPassword(string masterPassword);
+}

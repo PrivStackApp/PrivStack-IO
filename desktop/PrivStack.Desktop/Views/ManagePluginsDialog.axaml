@@ -1,0 +1,337 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PrivStack.Desktop.ViewModels"
+             xmlns:controls="using:PrivStack.Desktop.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="600"
+             x:Class="PrivStack.Desktop.Views.ManagePluginsDialog"
+             x:DataType="vm:SettingsViewModel"
+             IsVisible="{Binding IsManagePluginsDialogOpen}">
+
+    <UserControl.Styles>
+        <!-- Progress bar style for resource metrics -->
+        <Style Selector="ProgressBar.metric-bar">
+            <Setter Property="Height" Value="6"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryBrush}"/>
+        </Style>
+        <Style Selector="ProgressBar.metric-bar.warning">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeWarningBrush}"/>
+        </Style>
+        <Style Selector="ProgressBar.metric-bar.danger">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeDangerBrush}"/>
+        </Style>
+
+        <!-- Action link button style -->
+        <Style Selector="Button.action-link">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0,2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.action-link:pointerover /template/ ContentPresenter">
+            <Setter Property="TextBlock.TextDecorations" Value="Underline"/>
+        </Style>
+    </UserControl.Styles>
+
+    <!-- Full-screen backdrop -->
+    <Panel>
+        <Border Background="#80000000"
+                PointerPressed="OnBackdropPressed"/>
+
+        <!-- Centered dialog -->
+        <Border HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Width="640"
+                MaxHeight="700"
+                Background="{DynamicResource ThemeSurfaceBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                BoxShadow="0 8 32 0 #60000000"
+                ClipToBounds="True">
+            <Grid RowDefinitions="Auto,Auto,*">
+
+                <!-- Header -->
+                <Border Grid.Row="0" Padding="20,16"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}"
+                        BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="Manage Plugins"
+                                       FontSize="{DynamicResource ThemeFontSizeLg}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border Width="8" Height="8" CornerRadius="4"
+                                        Background="{DynamicResource ThemeSuccessBrush}"
+                                        VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding SandboxStatusText}"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Refresh button -->
+                        <Button Grid.Column="1"
+                                Command="{Binding RefreshPluginMetricsCommand}"
+                                Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                Padding="12,8" CornerRadius="6" Margin="0,0,12,0"
+                                ToolTip.Tip="Refresh metrics">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <controls:IconControl Icon="RotateCw" Size="14" StrokeThickness="1.5"
+                                                      Stroke="{DynamicResource ThemeTextMutedBrush}"/>
+                                <TextBlock Text="Refresh"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Close button -->
+                        <Button Grid.Column="2"
+                                Command="{Binding CloseManagePluginsDialogCommand}"
+                                Background="Transparent"
+                                Padding="8" CornerRadius="4">
+                            <controls:IconControl Icon="X" Size="18" StrokeThickness="1.5"
+                                                  Stroke="{DynamicResource ThemeTextMutedBrush}"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- Experimental Toggle -->
+                <Border Grid.Row="1" Padding="16,12"
+                        Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                        Margin="16,16,16,0" CornerRadius="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Experimental Features"
+                                       FontWeight="SemiBold"
+                                       FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                            <TextBlock Text="{Binding ExperimentalPluginsStatusText}"
+                                       FontSize="{DynamicResource ThemeFontSizeXs}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1"
+                                      IsChecked="{Binding ExperimentalPluginsEnabled}"
+                                      OnContent="" OffContent=""
+                                      VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <!-- Plugin List -->
+                <ScrollViewer Grid.Row="2" Padding="16"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding PluginItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PluginSettingsItem">
+                                <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                        CornerRadius="8" Padding="16" Margin="0,0,0,12"
+                                        ClipToBounds="True">
+                                    <StackPanel Spacing="12">
+
+                                        <!-- Row 1: Icon, Name, Status badges, Enable toggle -->
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <!-- Icon -->
+                                            <Border Grid.Column="0" Width="40" Height="40"
+                                                    Background="{DynamicResource ThemeSurfaceBrush}"
+                                                    CornerRadius="8" Margin="0,0,16,0">
+                                                <controls:IconControl Icon="{Binding Icon, FallbackValue=Box}"
+                                                                      Size="20" StrokeThickness="1.5"
+                                                                      Stroke="{DynamicResource ThemeTextMutedBrush}"
+                                                                      HorizontalAlignment="Center"
+                                                                      VerticalAlignment="Center"/>
+                                            </Border>
+
+                                            <!-- Name and Description -->
+                                            <Border Grid.Column="1" ClipToBounds="True" Margin="0,0,12,0">
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <TextBlock Text="{Binding Name}"
+                                                                   FontWeight="SemiBold"
+                                                                   FontSize="{DynamicResource ThemeFontSizeMd}"/>
+
+                                                        <!-- Status Badges -->
+                                                        <Border CornerRadius="4" Padding="6,2"
+                                                                IsVisible="{Binding IsHardLocked}"
+                                                                Background="{DynamicResource ThemeWarningBrush}">
+                                                            <TextBlock Text="Coming Soon"
+                                                                       FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                                       Foreground="{DynamicResource ThemeTextOnAccentBrush}"/>
+                                                        </Border>
+                                                        <Border CornerRadius="4" Padding="6,2"
+                                                                IsVisible="{Binding IsExperimental}"
+                                                                Background="{DynamicResource ThemePrimaryBrush}">
+                                                            <TextBlock Text="Experimental"
+                                                                       FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                                       Foreground="{DynamicResource ThemeTextOnAccentBrush}"/>
+                                                        </Border>
+                                                        <Border CornerRadius="4" Padding="6,2"
+                                                                IsVisible="{Binding !CanDisable}"
+                                                                Background="{DynamicResource ThemeSuccessBrush}">
+                                                            <TextBlock Text="Core"
+                                                                       FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                                       Foreground="{DynamicResource ThemeTextOnAccentBrush}"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Description}"
+                                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               TextWrapping="NoWrap"/>
+                                                    <TextBlock Text="{Binding HardLockedReason}"
+                                                               FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                               Foreground="{DynamicResource ThemeWarningBrush}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               TextWrapping="NoWrap"
+                                                               IsVisible="{Binding IsHardLocked}"/>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Toggle -->
+                                            <ToggleSwitch Grid.Column="2"
+                                                          IsChecked="{Binding IsEnabled}"
+                                                          IsEnabled="{Binding CanToggle}"
+                                                          OnContent="" OffContent=""
+                                                          VerticalAlignment="Center"
+                                                          Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).TogglePluginCommand}"
+                                                          CommandParameter="{Binding}"/>
+                                        </Grid>
+
+                                        <!-- Row 2: Resource metrics (only if enabled and has metrics) -->
+                                        <Border IsVisible="{Binding IsEnabled}"
+                                                Background="{DynamicResource ThemeSurfaceBrush}"
+                                                CornerRadius="6" Padding="12"
+                                                ClipToBounds="True">
+                                            <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto">
+                                                <!-- Memory -->
+                                                <StackPanel Grid.Column="0" Grid.Row="0" Spacing="4" Margin="0,0,12,0">
+                                                    <TextBlock Text="Memory"
+                                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                                    <ProgressBar Classes="metric-bar"
+                                                                 Value="{Binding MemoryUsagePercent}"
+                                                                 Minimum="0" Maximum="100"
+                                                                 Margin="4,0,4,0"/>
+                                                    <TextBlock Text="{Binding MemoryDisplay}"
+                                                               FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+
+                                                <!-- CPU Fuel -->
+                                                <StackPanel Grid.Column="1" Grid.Row="0" Spacing="4" Margin="0,0,12,0">
+                                                    <TextBlock Text="CPU Usage"
+                                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                                    <ProgressBar Classes="metric-bar"
+                                                                 Value="{Binding FuelUsagePercent}"
+                                                                 Minimum="0" Maximum="100"
+                                                                 Margin="4,0,4,0"/>
+                                                    <TextBlock Text="{Binding FuelDisplay}"
+                                                               FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding FuelAverageDisplay}"
+                                                               FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding FuelPeakDisplay}"
+                                                               FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                               Foreground="{DynamicResource ThemeWarningBrush}"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+
+                                                <!-- Disk Usage -->
+                                                <StackPanel Grid.Column="2" Grid.Row="0" Spacing="4">
+                                                    <TextBlock Text="Disk Usage"
+                                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                                    <TextBlock Text="{Binding DiskDisplay}"
+                                                               FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               TextWrapping="NoWrap"
+                                                               Margin="0,4,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Row 3: Action links -->
+                                        <StackPanel Orientation="Horizontal" Spacing="16">
+                                            <ToggleButton IsChecked="{Binding IsExpanded}"
+                                                          FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                          Foreground="{DynamicResource ThemePrimaryBrush}"
+                                                          Background="Transparent"
+                                                          BorderThickness="0"
+                                                          Padding="0,2"
+                                                          Cursor="Hand">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <controls:IconControl Icon="ChevronRight" Size="12" StrokeThickness="1.5"
+                                                                          Stroke="{DynamicResource ThemePrimaryBrush}"
+                                                                          IsVisible="{Binding !IsExpanded}"/>
+                                                    <controls:IconControl Icon="ChevronDown" Size="12" StrokeThickness="1.5"
+                                                                          Stroke="{DynamicResource ThemePrimaryBrush}"
+                                                                          IsVisible="{Binding IsExpanded}"/>
+                                                    <TextBlock Text="Manage Permissions"/>
+                                                </StackPanel>
+                                            </ToggleButton>
+
+                                            <Button Classes="action-link"
+                                                    Content="Reset Plugin"
+                                                    FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                    Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).ResetPluginCommand}"
+                                                    CommandParameter="{Binding}"/>
+
+                                            <Button Classes="action-link"
+                                                    Content="Uninstall"
+                                                    FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                    Foreground="{DynamicResource ThemeDangerBrush}"
+                                                    IsVisible="{Binding CanToggle}"
+                                                    Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).UninstallPluginCommand}"
+                                                    CommandParameter="{Binding}"/>
+                                        </StackPanel>
+
+                                        <!-- Permissions panel (expandable) -->
+                                        <Border IsVisible="{Binding IsExpanded}"
+                                                Background="{DynamicResource ThemeSurfaceBrush}"
+                                                CornerRadius="6" Padding="12">
+                                            <ItemsControl ItemsSource="{Binding Permissions}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:PluginPermissionItem">
+                                                        <Grid ColumnDefinitions="Auto,*" Margin="0,4">
+                                                            <CheckBox Grid.Column="0"
+                                                                      IsChecked="{Binding IsGranted}"
+                                                                      IsEnabled="{Binding !IsTier1}"
+                                                                      VerticalAlignment="Top"
+                                                                      Margin="0,0,12,0"
+                                                                      Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).TogglePermissionCommand}"
+                                                                      CommandParameter="{Binding}"/>
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding DisplayName}"
+                                                                           FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                                                <TextBlock Text="{Binding Description}"
+                                                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                                           TextWrapping="Wrap"/>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Border>
+
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+            </Grid>
+        </Border>
+    </Panel>
+</UserControl>

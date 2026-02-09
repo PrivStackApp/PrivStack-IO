@@ -1,0 +1,594 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PrivStack.Desktop.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:services="using:PrivStack.Desktop.Services"
+             mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="560"
+             x:Class="PrivStack.Desktop.Views.SetupWizardView"
+             x:DataType="vm:SetupWizardViewModel">
+
+    <Grid RowDefinitions="Auto,*,Auto" Background="{DynamicResource ThemeBorderBrush}">
+        <!-- Header / Progress -->
+        <Border Grid.Row="0" Background="{DynamicResource ThemeSurfaceBrush}" Padding="20,12">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel>
+                    <TextBlock Text="PrivStack Setup" FontSize="{DynamicResource ThemeFontSizeLg}" FontWeight="Bold" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Spacing="8">
+                        <TextBlock FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="{DynamicResource ThemeTextMutedBrush}">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="Step {0} of {1}">
+                                    <Binding Path="StepNumber"/>
+                                    <Binding Path="TotalSteps"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                        <ProgressBar Minimum="0" Maximum="{Binding TotalSteps}" Value="{Binding StepNumber}"
+                                     Width="160" Height="3" Background="{DynamicResource ThemeSurfaceElevatedBrush}" Foreground="{DynamicResource ThemePrimaryBrush}"
+                                     CornerRadius="2"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Content Area -->
+        <Border Grid.Row="1" Padding="24,20">
+            <StackPanel Spacing="16">
+
+                <!-- ============================================================ -->
+                <!-- Step 1: Welcome                                              -->
+                <!-- ============================================================ -->
+                <StackPanel IsVisible="{Binding IsWelcomeStep}" Spacing="16">
+                    <TextBlock Text="Welcome to PrivStack" FontSize="{DynamicResource ThemeFontSize2Xl}" FontWeight="Bold"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" HorizontalAlignment="Center" Margin="0,16,0,0"/>
+                    <TextBlock Text="Your local-first productivity suite" FontSize="{DynamicResource ThemeFontSizeSm}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}" HorizontalAlignment="Center"/>
+
+                    <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="10" Padding="16" Margin="0,8,0,0">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="Here's what we'll set up:" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Border Width="28" Height="28" Background="{DynamicResource ThemePrimaryBrush}" CornerRadius="6">
+                                    <TextBlock Text="1" FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Bold" Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Personalize" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSmMd}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                    <TextBlock Text="Workspace, theme, and accessibility preferences" FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Border Width="28" Height="28" Background="{DynamicResource ThemeSuccessBrush}" CornerRadius="6">
+                                    <TextBlock Text="2" FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Bold" Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Data location" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSmMd}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                    <TextBlock Text="Local, Google Drive, iCloud, or custom" FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Border Width="28" Height="28" Background="{DynamicResource ThemeWarningBrush}" CornerRadius="6">
+                                    <TextBlock Text="3" FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Bold" Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="License &amp; security" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSmMd}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                    <TextBlock Text="Activate your license and set a master password" FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}" CornerRadius="8" Padding="12" Margin="0,4,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                            <TextBlock Text="🔒" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                            <TextBlock Text="Your data never leaves your device. No accounts, no cloud required."
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ============================================================ -->
+                <!-- Step 2: Workspace + Profile + Theme + Accessibility          -->
+                <!-- ============================================================ -->
+                <StackPanel IsVisible="{Binding IsWorkspaceStep}" Spacing="12">
+                    <TextBlock Text="Set Up Your Workspace" FontSize="{DynamicResource ThemeFontSize2Xl}" FontWeight="Bold"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                    <TextBlock Text="A workspace keeps your data organized. You can create more later."
+                               Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeSm}" TextWrapping="Wrap"/>
+
+                    <!-- Error Message -->
+                    <Border Background="{DynamicResource ThemeDangerBrush}" CornerRadius="6" Padding="10"
+                            Opacity="0.9"
+                            IsVisible="{Binding SetupError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding SetupError}" Foreground="White" FontSize="{DynamicResource ThemeFontSizeXsSm}" TextWrapping="Wrap"/>
+                    </Border>
+
+                    <StackPanel Spacing="6" Margin="0,4,0,0">
+                        <TextBlock Text="Workspace Name" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                        <TextBox Text="{Binding WorkspaceName}"
+                                 Watermark="e.g. Work, Personal, Side Project"
+                                 Background="{DynamicResource ThemeSurfaceElevatedBrush}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                 BorderThickness="0" Padding="10" CornerRadius="6"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="6" Margin="0,4,0,0">
+                        <TextBlock Text="Display Name" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                        <TextBox Text="{Binding DisplayName}"
+                                 Watermark="Your name"
+                                 Background="{DynamicResource ThemeSurfaceElevatedBrush}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                 BorderThickness="0" Padding="10" CornerRadius="6"/>
+                        <TextBlock Text="Shown in shared documents and sync"
+                                   Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="6" Margin="0,4,0,0">
+                        <TextBlock Text="Theme" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                        <ComboBox ItemsSource="{Binding AvailableThemes}"
+                                  SelectedItem="{Binding SelectedTheme}"
+                                  HorizontalAlignment="Stretch"
+                                  Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                  Padding="10,8" CornerRadius="6">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ThemeOption">
+                                    <TextBlock Text="{Binding DisplayName}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- Font Scale / Accessibility -->
+                    <StackPanel Spacing="4" Margin="0,4,0,0">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <TextBlock Text="Text Size" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeTextPrimaryBrush}" VerticalAlignment="Center"/>
+                            <Slider Grid.Column="1" Minimum="0.8" Maximum="1.5"
+                                    Value="{Binding FontScaleMultiplier}"
+                                    TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                    Foreground="{DynamicResource ThemePrimaryBrush}"
+                                    Margin="12,0"/>
+                            <TextBlock Grid.Column="2" Text="{Binding FontScalePercentText}" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemePrimaryBrush}" VerticalAlignment="Center" MinWidth="36"/>
+                        </Grid>
+                        <TextBlock Text="You can change theme and text size anytime in Settings"
+                                   Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- ============================================================ -->
+                <!-- Step 3: Data Directory                                       -->
+                <!-- ============================================================ -->
+                <StackPanel IsVisible="{Binding IsDataDirectoryStep}" Spacing="12">
+                    <TextBlock Text="Where should we store your data?" FontSize="{DynamicResource ThemeFontSize2Xl}" FontWeight="Bold"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                    <TextBlock Text="Everything stays on your device. Pick a folder."
+                               Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+
+                    <StackPanel Spacing="8" Margin="0,8,0,0">
+                        <!-- Default Option -->
+                        <Button Command="{Binding SelectDirectoryTypeCommand}"
+                                CommandParameter="{x:Static vm:DataDirectoryType.Default}"
+                                HorizontalContentAlignment="Stretch" Padding="0" CornerRadius="8">
+                            <Button.Background>
+                                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                                    <Binding Path="SelectedDirectoryType" Converter="{x:Static ObjectConverters.Equal}" ConverterParameter="{x:Static vm:DataDirectoryType.Default}"/>
+                                </MultiBinding>
+                            </Button.Background>
+                            <Border Padding="12" CornerRadius="8"
+                                    Background="{DynamicResource ThemeSurfaceElevatedBrush}">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <Border Grid.Column="0" Width="36" Height="36" Background="{DynamicResource ThemePrimaryBrush}" CornerRadius="8" VerticalAlignment="Center">
+                                        <TextBlock Text="📁" FontSize="{DynamicResource ThemeFontSizeLg}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
+                                        <TextBlock Text="Default Location (Recommended)" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSmMd}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                        <TextBlock Text="Local app data folder on this device"
+                                                   FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="✓" FontSize="{DynamicResource ThemeFontSizeLg}"
+                                               Foreground="{DynamicResource ThemePrimaryBrush}"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static vm:DataDirectoryType.Default}}"/>
+                                </Grid>
+                            </Border>
+                        </Button>
+
+                        <!-- Google Drive Option -->
+                        <Button Command="{Binding SelectDirectoryTypeCommand}"
+                                CommandParameter="{x:Static vm:DataDirectoryType.GoogleDrive}"
+                                IsEnabled="{Binding IsGoogleDriveAvailable}"
+                                HorizontalContentAlignment="Stretch" Padding="0" CornerRadius="8">
+                            <Border Padding="12" CornerRadius="8"
+                                    Background="{DynamicResource ThemeSurfaceElevatedBrush}">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <Border Grid.Column="0" Width="36" Height="36" Background="#4285F4" CornerRadius="8" VerticalAlignment="Center">
+                                        <TextBlock Text="G" FontSize="{DynamicResource ThemeFontSizeLg}" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
+                                        <TextBlock Text="Google Drive" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSmMd}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                        <TextBlock Text="Sync across devices via Google Drive"
+                                                   FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <TextBlock Text="✓" FontSize="{DynamicResource ThemeFontSizeLg}"
+                                                   Foreground="{DynamicResource ThemePrimaryBrush}"
+                                                   IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static vm:DataDirectoryType.GoogleDrive}}"/>
+                                        <TextBlock Text="Install app" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   ToolTip.Tip="Install Google Drive for Desktop to enable this option"
+                                                   IsVisible="{Binding !IsGoogleDriveAvailable}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Button>
+
+                        <!-- iCloud Option -->
+                        <Button Command="{Binding SelectDirectoryTypeCommand}"
+                                CommandParameter="{x:Static vm:DataDirectoryType.ICloud}"
+                                IsEnabled="{Binding IsICloudAvailable}"
+                                HorizontalContentAlignment="Stretch" Padding="0" CornerRadius="8">
+                            <Border Padding="12" CornerRadius="8"
+                                    Background="{DynamicResource ThemeSurfaceElevatedBrush}">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <Border Grid.Column="0" Width="36" Height="36" Background="#3693F3" CornerRadius="8" VerticalAlignment="Center">
+                                        <TextBlock Text="☁️" FontSize="{DynamicResource ThemeFontSizeLg}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
+                                        <TextBlock Text="iCloud Drive" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSmMd}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                        <TextBlock Text="Sync across Apple devices via iCloud"
+                                                   FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <TextBlock Text="✓" FontSize="{DynamicResource ThemeFontSizeLg}"
+                                                   Foreground="{DynamicResource ThemePrimaryBrush}"
+                                                   IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static vm:DataDirectoryType.ICloud}}"/>
+                                        <TextBlock Text="Enable iCloud" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   ToolTip.Tip="Enable iCloud Drive in System Settings to use this option"
+                                                   IsVisible="{Binding !IsICloudAvailable}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Button>
+
+                        <!-- Custom Location Option -->
+                        <Button Command="{Binding SelectDirectoryTypeCommand}"
+                                CommandParameter="{x:Static vm:DataDirectoryType.Custom}"
+                                HorizontalContentAlignment="Stretch" Padding="0" CornerRadius="8">
+                            <Border Padding="12" CornerRadius="8"
+                                    Background="{DynamicResource ThemeSurfaceElevatedBrush}">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <Border Grid.Column="0" Width="36" Height="36" Background="{DynamicResource ThemeWarningBrush}" CornerRadius="8" VerticalAlignment="Center">
+                                        <TextBlock Text="📂" FontSize="{DynamicResource ThemeFontSizeLg}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
+                                        <TextBlock Text="Custom Location" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSmMd}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                        <TextBlock Text="Choose your own folder (e.g., NAS, external drive)"
+                                                   FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="✓" FontSize="{DynamicResource ThemeFontSizeLg}"
+                                               Foreground="{DynamicResource ThemePrimaryBrush}"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static vm:DataDirectoryType.Custom}}"/>
+                                </Grid>
+                            </Border>
+                        </Button>
+
+                        <!-- Custom Directory Browser (shown when Custom is selected) -->
+                        <Border IsVisible="{Binding IsCustomDirectorySelected}"
+                                Background="{DynamicResource ThemeBackgroundBrush}"
+                                CornerRadius="8" Padding="12" Margin="0,4,0,0">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Border Grid.Column="0"
+                                        Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                        CornerRadius="4" Padding="10,6">
+                                    <TextBlock Text="{Binding CustomDataDirectory}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip.Tip="{Binding CustomDataDirectory}"/>
+                                </Border>
+                                <Button Grid.Column="1" Content="Browse..."
+                                        Command="{Binding BrowseDataDirectoryCommand}"
+                                        Background="{DynamicResource ThemePrimaryBrush}"
+                                        Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                        Padding="12,6" Margin="8,0,0,0" CornerRadius="4"
+                                        FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Current Selection Info -->
+                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}" CornerRadius="6" Padding="10" Margin="0,4,0,0"
+                            IsVisible="{Binding !IsCustomDirectorySelected}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="📍" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                            <TextBlock Text="{Binding DataDirectoryDisplay}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ============================================================ -->
+                <!-- Step 3: License                                              -->
+                <!-- ============================================================ -->
+                <StackPanel IsVisible="{Binding IsLicenseStep}" Spacing="12">
+                    <TextBlock Text="Activate Your License" FontSize="{DynamicResource ThemeFontSize2Xl}" FontWeight="Bold"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                    <TextBlock Text="Sign in with your PrivStack account to activate."
+                               Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+
+                    <!-- Success State (Licensed) -->
+                    <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="8" Padding="12"
+                            IsVisible="{Binding IsLicenseValid}">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="22" Height="22" Background="{DynamicResource ThemeSuccessBrush}" CornerRadius="11">
+                                <TextBlock Text="✓" FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel>
+                                <TextBlock Text="License Activated" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeSuccessBrush}"/>
+                                <TextBlock Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}">
+                                    <TextBlock.Text>
+                                        <MultiBinding StringFormat="{}{0} License">
+                                            <Binding Path="LicenseTier"/>
+                                        </MultiBinding>
+                                    </TextBlock.Text>
+                                </TextBlock>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Sign In Form -->
+                    <StackPanel Spacing="8" IsVisible="{Binding !IsLicenseValid}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Email" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                            <TextBox Text="{Binding LoginEmail}"
+                                     Watermark="you@example.com"
+                                     Background="{DynamicResource ThemeSurfaceElevatedBrush}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     BorderThickness="0" Padding="10" CornerRadius="6"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Password" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                            <TextBox Text="{Binding LoginPassword}"
+                                     PasswordChar="&#x25CF;"
+                                     Watermark="Your account password"
+                                     Background="{DynamicResource ThemeSurfaceElevatedBrush}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     BorderThickness="0" Padding="10" CornerRadius="6"/>
+                        </StackPanel>
+
+                        <!-- Login Error -->
+                        <TextBlock Text="{Binding LoginError}" Foreground="{DynamicResource ThemeDangerBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding LoginError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                        <!-- Sign In & Activate button -->
+                        <Button Command="{Binding LoginAndActivateCommand}"
+                                IsEnabled="{Binding !IsLoggingIn}"
+                                Background="{DynamicResource ThemePrimaryBrush}" Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                Padding="14,8" CornerRadius="6"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                FontSize="{DynamicResource ThemeFontSizeSm}">
+                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                <ProgressBar IsIndeterminate="True" Width="14" Height="14"
+                                             Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                             IsVisible="{Binding IsLoggingIn}"/>
+                                <TextBlock Text="Sign In &amp; Activate" FontWeight="SemiBold"
+                                           IsVisible="{Binding !IsLoggingIn}"/>
+                                <TextBlock Text="Signing in..." FontWeight="SemiBold"
+                                           IsVisible="{Binding IsLoggingIn}"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- No account hint -->
+                        <TextBlock Text="Don't have an account? Sign up at privstack.io"
+                                   Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Device Info -->
+                    <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="6" Padding="10">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="Device:" Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                            <TextBlock Foreground="{DynamicResource ThemeTextPrimaryBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}">
+                                <TextBlock.Text>
+                                    <MultiBinding StringFormat="{}{0} ({1})">
+                                        <Binding Path="DeviceInfo.Hostname"/>
+                                        <Binding Path="DeviceInfo.OsName"/>
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ============================================================ -->
+                <!-- Step 4: Password                                             -->
+                <!-- ============================================================ -->
+                <StackPanel IsVisible="{Binding IsPasswordStep}" Spacing="12">
+                    <TextBlock Text="{Binding PasswordStepTitle}" FontSize="{DynamicResource ThemeFontSize2Xl}" FontWeight="Bold"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                    <TextBlock Text="{Binding PasswordStepDescription}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeSm}" TextWrapping="Wrap"/>
+
+                    <!-- Error Message -->
+                    <Border Background="{DynamicResource ThemeDangerBrush}" CornerRadius="6" Padding="10"
+                            Opacity="0.9"
+                            IsVisible="{Binding SetupError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding SetupError}" Foreground="White" FontSize="{DynamicResource ThemeFontSizeXsSm}" TextWrapping="Wrap"/>
+                    </Border>
+
+                    <StackPanel Spacing="10" Margin="0,4,0,0">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Master Password" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                            <TextBox Text="{Binding MasterPassword}"
+                                     PasswordChar="●"
+                                     Watermark="Enter your master password"
+                                     Background="{DynamicResource ThemeSurfaceElevatedBrush}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     BorderThickness="0" Padding="10" CornerRadius="6"/>
+                            <!-- Password strength (only for new setup) -->
+                            <StackPanel Orientation="Horizontal" Spacing="6"
+                                        IsVisible="{Binding ShowConfirmPassword}">
+                                <TextBlock Text="Strength:" Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           IsVisible="{Binding PasswordStrength, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                <TextBlock Text="{Binding PasswordStrength}" FontSize="{DynamicResource ThemeFontSizeXsSm}" FontWeight="SemiBold"
+                                           IsVisible="{Binding PasswordStrength, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                    <TextBlock.Foreground>
+                                        <MultiBinding>
+                                            <Binding Path="PasswordStrength"/>
+                                        </MultiBinding>
+                                    </TextBlock.Foreground>
+                                </TextBlock>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Confirm Password (only for new setup) -->
+                        <StackPanel Spacing="6" IsVisible="{Binding ShowConfirmPassword}">
+                            <TextBlock Text="Confirm Password" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                            <TextBox Text="{Binding ConfirmPassword}"
+                                     PasswordChar="●"
+                                     Watermark="Confirm your password"
+                                     Background="{DynamicResource ThemeSurfaceElevatedBrush}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     BorderThickness="0" Padding="10" CornerRadius="6"/>
+                            <TextBlock Text="Passwords do not match" Foreground="{DynamicResource ThemeDangerBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       IsVisible="{Binding !PasswordsMatch}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Warning for new setup -->
+                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}" CornerRadius="6" Padding="10"
+                            IsVisible="{Binding ShowConfirmPassword}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="⚠" Foreground="{DynamicResource ThemeWarningBrush}" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                            <TextBlock Text="Store this password safely. If you forget it, your data cannot be recovered."
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Info for existing data -->
+                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}" CornerRadius="6" Padding="10"
+                            IsVisible="{Binding IsExistingData}">
+                        <StackPanel Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="ℹ" Foreground="{DynamicResource ThemePrimaryBrush}" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                <TextBlock Text="Existing data found. Enter your password to unlock."
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}" TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <!-- Forgot password link -->
+                            <Button Command="{Binding ShowResetPromptCommand}"
+                                    Background="Transparent" Padding="0" HorizontalAlignment="Left"
+                                    Cursor="Hand"
+                                    IsVisible="{Binding !ShowResetConfirmation}">
+                                <TextBlock Text="I forgot my password and need to reset"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeDangerBrush}"
+                                           TextDecorations="Underline"/>
+                            </Button>
+
+                            <!-- Reset confirmation -->
+                            <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="6" Padding="10"
+                                    IsVisible="{Binding ShowResetConfirmation}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="⚠ This will permanently delete all data in this workspace. Your license will remain active — you'll just start with a fresh database."
+                                               Foreground="{DynamicResource ThemeWarningBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}" TextWrapping="Wrap"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Command="{Binding ConfirmResetDataCommand}"
+                                                Background="{DynamicResource ThemeDangerBrush}" Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                                Padding="12,6" CornerRadius="4"
+                                                FontSize="{DynamicResource ThemeFontSizeXsSm}" FontWeight="SemiBold"
+                                                Content="Wipe Data &amp; Reset"/>
+                                        <Button Command="{Binding CancelResetCommand}"
+                                                Background="{DynamicResource ThemeSurfaceElevatedBrush}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                Padding="12,6" CornerRadius="4"
+                                                FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                Content="Cancel"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ============================================================ -->
+                <!-- Step 5: Complete                                             -->
+                <!-- ============================================================ -->
+                <StackPanel IsVisible="{Binding IsCompleteStep}" Spacing="12" HorizontalAlignment="Center">
+                    <Border Width="64" Height="64" Background="{DynamicResource ThemeSuccessBrush}" CornerRadius="32" Margin="0,12,0,0">
+                        <TextBlock Text="✓" FontSize="{DynamicResource ThemeFontSize2Xl}" Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <TextBlock Text="You're All Set!" FontSize="{DynamicResource ThemeFontSize2Xl}" FontWeight="Bold"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" HorizontalAlignment="Center"
+                               IsVisible="{Binding !IsAppLoading}"/>
+                    <TextBlock Text="PrivStack is ready to use."
+                               Foreground="{DynamicResource ThemeTextMutedBrush}" HorizontalAlignment="Center" FontSize="{DynamicResource ThemeFontSizeSm}"
+                               IsVisible="{Binding !IsAppLoading}"/>
+
+                    <!-- Summary (hidden during loading) -->
+                    <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="10" Padding="20" Margin="0,12,0,0" MinWidth="300"
+                            IsVisible="{Binding !IsAppLoading}">
+                        <StackPanel Spacing="8">
+                            <Grid ColumnDefinitions="80,*">
+                                <TextBlock Text="Name:" Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding DisplayName}" Foreground="{DynamicResource ThemeTextPrimaryBrush}" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="80,*">
+                                <TextBlock Text="License:" Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding LicenseTier}" Foreground="{DynamicResource ThemePrimaryBrush}" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="80,*">
+                                <TextBlock Text="Workspace:" Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding WorkspaceName}" Foreground="{DynamicResource ThemeTextPrimaryBrush}" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="80,*">
+                                <TextBlock Text="Theme:" Foreground="{DynamicResource ThemeTextMutedBrush}" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding SelectedThemeDisplay}" Foreground="{DynamicResource ThemeTextPrimaryBrush}" FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- App Loading State (shown after "Get Started") -->
+                    <StackPanel IsVisible="{Binding IsAppLoading}" Spacing="14" HorizontalAlignment="Center" Margin="0,8,0,0">
+                        <TextBlock Text="Launching PrivStack..." FontSize="{DynamicResource ThemeFontSizeLg}" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" HorizontalAlignment="Center"/>
+                        <ProgressBar IsIndeterminate="True"
+                                     Width="200" Height="3"
+                                     Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                     Foreground="{DynamicResource ThemePrimaryBrush}"
+                                     CornerRadius="2"/>
+                        <TextBlock Text="{Binding LoadingMessage}"
+                                   FontSize="{DynamicResource ThemeFontSizeSm}"
+                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Footer / Navigation (hidden during app loading) -->
+        <Border Grid.Row="2" Background="{DynamicResource ThemeSurfaceBrush}" Padding="20,12"
+                IsVisible="{Binding !IsAppLoading}">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <Button Grid.Column="1" Content="Back" Command="{Binding GoBackCommand}"
+                        IsVisible="{Binding CanGoBack}"
+                        Background="{DynamicResource ThemeSurfaceElevatedBrush}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                        Padding="20,8" CornerRadius="6" Margin="0,0,10,0"
+                        FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                <Button Grid.Column="2" Content="{Binding NextButtonText}" Command="{Binding GoNextCommand}"
+                        IsEnabled="{Binding CanGoNext}"
+                        Background="{DynamicResource ThemePrimaryBrush}" Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                        Padding="20,8" CornerRadius="6" FontWeight="SemiBold"
+                        FontSize="{DynamicResource ThemeFontSizeSm}"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

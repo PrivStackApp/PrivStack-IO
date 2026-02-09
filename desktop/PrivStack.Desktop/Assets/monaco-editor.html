@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            background: #1e1e2e;
+        }
+        #editor {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="editor"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+    <script>
+        let editor = null;
+        let isReadOnly = true;
+
+        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+
+        require(['vs/editor/editor.main'], function () {
+            // Define custom dark theme matching the app
+            monaco.editor.defineTheme('privstack-dark', {
+                base: 'vs-dark',
+                inherit: true,
+                rules: [],
+                colors: {
+                    'editor.background': '#1e1e2e',
+                    'editor.foreground': '#cdd6f4',
+                    'editorLineNumber.foreground': '#6c7086',
+                    'editorLineNumber.activeForeground': '#cdd6f4',
+                    'editor.selectionBackground': '#45475a',
+                    'editor.lineHighlightBackground': '#313244',
+                }
+            });
+
+            editor = monaco.editor.create(document.getElementById('editor'), {
+                value: '',
+                language: 'plaintext',
+                theme: 'privstack-dark',
+                automaticLayout: true,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                fontSize: 13,
+                fontFamily: "'JetBrains Mono', 'Cascadia Code', Consolas, 'Courier New', monospace",
+                lineNumbers: 'on',
+                readOnly: true,
+                wordWrap: 'off',
+                padding: { top: 16, bottom: 16 },
+                scrollbar: {
+                    vertical: 'auto',
+                    horizontal: 'auto'
+                }
+            });
+
+            // Notify that editor is ready
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage({ type: 'ready' });
+            }
+
+            // Listen for content changes
+            editor.onDidChangeModelContent(() => {
+                if (window.chrome && window.chrome.webview) {
+                    window.chrome.webview.postMessage({
+                        type: 'contentChanged',
+                        content: editor.getValue()
+                    });
+                }
+            });
+        });
+
+        // Functions called from C#
+        function setCode(code, language) {
+            if (editor) {
+                const model = editor.getModel();
+                monaco.editor.setModelLanguage(model, mapLanguage(language || 'plaintext'));
+                editor.setValue(code || '');
+            }
+        }
+
+        function getCode() {
+            return editor ? editor.getValue() : '';
+        }
+
+        function setReadOnly(readOnly) {
+            if (editor) {
+                isReadOnly = readOnly;
+                editor.updateOptions({ readOnly: readOnly });
+            }
+        }
+
+        function setLanguage(language) {
+            if (editor) {
+                const model = editor.getModel();
+                monaco.editor.setModelLanguage(model, mapLanguage(language || 'plaintext'));
+            }
+        }
+
+        function mapLanguage(lang) {
+            if (!lang) return 'plaintext';
+            const map = {
+                'rs': 'rust', 'rust': 'rust',
+                'py': 'python', 'python': 'python',
+                'js': 'javascript', 'javascript': 'javascript',
+                'ts': 'typescript', 'typescript': 'typescript',
+                'go': 'go',
+                'java': 'java',
+                'cs': 'csharp', 'csharp': 'csharp',
+                'cpp': 'cpp', 'c++': 'cpp',
+                'c': 'c',
+                'rb': 'ruby', 'ruby': 'ruby',
+                'swift': 'swift',
+                'kt': 'kotlin', 'kotlin': 'kotlin',
+                'php': 'php',
+                'html': 'html', 'htm': 'html',
+                'css': 'css',
+                'sql': 'sql',
+                'sh': 'shell', 'bash': 'shell', 'shell': 'shell',
+                'yaml': 'yaml', 'yml': 'yaml',
+                'json': 'json',
+                'toml': 'toml',
+                'md': 'markdown', 'markdown': 'markdown',
+                'xml': 'xml',
+                'txt': 'plaintext', 'plaintext': 'plaintext'
+            };
+            return map[lang.toLowerCase()] || 'plaintext';
+        }
+    </script>
+</body>
+</html>

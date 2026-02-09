@@ -1,0 +1,61 @@
+package privstack:plugin@0.1.0;
+
+/// Core plugin contract — every plugin must export this.
+interface plugin {
+    use types.{plugin-metadata, entity-schema, navigation-item, command-definition};
+
+    get-metadata: func() -> plugin-metadata;
+    get-entity-schemas: func() -> list<entity-schema>;
+    get-navigation-item: func() -> option<navigation-item>;
+    get-commands: func() -> list<command-definition>;
+
+    initialize: func() -> bool;
+    activate: func();
+    deactivate: func();
+    on-navigated-to: func();
+    on-navigated-from: func();
+    dispose: func();
+
+    /// Returns the current view state as JSON for ViewModelProxy rendering.
+    get-view-state: func() -> string;
+    /// Receives a command from the host/UI layer.
+    handle-command: func(name: string, args: string) -> string;
+}
+
+/// Optional: plugin provides linkable items for cross-plugin linking.
+interface linkable-item-provider {
+    use types.{linkable-item};
+
+    link-type: func() -> string;
+    link-type-display-name: func() -> string;
+    link-type-icon: func() -> string;
+    search-items: func(query: string, max-results: u32) -> list<linkable-item>;
+    get-item-by-id: func(item-id: string) -> option<linkable-item>;
+}
+
+/// Optional: plugin can be navigated to via deep links.
+interface deep-link-target {
+    link-type: func() -> string;
+    navigate-to-item: func(item-id: string);
+}
+
+/// Optional: plugin has timer functionality.
+interface timer {
+    use types.{timer-state, timer-result};
+
+    start-timer: func(item-id: string);
+    pause-timer: func();
+    resume-timer: func();
+    stop-timer: func() -> timer-result;
+    get-timer-state: func() -> timer-state;
+}
+
+/// Optional: plugin supports shutdown-aware cleanup.
+interface shutdown-aware {
+    on-shutdown: func();
+}
+
+/// Optional: plugin provides raw view data for host-side template evaluation.
+interface template-data-provider {
+    get-view-data: func() -> string;
+}

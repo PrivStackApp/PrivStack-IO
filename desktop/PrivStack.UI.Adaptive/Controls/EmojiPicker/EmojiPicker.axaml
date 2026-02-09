@@ -1,0 +1,117 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="500"
+             x:Class="PrivStack.UI.Adaptive.Controls.EmojiPicker.EmojiPicker"
+             x:CompileBindings="False"
+             IsVisible="{Binding IsOpen}">
+
+    <!-- Overlay Background -->
+    <Grid>
+        <!-- Backdrop (click to close) -->
+        <Border Background="#80000000" PointerPressed="OnBackdropPressed"/>
+
+        <!-- Picker Container -->
+        <Border Background="{DynamicResource ThemeBorderBrush}" CornerRadius="12"
+                HorizontalAlignment="Center" VerticalAlignment="Top"
+                Margin="0,80,0,0" Width="380"
+                BoxShadow="0 8 32 0 #40000000">
+            <Grid RowDefinitions="Auto,Auto,Auto,*">
+                <!-- Search Input -->
+                <Border Grid.Row="0" Background="{DynamicResource ThemeSurfaceElevatedBrush}" CornerRadius="8" Margin="12,12,12,0" Padding="4">
+                    <TextBox Text="{Binding SearchQuery}"
+                             Watermark="Search emojis..."
+                             Background="Transparent" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                             BorderThickness="0" Padding="12,10"
+                             FontSize="{DynamicResource ThemeFontSizeMd}"
+                             CaretBrush="{DynamicResource ThemeTextPrimaryBrush}"
+                             Name="SearchBox"/>
+                </Border>
+
+                <!-- Category Tabs (keyboard navigable, horizontally scrollable) -->
+                <ScrollViewer Grid.Row="1"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Disabled"
+                              Margin="12,8,12,0">
+                    <ItemsControl Name="CategoryTabs"
+                                  ItemsSource="{Binding Categories}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="4"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Name="CategoryBorder"
+                                        Padding="8,6"
+                                        CornerRadius="6"
+                                        MinWidth="36"
+                                        MinHeight="36"
+                                        Cursor="Hand"
+                                        Background="Transparent"
+                                        PointerPressed="OnCategoryPressed"
+                                        ToolTip.Tip="{Binding Name}">
+                                    <TextBlock Text="{Binding Icon}"
+                                               FontSize="{DynamicResource ThemeFontSizeLgXl}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Hint -->
+                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
+                            Margin="12,8,12,0" Spacing="8">
+                    <TextBlock Text="click to insert" FontSize="{DynamicResource ThemeFontSizeXs}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                    <TextBlock Text="esc close" FontSize="{DynamicResource ThemeFontSizeXs}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                </StackPanel>
+
+                <!-- Emoji Grid with Scroll -->
+                <ScrollViewer Grid.Row="3"
+                              MaxHeight="300"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <ItemsControl Name="EmojiGrid"
+                                  ItemsSource="{Binding FilteredEmojis}"
+                                  Margin="8,8,20,12">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Name="EmojiBorder"
+                                        Width="48" Height="48"
+                                        CornerRadius="6"
+                                        Margin="4"
+                                        ToolTip.Tip="{Binding Name}"
+                                        Background="Transparent"
+                                        Cursor="Hand"
+                                        PointerPressed="OnEmojiPressed">
+                                    <TextBlock Text="{Binding Emoji}"
+                                               FontSize="{DynamicResource ThemeFontSize3Xl}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Empty State -->
+                <StackPanel Grid.Row="3" HorizontalAlignment="Center" VerticalAlignment="Center"
+                            IsVisible="{Binding !FilteredEmojis.Count}" Margin="0,20">
+                    <TextBlock Text="No emojis found" FontSize="{DynamicResource ThemeFontSizeSmMd}" Foreground="{DynamicResource ThemeTextMutedBrush}"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="Try a different search term"
+                               FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="{DynamicResource ThemeHoverBrush}"
+                               HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

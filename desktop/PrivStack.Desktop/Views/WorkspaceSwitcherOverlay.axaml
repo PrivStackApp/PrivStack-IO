@@ -1,0 +1,198 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PrivStack.Desktop.ViewModels"
+             xmlns:controls="using:PrivStack.Desktop.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="400"
+             x:Class="PrivStack.Desktop.Views.WorkspaceSwitcherOverlay"
+             x:DataType="vm:WorkspaceSwitcherViewModel"
+             IsVisible="{Binding IsOpen}">
+
+    <UserControl.Styles>
+        <Style Selector="Button.ws-item">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="16,14"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="4,2"/>
+        </Style>
+        <Style Selector="Button.ws-item:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+        </Style>
+        <Style Selector="Button.ws-delete">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Opacity" Value="0.5"/>
+        </Style>
+        <Style Selector="Button.ws-delete:pointerover">
+            <Setter Property="Opacity" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource ThemeDangerBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <!-- Full-screen backdrop -->
+    <Panel>
+        <Border Background="#80000000"
+                PointerPressed="OnBackdropPressed"/>
+
+        <!-- Centered palette -->
+        <Border HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="0,80,0,0"
+                Width="480"
+                MaxHeight="500"
+                Background="{DynamicResource ThemeSurfaceBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                BoxShadow="0 8 32 0 #60000000"
+                ClipToBounds="True">
+            <Grid RowDefinitions="Auto,*,Auto">
+                <!-- Search bar -->
+                <Border Grid.Row="0" Padding="16,12"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}"
+                        BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <controls:IconControl Grid.Column="0" Icon="Search" Size="18" StrokeThickness="1.5"
+                                              Stroke="{DynamicResource ThemeTextMutedBrush}"
+                                              VerticalAlignment="Center" Margin="0,0,12,0"/>
+                        <TextBox Grid.Column="1" x:Name="SearchBox"
+                                 Text="{Binding SearchQuery, Mode=TwoWay}"
+                                 Watermark="Search workspaces..."
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                 FontSize="{DynamicResource ThemeFontSizeMd}"/>
+                    </Grid>
+                </Border>
+
+                <!-- Workspace list -->
+                <ScrollViewer Grid.Row="1" Padding="8">
+                    <ItemsControl ItemsSource="{Binding FilteredWorkspaces}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:WorkspaceItem">
+                                <Panel>
+                                    <!-- Normal state -->
+                                    <Button Classes="ws-item"
+                                            IsVisible="{Binding !IsConfirmingDelete}"
+                                            Command="{Binding $parent[UserControl].((vm:WorkspaceSwitcherViewModel)DataContext).SwitchWorkspaceCommand}"
+                                            CommandParameter="{Binding Id}">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                            <!-- Active indicator -->
+                                            <controls:IconControl Grid.Column="0"
+                                                                  Icon="Check" Size="16" StrokeThickness="2"
+                                                                  Stroke="{DynamicResource ThemeSuccessBrush}"
+                                                                  IsVisible="{Binding IsActive}"
+                                                                  VerticalAlignment="Center"
+                                                                  Margin="0,0,12,0"/>
+                                            <Border Grid.Column="0" Width="16" Margin="0,0,12,0"
+                                                    IsVisible="{Binding !IsActive}"/>
+
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}"
+                                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                       FontSize="{DynamicResource ThemeFontSizeMd}"
+                                                       VerticalAlignment="Center"/>
+
+                                            <!-- Delete button (hidden for active) -->
+                                            <Button Grid.Column="3" Classes="ws-delete"
+                                                    IsVisible="{Binding !IsActive}"
+                                                    Command="{Binding $parent[UserControl].((vm:WorkspaceSwitcherViewModel)DataContext).ConfirmDeleteCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <controls:IconControl Icon="X" Size="14" StrokeThickness="1.5"
+                                                                      Stroke="{DynamicResource ThemeTextMutedBrush}"/>
+                                            </Button>
+                                        </Grid>
+                                    </Button>
+
+                                    <!-- Delete confirmation state -->
+                                    <Border IsVisible="{Binding IsConfirmingDelete}"
+                                            Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                            CornerRadius="6" Padding="16,12">
+                                        <Grid ColumnDefinitions="*,Auto,Auto">
+                                            <TextBlock Grid.Column="0"
+                                                       Foreground="{DynamicResource ThemeDangerBrush}"
+                                                       FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                       VerticalAlignment="Center">
+                                                <TextBlock.Text>
+                                                    <MultiBinding StringFormat="Delete '{0}'?">
+                                                        <Binding Path="Name"/>
+                                                    </MultiBinding>
+                                                </TextBlock.Text>
+                                            </TextBlock>
+                                            <Button Grid.Column="1" Content="Delete"
+                                                    Background="{DynamicResource ThemeDangerBrush}"
+                                                    Foreground="White"
+                                                    Padding="12,6" CornerRadius="4" Margin="8,0,4,0"
+                                                    FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                    Command="{Binding $parent[UserControl].((vm:WorkspaceSwitcherViewModel)DataContext).DeleteWorkspaceCommand}"
+                                                    CommandParameter="{Binding}"/>
+                                            <Button Grid.Column="2" Content="Cancel"
+                                                    Background="{DynamicResource ThemeSurfaceBrush}"
+                                                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                    Padding="12,6" CornerRadius="4"
+                                                    FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                    Command="{Binding $parent[UserControl].((vm:WorkspaceSwitcherViewModel)DataContext).CancelDeleteCommand}"
+                                                    CommandParameter="{Binding}"/>
+                                        </Grid>
+                                    </Border>
+                                </Panel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Footer: Create new workspace -->
+                <Border Grid.Row="2" Padding="12"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}"
+                        BorderThickness="0,1,0,0">
+                    <Panel>
+                        <!-- Create button -->
+                        <Button IsVisible="{Binding !IsCreating}"
+                                Command="{Binding StartCreatingCommand}"
+                                Background="Transparent"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                Padding="12,10" CornerRadius="6"
+                                Cursor="Hand">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <controls:IconControl Icon="Plus" Size="16" StrokeThickness="1.5"
+                                                      Stroke="{DynamicResource ThemePrimaryBrush}"/>
+                                <TextBlock Text="Create New Workspace"
+                                           Foreground="{DynamicResource ThemePrimaryBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeSmMd}"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Inline create form -->
+                        <Grid IsVisible="{Binding IsCreating}"
+                              ColumnDefinitions="*,Auto,Auto">
+                            <TextBox Grid.Column="0" x:Name="NewWorkspaceNameBox"
+                                     Text="{Binding NewWorkspaceName, Mode=TwoWay}"
+                                     Watermark="Workspace name..."
+                                     Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     BorderThickness="0" Padding="12,8" CornerRadius="6"/>
+                            <Button Grid.Column="1" Content="Create"
+                                    Command="{Binding CreateWorkspaceCommand}"
+                                    Background="{DynamicResource ThemePrimaryBrush}"
+                                    Foreground="White"
+                                    Padding="16,8" CornerRadius="6" Margin="8,0,4,0"
+                                    FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                            <Button Grid.Column="2" Content="Cancel"
+                                    Command="{Binding CancelCreatingCommand}"
+                                    Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                    Padding="16,8" CornerRadius="6"
+                                    FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                        </Grid>
+                    </Panel>
+                </Border>
+            </Grid>
+        </Border>
+    </Panel>
+</UserControl>

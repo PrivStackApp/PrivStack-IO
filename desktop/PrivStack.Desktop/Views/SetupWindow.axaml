@@ -1,0 +1,21 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PrivStack.Desktop.ViewModels"
+        xmlns:views="using:PrivStack.Desktop.Views"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="560"
+        x:Class="PrivStack.Desktop.Views.SetupWindow"
+        x:DataType="vm:SetupWizardViewModel"
+        Title="PrivStack Setup"
+        Width="600"
+        MinWidth="600" MinHeight="400"
+        MaxHeight="800"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        SystemDecorations="Full"
+        Background="{DynamicResource ThemeBorderBrush}">
+
+    <views:SetupWizardView/>
+</Window>
