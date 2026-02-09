@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="1024" height="1024">
+  <!-- Background rounded rectangle -->
+  <rect x="32" y="32" width="448" height="448" rx="64" ry="64" fill="#08080C"/>
+  <!-- Border rounded rectangle -->
+  <rect x="32" y="32" width="448" height="448" rx="64" ry="64" fill="none" stroke="#00D4FF" stroke-width="48"/>
+  <!-- Checkmark -->
+  <polyline points="160,256 224,320 352,192" fill="none" stroke="#00D4FF" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

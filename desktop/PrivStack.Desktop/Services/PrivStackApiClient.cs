@@ -1,0 +1,216 @@
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using PrivStack.Desktop.Models;
+
+namespace PrivStack.Desktop.Services;
+
+/// <summary>
+/// HTTP client for authenticating with the PrivStack API and fetching license keys.
+/// </summary>
+public sealed class PrivStackApiClient
+{
+    public const string ApiBaseUrl = "https://privstack.io";
+
+    private static readonly HttpClient Http = new()
+    {
+        Timeout = TimeSpan.FromSeconds(15)
+    };
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    /// <summary>
+    /// Authenticates with the PrivStack API using email/password.
+    /// </summary>
+    public async Task<LoginResponse> LoginAsync(string email, string password)
+    {
+        var payload = JsonSerializer.Serialize(new { email, password }, JsonOptions);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{ApiBaseUrl}/api/auth/login")
+        {
+            Content = new StringContent(payload, Encoding.UTF8, "application/json")
+        };
+        request.Headers.Add("X-Client-Type", "desktop");
+
+        using var response = await Http.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = TryParseError(body);
+            throw new PrivStackApiException(error ?? $"Login failed (HTTP {(int)response.StatusCode})");
+        }
+
+        return JsonSerializer.Deserialize<LoginResponse>(body, JsonOptions)
+               ?? throw new PrivStackApiException("Empty response from server");
+    }
+
+    /// <summary>
+    /// Fetches the user's license key from the PrivStack API.
+    /// </summary>
+    public async Task<LicenseResponse> GetLicenseKeyAsync(string accessToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/api/account/license");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await Http.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = TryParseError(body);
+            throw new PrivStackApiException(error ?? $"Failed to fetch license (HTTP {(int)response.StatusCode})");
+        }
+
+        return JsonSerializer.Deserialize<LicenseResponse>(body, JsonOptions)
+               ?? throw new PrivStackApiException("Empty response from server");
+    }
+
+    /// <summary>
+    /// Fetches the list of official plugins from the PrivStack registry.
+    /// </summary>
+    public async Task<IReadOnlyList<Models.PluginRegistry.OfficialPluginInfo>> GetOfficialPluginsAsync(CancellationToken ct = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/api/official-plugins");
+        request.Headers.Add("X-Client-Type", "desktop");
+
+        using var response = await Http.SendAsync(request, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = TryParseError(body);
+            throw new PrivStackApiException(error ?? $"Failed to fetch official plugins (HTTP {(int)response.StatusCode})");
+        }
+
+        var result = JsonSerializer.Deserialize<OfficialPluginsResponse>(body, JsonOptions);
+        return result?.Plugins ?? [];
+    }
+
+    /// <summary>
+    /// Fetches the latest release info from the public endpoint (no auth required).
+    /// </summary>
+    public async Task<LatestReleaseInfo?> GetLatestReleaseAsync(CancellationToken ct = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/api/releases/latest");
+        request.Headers.Add("X-Client-Type", "desktop");
+
+        using var response = await Http.SendAsync(request, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = TryParseError(body);
+            throw new PrivStackApiException(error ?? $"Failed to fetch latest release (HTTP {(int)response.StatusCode})");
+        }
+
+        return JsonSerializer.Deserialize<LatestReleaseInfo>(body, JsonOptions);
+    }
+
+    /// <summary>
+    /// Fetches downloadable release artifacts with checksums (requires authentication).
+    /// </summary>
+    public async Task<AccountReleasesResponse?> GetAccountReleasesAsync(string accessToken, CancellationToken ct = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/api/account/releases");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await Http.SendAsync(request, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = TryParseError(body);
+            throw new PrivStackApiException(error ?? $"Failed to fetch account releases (HTTP {(int)response.StatusCode})");
+        }
+
+        return JsonSerializer.Deserialize<AccountReleasesResponse>(body, JsonOptions);
+    }
+
+    private static string? TryParseError(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("error", out var errorProp))
+                return errorProp.GetString();
+        }
+        catch
+        {
+            // Not JSON or no error field
+        }
+        return null;
+    }
+}
+
+/// <summary>
+/// Exception for PrivStack API errors.
+/// </summary>
+public class PrivStackApiException : Exception
+{
+    public PrivStackApiException(string message) : base(message) { }
+}
+
+// --- Response DTOs ---
+
+public record LoginResponse
+{
+    [JsonPropertyName("user")]
+    public LoginUser? User { get; init; }
+
+    [JsonPropertyName("accessToken")]
+    public string AccessToken { get; init; } = string.Empty;
+
+    [JsonPropertyName("refreshToken")]
+    public string? RefreshToken { get; init; }
+}
+
+public record LoginUser
+{
+    [JsonPropertyName("id")]
+    public int Id { get; init; }
+
+    [JsonPropertyName("email")]
+    public string Email { get; init; } = string.Empty;
+
+    [JsonPropertyName("display_name")]
+    public string? DisplayName { get; init; }
+
+    [JsonPropertyName("role")]
+    public string? Role { get; init; }
+}
+
+public record LicenseResponse
+{
+    [JsonPropertyName("license")]
+    public LicenseData? License { get; init; }
+}
+
+public record LicenseData
+{
+    [JsonPropertyName("key")]
+    public string Key { get; init; } = string.Empty;
+
+    [JsonPropertyName("plan")]
+    public string Plan { get; init; } = string.Empty;
+
+    [JsonPropertyName("subscription_status")]
+    public string? SubscriptionStatus { get; init; }
+
+    [JsonPropertyName("expires_at")]
+    public string? ExpiresAt { get; init; }
+
+    [JsonPropertyName("issued_at")]
+    public string? IssuedAt { get; init; }
+}
+
+public record OfficialPluginsResponse
+{
+    [JsonPropertyName("plugins")]
+    public List<Models.PluginRegistry.OfficialPluginInfo>? Plugins { get; init; }
+}

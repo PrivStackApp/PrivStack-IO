@@ -1,0 +1,625 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:PrivStack.Desktop.ViewModels"
+             xmlns:plugin="using:PrivStack.Desktop.Services.Plugin"
+             xmlns:sdk="using:PrivStack.Sdk"
+             xmlns:cap="using:PrivStack.Sdk.Capabilities"
+             xmlns:controls="using:PrivStack.Desktop.Controls"
+             mc:Ignorable="d" d:DesignWidth="220" d:DesignHeight="600"
+             x:Class="PrivStack.Desktop.Views.NavigationSidebar"
+             x:DataType="vm:MainWindowViewModel">
+
+    <UserControl.Styles>
+        <!-- Sidebar container -->
+        <Style Selector="Border.sidebar-container">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeNavBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,1,0"/>
+            <Setter Property="BoxShadow" Value="2 0 8 0 #20000000"/>
+        </Style>
+
+        <!-- Navigation item base -->
+        <Style Selector="Button.nav-item">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextBrush}"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Margin" Value="8,2"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.12"/>
+                    <BrushTransition Property="Foreground" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <Style Selector="Button.nav-item:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+        </Style>
+        <Style Selector="Button.nav-item:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+        </Style>
+
+        <Style Selector="Button.nav-item:pressed">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavSelectedBrush}"/>
+        </Style>
+        <Style Selector="Button.nav-item:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavSelectedBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+        </Style>
+
+        <Style Selector="Button.nav-item.active">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavSelectedBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+        </Style>
+        <Style Selector="Button.nav-item.active /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavSelectedBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+        </Style>
+
+        <!-- Icon styling in nav items -->
+        <Style Selector="Button.nav-item controls|IconControl">
+            <Setter Property="Stroke" Value="{DynamicResource ThemeNavTextBrush}"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Stroke" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <Style Selector="Button.nav-item:pointerover controls|IconControl">
+            <Setter Property="Stroke" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+        </Style>
+
+        <Style Selector="Button.nav-item.active controls|IconControl">
+            <Setter Property="Stroke" Value="{DynamicResource ThemePrimaryBrush}"/>
+        </Style>
+
+        <!-- Nav item text -->
+        <Style Selector="Button.nav-item TextBlock.nav-label">
+            <Setter Property="Margin" Value="12,0,0,0"/>
+            <Setter Property="FontSize" Value="{DynamicResource ThemeFontSizeSmMd}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Collapsed mode - icon only button (matches expanded sizing) -->
+        <Style Selector="Button.nav-item-collapsed">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextBrush}"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Margin" Value="8,2"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <Style Selector="Button.nav-item-collapsed:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
+        </Style>
+        <Style Selector="Button.nav-item-collapsed:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
+        </Style>
+
+        <Style Selector="Button.nav-item-collapsed:pressed">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavSelectedBrush}"/>
+        </Style>
+        <Style Selector="Button.nav-item-collapsed:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavSelectedBrush}"/>
+        </Style>
+
+        <Style Selector="Button.nav-item-collapsed.active">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavSelectedBrush}"/>
+        </Style>
+        <Style Selector="Button.nav-item-collapsed.active /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavSelectedBrush}"/>
+        </Style>
+
+        <Style Selector="Button.nav-item-collapsed controls|IconControl">
+            <Setter Property="Stroke" Value="{DynamicResource ThemeNavTextBrush}"/>
+        </Style>
+
+        <Style Selector="Button.nav-item-collapsed:pointerover controls|IconControl">
+            <Setter Property="Stroke" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+        </Style>
+
+        <Style Selector="Button.nav-item-collapsed.active controls|IconControl">
+            <Setter Property="Stroke" Value="{DynamicResource ThemePrimaryBrush}"/>
+        </Style>
+
+        <!-- Footer items (settings, sync, etc.) -->
+        <Style Selector="Button.nav-footer-item">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextBrush}"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Margin" Value="8,1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <Style Selector="Button.nav-footer-item:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+        </Style>
+        <Style Selector="Button.nav-footer-item:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+        </Style>
+
+        <Style Selector="Button.nav-footer-item controls|IconControl">
+            <Setter Property="Stroke" Value="{DynamicResource ThemeNavTextBrush}"/>
+        </Style>
+
+        <Style Selector="Button.nav-footer-item:pointerover controls|IconControl">
+            <Setter Property="Stroke" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+        </Style>
+
+        <!-- Footer items collapsed (icons only, matching footer vertical sizing) -->
+        <Style Selector="Button.nav-footer-item-collapsed">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextBrush}"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Margin" Value="8,1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <Style Selector="Button.nav-footer-item-collapsed:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
+        </Style>
+        <Style Selector="Button.nav-footer-item-collapsed:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
+        </Style>
+
+        <Style Selector="Button.nav-footer-item-collapsed controls|IconControl">
+            <Setter Property="Stroke" Value="{DynamicResource ThemeNavTextBrush}"/>
+        </Style>
+
+        <Style Selector="Button.nav-footer-item-collapsed:pointerover controls|IconControl">
+            <Setter Property="Stroke" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
+        </Style>
+
+        <!-- Disabled/locked nav items -->
+        <Style Selector="Button.nav-item.locked">
+            <Setter Property="Opacity" Value="0.5"/>
+            <Setter Property="Cursor" Value="Arrow"/>
+        </Style>
+
+        <Style Selector="Button.nav-item-collapsed.locked">
+            <Setter Property="Opacity" Value="0.5"/>
+            <Setter Property="Cursor" Value="Arrow"/>
+        </Style>
+
+        <!-- Dragging state for nav item -->
+        <Style Selector="Border.nav-item-wrapper.dragging">
+            <Setter Property="Opacity" Value="0.3"/>
+        </Style>
+
+        <!-- Smooth transform animation for reorder shifting -->
+        <Style Selector="Border.nav-item-wrapper">
+            <Setter Property="RenderTransform" Value="none"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <!-- Drag ghost floating card -->
+        <Style Selector="Border.drag-ghost">
+            <Setter Property="Background" Value="{DynamicResource ThemeNavBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemePrimaryBrush}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Opacity" Value="0.9"/>
+            <Setter Property="BoxShadow" Value="0 4 12 0 #40000000"/>
+        </Style>
+    </UserControl.Styles>
+
+    <!-- Main sidebar layout -->
+    <Border Classes="sidebar-container">
+        <Grid RowDefinitions="Auto,*,Auto">
+            <!-- Header: Logo + Title + Workspace Name -->
+            <Panel Grid.Row="0">
+                <!-- Expanded header -->
+                <StackPanel IsVisible="{Binding !IsSidebarCollapsed}"
+                            Margin="0,0,0,2">
+                    <!-- PrivStack title row (always visible) -->
+                    <StackPanel Orientation="Horizontal" Spacing="12"
+                                Margin="20,12,12,0">
+                        <controls:LogoControl Width="18" Height="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="PrivStack"
+                                   FontSize="{DynamicResource ThemeFontSizeMd}" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource ThemeNavTextHoverBrush}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Workspace name (clickable, below title) -->
+                    <Button Command="{Binding OpenWorkspaceSwitcherCommand}"
+                            Background="Transparent"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Padding="20,4,12,6"
+                            CornerRadius="0"
+                            Cursor="Hand"
+                            ToolTip.Tip="Switch Workspace (Ctrl+K W)">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="{Binding CurrentWorkspaceName}"
+                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeNavTextBrush}"
+                                       MaxLines="1" TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center"/>
+                            <controls:IconControl Icon="ChevronDown" Size="10" StrokeThickness="1.5"
+                                                  Stroke="{DynamicResource ThemeNavTextBrush}"
+                                                  VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- Collapsed header: logo aligned with nav icons -->
+                <Border IsVisible="{Binding IsSidebarCollapsed}"
+                        Padding="12,10"
+                        Margin="8,12,8,6"
+                        HorizontalAlignment="Left">
+                    <controls:LogoControl Width="18" Height="18"
+                                          VerticalAlignment="Center"/>
+                </Border>
+            </Panel>
+
+            <!-- Navigation Items -->
+            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <Grid>
+                    <!-- Expanded mode navigation -->
+                    <ItemsControl x:Name="ExpandedNavItems"
+                                  ItemsSource="{Binding NavigationItems}"
+                                  IsVisible="{Binding !IsSidebarCollapsed}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="sdk:NavigationItem">
+                                <Border Classes="nav-item-wrapper"
+                                        Background="Transparent">
+                                    <Button Classes="nav-item"
+                                            Classes.active="{Binding IsSelected}"
+                                            Classes.locked="{Binding IsHardLocked}"
+                                            Command="{Binding $parent[UserControl].((vm:MainWindowViewModel)DataContext).SelectTabCommand}"
+                                            CommandParameter="{Binding Id}"
+                                            IsEnabled="{Binding IsEnabled}"
+                                            ToolTip.Tip="{Binding Tooltip}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <controls:IconControl Icon="{Binding Icon}" Size="18" StrokeThickness="1.5"/>
+                                            <TextBlock Text="{Binding DisplayName}" Classes="nav-label"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Collapsed mode navigation (icons only) -->
+                    <ItemsControl x:Name="CollapsedNavItems"
+                                  ItemsSource="{Binding NavigationItems}"
+                                  IsVisible="{Binding IsSidebarCollapsed}"
+                                  HorizontalAlignment="Stretch">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="sdk:NavigationItem">
+                                <Border Classes="nav-item-wrapper"
+                                        Background="Transparent">
+                                    <Button Classes="nav-item-collapsed"
+                                            Classes.active="{Binding IsSelected}"
+                                            Classes.locked="{Binding IsHardLocked}"
+                                            Command="{Binding $parent[UserControl].((vm:MainWindowViewModel)DataContext).SelectTabCommand}"
+                                            CommandParameter="{Binding Id}"
+                                            IsEnabled="{Binding IsEnabled}"
+                                            ToolTip.Tip="{Binding DisplayName}">
+                                        <controls:IconControl Icon="{Binding Icon}" Size="18" StrokeThickness="1.5"/>
+                                    </Button>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Drag overlay canvas for floating ghost -->
+                    <Canvas x:Name="DragOverlay"
+                            IsHitTestVisible="False"
+                            ZIndex="1000"/>
+                </Grid>
+            </ScrollViewer>
+
+                        <!-- Footer: Settings, Sync, User -->
+                        <Border Grid.Row="2" Padding="0,8"
+                                BorderBrush="{DynamicResource ThemeNavBorderSubtleBrush}"
+                                BorderThickness="0,1,0,0">
+                            <StackPanel>
+                                <!-- Expanded footer -->
+                                <StackPanel IsVisible="{Binding !IsSidebarCollapsed}" Spacing="4">
+                                    <!-- Active Timers (multi-timer) -->
+                                    <ItemsControl ItemsSource="{Binding AllActiveTimers}"
+                                                  IsVisible="{Binding HasActiveTimers}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="cap:ActiveTimerInfo">
+                                                <Button Classes="nav-footer-item"
+                                                        Command="{Binding $parent[UserControl].((vm:MainWindowViewModel)DataContext).NavigateToSpecificTimerCommand}"
+                                                        CommandParameter="{Binding ItemId}"
+                                                        ToolTip.Tip="{Binding Title}">
+                                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                                        <!-- Status dot: green=running, amber=paused -->
+                                                        <Panel Grid.Column="0" Width="8" Height="8" VerticalAlignment="Center">
+                                                            <Border Width="8" Height="8" CornerRadius="4"
+                                                                    Background="{DynamicResource ThemeSuccessBrush}"
+                                                                    IsVisible="{Binding IsRunning}"/>
+                                                            <Border Width="8" Height="8" CornerRadius="4"
+                                                                    Background="{DynamicResource ThemeWarningBrush}"
+                                                                    IsVisible="{Binding !IsRunning}"/>
+                                                        </Panel>
+                                                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Title}"
+                                                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                                       Foreground="{DynamicResource ThemeNavTextBrush}"
+                                                                       MaxLines="1" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Text="{Binding ElapsedDisplay}"
+                                                                       FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource ThemeSuccessBrush}"/>
+                                                        </StackPanel>
+                                                        <!-- Stop button -->
+                                                        <Button Grid.Column="2"
+                                                                Command="{Binding $parent[UserControl].((vm:MainWindowViewModel)DataContext).StopSpecificTimerCommand}"
+                                                                CommandParameter="{Binding ItemId}"
+                                                                Background="Transparent" Padding="4" Margin="4,0,0,0"
+                                                                CornerRadius="4" Cursor="Hand"
+                                                                VerticalAlignment="Center"
+                                                                ToolTip.Tip="Stop Timer">
+                                                            <controls:IconControl Icon="Square" Size="12" StrokeThickness="1.5"
+                                                                                  Stroke="{DynamicResource ThemeDangerBrush}"/>
+                                                        </Button>
+                                                    </Grid>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <!-- Collapse toggle -->
+                                    <Button Classes="nav-footer-item"
+                                            Command="{Binding ToggleSidebarCommand}"
+                                            ToolTip.Tip="{Binding SidebarCollapseTooltip}">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <controls:IconControl Icon="PanelLeftClose" Size="18" StrokeThickness="1.5"/>
+                                            <TextBlock Text="Collapse" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- Command palette shortcut -->
+                                    <Button Classes="nav-footer-item"
+                                            Command="{Binding CommandPaletteVM.ToggleCommand}"
+                                            ToolTip.Tip="Command Palette (Cmd+K)">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <controls:IconControl Icon="Search" Size="18" StrokeThickness="1.5"/>
+                                            <TextBlock Text="Search" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- Sync status -->
+                                    <Button Classes="nav-footer-item"
+                                            Command="{Binding OpenSyncFromMenuCommand}"
+                                            ToolTip.Tip="Sync Settings">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                                                <controls:IconControl Icon="Sync" Size="18" StrokeThickness="1.5"/>
+                                                <TextBlock Text="Sync" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Width="8" Height="8" CornerRadius="4"
+                                                    VerticalAlignment="Center" Margin="8,0,0,0">
+                                                <Border.Styles>
+                                                    <Style Selector="Border">
+                                                        <Setter Property="Background" Value="{DynamicResource ThemeNavTextBrush}"/>
+                                                    </Style>
+                                                </Border.Styles>
+                                            </Border>
+                                        </Grid>
+                                    </Button>
+            
+                                    <!-- User profile + Settings row -->
+                                    <Grid ColumnDefinitions="*,Auto" Margin="8,2">
+                                        <!-- User profile (left) -->
+                                        <Button Grid.Column="0" Classes="nav-footer-item"
+                                                Margin="0"
+                                                Command="{Binding ToggleUserMenuCommand}">
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <Border Width="24" Height="24" CornerRadius="12"
+                                                        Background="{DynamicResource ThemePrimaryBrush}">
+                                                    <TextBlock Text="{Binding UserInitial}"
+                                                               FontSize="{DynamicResource ThemeFontSizeXsSm}" FontWeight="SemiBold"
+                                                               Foreground="White"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"/>
+                                                </Border>
+                                                <TextBlock Text="{Binding UserDisplayName}"
+                                                           FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Medium"
+                                                           Foreground="{DynamicResource ThemeNavTextHoverBrush}"
+                                                           VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- Settings (right) -->
+                                        <Button Grid.Column="1"
+                                                Command="{Binding OpenSettingsCommand}"
+                                                ToolTip.Tip="Settings"
+                                                Background="Transparent"
+                                                Padding="8"
+                                                Margin="4,0,0,0"
+                                                CornerRadius="6"
+                                                VerticalAlignment="Center"
+                                                Cursor="Hand">
+                                            <controls:IconControl Icon="Settings" Size="18" StrokeThickness="1.5"
+                                                                  Stroke="{DynamicResource ThemeNavTextBrush}"/>
+                                        </Button>
+                                    </Grid>
+
+                                </StackPanel>
+            
+                                <!-- Collapsed footer (icons only) -->
+                                <StackPanel IsVisible="{Binding IsSidebarCollapsed}"
+                                            HorizontalAlignment="Stretch" Spacing="4">
+                                    <!-- Active Timer (collapsed) — green dot with badge count + hover flyout -->
+                                    <Border x:Name="CollapsedTimerIndicator"
+                                            IsVisible="{Binding HasActiveTimers}"
+                                            Background="Transparent"
+                                            Padding="12,8" Margin="8,1" CornerRadius="6"
+                                            Cursor="Hand"
+                                            PointerEntered="OnCollapsedTimerPointerEnter"
+                                            PointerExited="OnCollapsedTimerPointerLeave">
+                                        <Panel HorizontalAlignment="Center">
+                                            <Border Width="10" Height="10" CornerRadius="5"
+                                                    Background="{DynamicResource ThemeSuccessBrush}"/>
+                                        </Panel>
+                                    </Border>
+                                    <Popup x:Name="CollapsedTimerPopup"
+                                           PlacementTarget="{Binding #CollapsedTimerIndicator}"
+                                           Placement="Right"
+                                           HorizontalOffset="4"
+                                           IsLightDismissEnabled="False"
+                                           IsOpen="False">
+                                        <Border Background="{DynamicResource ThemeSurfaceBrush}"
+                                                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                                BorderThickness="1" CornerRadius="8"
+                                                Padding="16,12" MinWidth="240"
+                                                BoxShadow="4 4 12 0 #40000000"
+                                                PointerEntered="OnTimerPopupPointerEnter"
+                                                PointerExited="OnTimerPopupPointerLeave">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="Active Timers"
+                                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                           FontWeight="SemiBold"/>
+                                                <ItemsControl ItemsSource="{Binding AllActiveTimers}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="cap:ActiveTimerInfo">
+                                                            <Border Margin="0,2" Padding="8,6" CornerRadius="4"
+                                                                    Background="{DynamicResource ThemeSurfaceElevatedBrush}">
+                                                                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                                                                    <!-- Status dot -->
+                                                                    <Panel Grid.Column="0" Grid.RowSpan="2" Width="8" Height="8"
+                                                                           VerticalAlignment="Center" Margin="0,0,8,0">
+                                                                        <Border Width="8" Height="8" CornerRadius="4"
+                                                                                Background="{DynamicResource ThemeSuccessBrush}"
+                                                                                IsVisible="{Binding IsRunning}"/>
+                                                                        <Border Width="8" Height="8" CornerRadius="4"
+                                                                                Background="{DynamicResource ThemeWarningBrush}"
+                                                                                IsVisible="{Binding !IsRunning}"/>
+                                                                    </Panel>
+                                                                    <!-- Title -->
+                                                                    <TextBlock Grid.Column="1" Grid.Row="0"
+                                                                               Text="{Binding Title}"
+                                                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                                               MaxLines="1" TextTrimming="CharacterEllipsis"/>
+                                                                    <!-- Elapsed -->
+                                                                    <TextBlock Grid.Column="1" Grid.Row="1"
+                                                                               Text="{Binding ElapsedDisplay}"
+                                                                               FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="SemiBold"
+                                                                               Foreground="{DynamicResource ThemeSuccessBrush}"/>
+                                                                    <!-- Stop button -->
+                                                                    <Button Grid.Column="2" Grid.RowSpan="2"
+                                                                            Command="{Binding $parent[UserControl].((vm:MainWindowViewModel)DataContext).StopSpecificTimerCommand}"
+                                                                            CommandParameter="{Binding ItemId}"
+                                                                            Background="Transparent" Padding="4"
+                                                                            CornerRadius="4" Cursor="Hand"
+                                                                            VerticalAlignment="Center"
+                                                                            ToolTip.Tip="Stop">
+                                                                        <controls:IconControl Icon="Square" Size="10" StrokeThickness="1.5"
+                                                                                              Stroke="{DynamicResource ThemeDangerBrush}"/>
+                                                                    </Button>
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+                                    </Popup>
+
+                                    <!-- Expand button -->
+                                    <Button Classes="nav-footer-item-collapsed"
+                                            Command="{Binding ToggleSidebarCommand}"
+                                            ToolTip.Tip="Expand sidebar">
+                                        <controls:IconControl Icon="PanelLeftOpen" Size="18" StrokeThickness="1.5"/>
+                                    </Button>
+
+                                    <!-- Command palette -->
+                                    <Button Classes="nav-footer-item-collapsed"
+                                            Command="{Binding CommandPaletteVM.ToggleCommand}"
+                                            ToolTip.Tip="Search (Cmd+K)">
+                                        <controls:IconControl Icon="Search" Size="18" StrokeThickness="1.5"/>
+                                    </Button>
+
+                                    <!-- Sync -->
+                                    <Button Classes="nav-footer-item-collapsed"
+                                            Command="{Binding OpenSyncFromMenuCommand}"
+                                            ToolTip.Tip="Sync">
+                                        <controls:IconControl Icon="Sync" Size="18" StrokeThickness="1.5"/>
+                                    </Button>
+
+                                    <!-- User + Settings row (collapsed) -->
+                                    <Grid ColumnDefinitions="*,Auto" Margin="8,2">
+                                        <!-- User (left) -->
+                                        <Button Grid.Column="0" Classes="nav-footer-item-collapsed"
+                                                Margin="0"
+                                                Command="{Binding ToggleUserMenuCommand}"
+                                                ToolTip.Tip="{Binding UserDisplayName}">
+                                            <Border Width="24" Height="24" CornerRadius="12"
+                                                    Background="{DynamicResource ThemePrimaryBrush}">
+                                                <TextBlock Text="{Binding UserInitial}"
+                                                           FontSize="{DynamicResource ThemeFontSizeXsSm}" FontWeight="SemiBold"
+                                                           Foreground="White"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </Border>
+                                        </Button>
+
+                                        <!-- Settings (right) -->
+                                        <Button Grid.Column="1"
+                                                Command="{Binding OpenSettingsCommand}"
+                                                ToolTip.Tip="Settings"
+                                                Background="Transparent"
+                                                Padding="8"
+                                                Margin="4,0,0,0"
+                                                CornerRadius="6"
+                                                VerticalAlignment="Center"
+                                                Cursor="Hand">
+                                            <controls:IconControl Icon="Settings" Size="18" StrokeThickness="1.5"
+                                                                  Stroke="{DynamicResource ThemeNavTextBrush}"/>
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+            </UserControl>

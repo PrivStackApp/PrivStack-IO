@@ -1,0 +1,82 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PrivStack.Desktop.ViewModels"
+             x:Class="PrivStack.Desktop.Views.SensitiveUnlockOverlay"
+             x:DataType="vm:SensitiveUnlockViewModel">
+
+    <!-- Semi-transparent dark overlay that covers the entire sensitive view -->
+    <Grid Background="#E0181820">
+        <Border Background="{DynamicResource ThemeSurfaceBrush}"
+                CornerRadius="12" Padding="32"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                Width="400"
+                BoxShadow="0 8 32 0 #40000000">
+            <StackPanel Spacing="16">
+                <!-- Lock Icon -->
+                <Border Background="{DynamicResource ThemeHoverBrush}"
+                        CornerRadius="50" Width="80" Height="80"
+                        HorizontalAlignment="Center">
+                    <TextBlock Text="&#x1F512;" FontSize="{DynamicResource ThemeFontSize3Xl}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <!-- Title -->
+                <TextBlock Text="Sensitive Data Locked"
+                           FontSize="{DynamicResource ThemeFontSizeXl}" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+                <!-- Description -->
+                <TextBlock Text="Enter your master password to view this content"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"/>
+
+                <!-- Password Input -->
+                <TextBox x:Name="PasswordInput"
+                         PasswordChar="*"
+                         Watermark="Master Password"
+                         Text="{Binding Password, Mode=TwoWay}"
+                         IsEnabled="{Binding !IsUnlocking}"
+                         Classes="themed-input"
+                         Padding="12">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding UnlockCommand}"/>
+                    </TextBox.KeyBindings>
+                </TextBox>
+
+                <!-- Error Message -->
+                <Border Background="#30F38BA8" CornerRadius="6" Padding="12,8"
+                        IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="{Binding ErrorMessage}"
+                               Foreground="{DynamicResource ThemeDangerBrush}"
+                               TextAlignment="Center"
+                               FontSize="{DynamicResource ThemeFontSizeSmMd}"/>
+                </Border>
+
+                <!-- Unlock Button -->
+                <Button HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        Command="{Binding UnlockCommand}"
+                        IsEnabled="{Binding !IsUnlocking}"
+                        Background="{DynamicResource ThemePrimaryBrush}"
+                        Foreground="White"
+                        Padding="12,10"
+                        CornerRadius="6"
+                        FontWeight="SemiBold">
+                    <Panel>
+                        <TextBlock Text="Unlock" IsVisible="{Binding !IsUnlocking}"/>
+                        <TextBlock Text="Unlocking..." IsVisible="{Binding IsUnlocking}"/>
+                    </Panel>
+                </Button>
+
+                <!-- Hint text -->
+                <TextBlock Text="Your data is protected with end-to-end encryption"
+                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                           TextAlignment="Center"
+                           Margin="0,8,0,0"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

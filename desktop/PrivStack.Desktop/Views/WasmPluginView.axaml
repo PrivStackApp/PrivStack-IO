@@ -1,0 +1,38 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:plugin="using:PrivStack.Desktop.Services.Plugin"
+             xmlns:adaptive="using:PrivStack.UI.Adaptive"
+             x:Class="PrivStack.Desktop.Views.WasmPluginView"
+             x:DataType="plugin:WasmViewModelProxy">
+    <Grid>
+        <!-- Main content -->
+        <adaptive:AdaptiveViewRenderer
+            x:Name="MainRenderer"
+            ViewStateJson="{Binding ViewStateJson}"
+            PluginId="{Binding PluginId}"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch" />
+
+        <!-- Loading overlay - shown during navigation transitions -->
+        <Border x:Name="LoadingOverlay"
+                IsVisible="False"
+                Background="{DynamicResource ThemeBackgroundBrush}"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch">
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="16">
+                <ProgressBar IsIndeterminate="True"
+                             Width="200" Height="3"
+                             Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                             Foreground="{DynamicResource ThemePrimaryBrush}"
+                             CornerRadius="2"/>
+                <TextBlock x:Name="LoadingText"
+                           Text="Loading..."
+                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

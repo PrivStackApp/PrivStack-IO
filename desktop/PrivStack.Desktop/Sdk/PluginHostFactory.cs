@@ -1,0 +1,45 @@
+using Microsoft.Extensions.DependencyInjection;
+using PrivStack.Desktop.Services;
+using PrivStack.Desktop.Services.Abstractions;
+using PrivStack.Desktop.Services.Plugin;
+using PrivStack.Sdk;
+using PrivStack.Sdk.Capabilities;
+
+namespace PrivStack.Desktop.Sdk;
+
+/// <summary>
+/// Creates IPluginHost instances for plugins. Used by PluginRegistry during
+/// plugin initialization for SDK-based plugins.
+/// </summary>
+internal sealed class PluginHostFactory
+{
+    private readonly SdkHost _sdkHost;
+    private readonly CapabilityBroker _capabilityBroker = new();
+    private readonly ISdkDialogService _dialogService;
+    private readonly IAppSettingsService _appSettings;
+    private readonly IPluginRegistry _pluginRegistry;
+    private readonly IUiDispatcher _dispatcher;
+    private readonly InfoPanelService _infoPanelService;
+    private readonly IFocusModeService _focusModeService;
+
+    public ICapabilityBroker CapabilityBroker => _capabilityBroker;
+
+    public PluginHostFactory()
+    {
+        _sdkHost = App.Services.GetRequiredService<SdkHost>();
+        _appSettings = App.Services.GetRequiredService<IAppSettingsService>();
+        _pluginRegistry = App.Services.GetRequiredService<IPluginRegistry>();
+        _dialogService = new SdkDialogServiceAdapter(App.Services.GetRequiredService<IDialogService>());
+        _dispatcher = App.Services.GetRequiredService<IUiDispatcher>();
+        _infoPanelService = App.Services.GetRequiredService<InfoPanelService>();
+        _focusModeService = App.Services.GetRequiredService<IFocusModeService>();
+
+        // Register the default local filesystem storage provider
+        _capabilityBroker.Register<IStorageProvider>(new LocalStorageProvider());
+    }
+
+    public IPluginHost CreateHost(string pluginId)
+    {
+        return new PluginHost(_sdkHost, _capabilityBroker, pluginId, _dialogService, _appSettings, _pluginRegistry, _dispatcher, _infoPanelService, _focusModeService);
+    }
+}

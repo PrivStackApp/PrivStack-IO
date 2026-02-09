@@ -1,0 +1,50 @@
+package privstack:plugin@0.1.0;
+
+/// The standard plugin world. Every plugin targets this world.
+world plugin-world {
+    // Host-provided imports (capabilities the plugin can call)
+    import sdk;
+    import settings;
+    import logger;
+    import navigation;
+    import vault;
+    import linking;
+    import dialogs;
+    import state-notify;
+    import network;
+
+    // Guest-provided exports (what the plugin must/can implement)
+    export plugin;
+
+    // Optional capability exports
+    export linkable-item-provider;
+    export deep-link-target;
+    export timer;
+    export shutdown-aware;
+    export template-data-provider;
+}
+
+/// Extended world for agent plugins.
+world agent-plugin-world {
+    // All standard imports
+    import sdk;
+    import settings;
+    import logger;
+    import navigation;
+    import vault;
+    import linking;
+    import dialogs;
+    import state-notify;
+    import network;
+
+    // Agent-specific imports
+    import agent;
+
+    // Standard exports
+    export plugin;
+    export linkable-item-provider;
+    export deep-link-target;
+    export timer;
+    export shutdown-aware;
+    export template-data-provider;
+}

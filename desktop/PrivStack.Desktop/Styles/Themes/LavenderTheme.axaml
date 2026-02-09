@@ -1,0 +1,228 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- PrivStack Lavender Theme (Light) -->
+    <!-- Soft purple and mauve tones -->
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- BACKGROUND COLORS                                                        -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Color x:Key="ThemeBackground">#EEEAF4</Color>
+    <Color x:Key="ThemeSurface">#F7F4FB</Color>
+    <Color x:Key="ThemeSurfaceElevated">#FFFFFF</Color>
+    <Color x:Key="ThemeSurfaceGlass">#D9F7F4FB</Color>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- BORDER COLORS                                                            -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Color x:Key="ThemeBorder">#C4BAD4</Color>
+    <Color x:Key="ThemeBorderSubtle">#D8D0E4</Color>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- TEXT COLORS                                                              -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Color x:Key="ThemeTextPrimary">#281E3A</Color>
+    <Color x:Key="ThemeTextSecondary">#504660</Color>
+    <Color x:Key="ThemeTextMuted">#6A5D7B</Color>
+    <Color x:Key="ThemeTextOnAccent">#FFFFFF</Color>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- PRIMARY ACCENT (PURPLE)                                                  -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Color x:Key="ThemePrimary">#7B5EA7</Color>
+    <Color x:Key="ThemePrimaryHover">#6A4D96</Color>
+    <Color x:Key="ThemePrimaryMuted">#267B5EA7</Color>
+    <Color x:Key="ThemePrimaryGlow">#337B5EA7</Color>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SECONDARY ACCENT (MAUVE)                                                 -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Color x:Key="ThemeSecondary">#835694</Color>
+    <Color x:Key="ThemeSecondaryHover">#6E4480</Color>
+    <Color x:Key="ThemeSecondaryMuted">#26835694</Color>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SEMANTIC COLORS                                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Color x:Key="ThemeSuccess">#2D8B4E</Color>
+    <Color x:Key="ThemeSuccessMuted">#262D8B4E</Color>
+    <Color x:Key="ThemeWarning">#996815</Color>
+    <Color x:Key="ThemeWarningMuted">#26996815</Color>
+    <Color x:Key="ThemeDanger">#CC3333</Color>
+    <Color x:Key="ThemeDangerMuted">#26CC3333</Color>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- INTERACTION STATES                                                       -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Color x:Key="ThemeHover">#E0D8EA</Color>
+    <Color x:Key="ThemeSelected">#D4C8E4</Color>
+    <Color x:Key="ThemePressed">#C8BCD8</Color>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- SPECIAL COLORS                                                           -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Color x:Key="ThemeSelection">#407B5EA7</Color>
+    <Color x:Key="ThemeScrollTrack">#EEEAF4</Color>
+    <Color x:Key="ThemeScrollThumb">#AEA4BE</Color>
+    <Color x:Key="ThemeScrollThumbHover">#8E8498</Color>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- BRUSH RESOURCES                                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <SolidColorBrush x:Key="ThemeBackgroundBrush" Color="{StaticResource ThemeBackground}"/>
+    <SolidColorBrush x:Key="ThemeSurfaceBrush" Color="{StaticResource ThemeSurface}"/>
+    <SolidColorBrush x:Key="ThemeSurfaceElevatedBrush" Color="{StaticResource ThemeSurfaceElevated}"/>
+    <SolidColorBrush x:Key="ThemeSurfaceGlassBrush" Color="{StaticResource ThemeSurfaceGlass}"/>
+
+    <SolidColorBrush x:Key="ThemeBorderBrush" Color="{StaticResource ThemeBorder}"/>
+    <SolidColorBrush x:Key="ThemeBorderSubtleBrush" Color="{StaticResource ThemeBorderSubtle}"/>
+
+    <SolidColorBrush x:Key="ThemeTextPrimaryBrush" Color="{StaticResource ThemeTextPrimary}"/>
+    <SolidColorBrush x:Key="ThemeTextSecondaryBrush" Color="{StaticResource ThemeTextSecondary}"/>
+    <SolidColorBrush x:Key="ThemeTextMutedBrush" Color="{StaticResource ThemeTextMuted}"/>
+    <SolidColorBrush x:Key="ThemeTextOnAccentBrush" Color="{StaticResource ThemeTextOnAccent}"/>
+
+    <SolidColorBrush x:Key="ThemePrimaryBrush" Color="{StaticResource ThemePrimary}"/>
+    <SolidColorBrush x:Key="ThemeLinkBrush" Color="{StaticResource ThemePrimary}"/>
+    <SolidColorBrush x:Key="ThemePrimaryHoverBrush" Color="{StaticResource ThemePrimaryHover}"/>
+    <SolidColorBrush x:Key="ThemePrimaryMutedBrush" Color="{StaticResource ThemePrimaryMuted}"/>
+
+    <SolidColorBrush x:Key="ThemeSecondaryBrush" Color="{StaticResource ThemeSecondary}"/>
+    <SolidColorBrush x:Key="ThemeSecondaryHoverBrush" Color="{StaticResource ThemeSecondaryHover}"/>
+    <SolidColorBrush x:Key="ThemeSecondaryMutedBrush" Color="{StaticResource ThemeSecondaryMuted}"/>
+
+    <SolidColorBrush x:Key="ThemeSuccessBrush" Color="{StaticResource ThemeSuccess}"/>
+    <SolidColorBrush x:Key="ThemeSuccessMutedBrush" Color="{StaticResource ThemeSuccessMuted}"/>
+    <SolidColorBrush x:Key="ThemeWarningBrush" Color="{StaticResource ThemeWarning}"/>
+    <SolidColorBrush x:Key="ThemeWarningMutedBrush" Color="{StaticResource ThemeWarningMuted}"/>
+    <SolidColorBrush x:Key="ThemeDangerBrush" Color="{StaticResource ThemeDanger}"/>
+    <SolidColorBrush x:Key="ThemeDangerMutedBrush" Color="{StaticResource ThemeDangerMuted}"/>
+
+    <SolidColorBrush x:Key="ThemeHoverBrush" Color="{StaticResource ThemeHover}"/>
+    <SolidColorBrush x:Key="ThemeSelectedBrush" Color="{StaticResource ThemeSelected}"/>
+    <SolidColorBrush x:Key="ThemePressedBrush" Color="{StaticResource ThemePressed}"/>
+
+    <!-- Navigation Sidebar (dark sidebar on light content) -->
+    <Color x:Key="ThemeNavBackground">#1E162A</Color>
+    <Color x:Key="ThemeNavBorder">#342A44</Color>
+    <Color x:Key="ThemeNavBorderSubtle">#2A2038</Color>
+    <Color x:Key="ThemeNavText">#9080A8</Color>
+    <Color x:Key="ThemeNavTextHover">#FFFFFF</Color>
+    <Color x:Key="ThemeNavHover">#302640</Color>
+    <Color x:Key="ThemeNavSelected">#28203A</Color>
+
+    <SolidColorBrush x:Key="ThemeNavBackgroundBrush" Color="{StaticResource ThemeNavBackground}"/>
+    <SolidColorBrush x:Key="ThemeNavBorderBrush" Color="{StaticResource ThemeNavBorder}"/>
+    <SolidColorBrush x:Key="ThemeNavBorderSubtleBrush" Color="{StaticResource ThemeNavBorderSubtle}"/>
+    <SolidColorBrush x:Key="ThemeNavTextBrush" Color="{StaticResource ThemeNavText}"/>
+    <SolidColorBrush x:Key="ThemeNavTextHoverBrush" Color="{StaticResource ThemeNavTextHover}"/>
+    <SolidColorBrush x:Key="ThemeNavHoverBrush" Color="{StaticResource ThemeNavHover}"/>
+    <SolidColorBrush x:Key="ThemeNavSelectedBrush" Color="{StaticResource ThemeNavSelected}"/>
+
+    <SolidColorBrush x:Key="ThemeTableHeaderBrush" Color="{StaticResource ThemeHover}"/>
+
+    <!-- Code Block Brushes -->
+    <SolidColorBrush x:Key="ThemeCodeBlockBrush" Color="{StaticResource ThemeBackground}"/>
+    <SolidColorBrush x:Key="ThemeCodeBlockGutterBrush" Color="{StaticResource ThemeSurface}"/>
+
+    <SolidColorBrush x:Key="ThemeSelectionBrush" Color="{StaticResource ThemeSelection}"/>
+    <SolidColorBrush x:Key="ThemeScrollTrackBrush" Color="{StaticResource ThemeScrollTrack}"/>
+    <SolidColorBrush x:Key="ThemeScrollThumbBrush" Color="{StaticResource ThemeScrollThumb}"/>
+    <SolidColorBrush x:Key="ThemeScrollThumbHoverBrush" Color="{StaticResource ThemeScrollThumbHover}"/>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- LAYOUT CONSTANTS                                                         -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <CornerRadius x:Key="ThemeRadiusXs">4</CornerRadius>
+    <CornerRadius x:Key="ThemeRadiusSm">6</CornerRadius>
+    <CornerRadius x:Key="ThemeRadiusMd">8</CornerRadius>
+    <CornerRadius x:Key="ThemeRadiusLg">12</CornerRadius>
+    <CornerRadius x:Key="ThemeRadiusXl">16</CornerRadius>
+    <CornerRadius x:Key="ThemeRadiusFull">9999</CornerRadius>
+
+    <Thickness x:Key="ThemePaddingXs">4</Thickness>
+    <Thickness x:Key="ThemePaddingSm">8</Thickness>
+    <Thickness x:Key="ThemePaddingMd">12</Thickness>
+    <Thickness x:Key="ThemePaddingLg">16</Thickness>
+    <Thickness x:Key="ThemePaddingXl">24</Thickness>
+    <Thickness x:Key="ThemePadding2Xl">32</Thickness>
+
+    <x:Double x:Key="ThemeSidebarWidth">260</x:Double>
+    <x:Double x:Key="ThemeDetailPanelWidth">320</x:Double>
+    <x:Double x:Key="ThemeInfoPanelWidth">280</x:Double>
+    <x:Double x:Key="ThemePopupPanelWidth">320</x:Double>
+    <x:Double x:Key="ThemeSidebarNarrowWidth">200</x:Double>
+
+    <Thickness x:Key="ThemeListItemPadding">12,10</Thickness>
+    <Thickness x:Key="ThemeListItemPaddingCompact">8,6</Thickness>
+    <x:Double x:Key="ThemeListItemMinHeight">44</x:Double>
+    <x:Double x:Key="ThemeListItemMinHeightCompact">36</x:Double>
+    <x:Double x:Key="ThemeListItemSpacing">2</x:Double>
+
+    <x:Double x:Key="ThemeAvatarSizeSm">32</x:Double>
+    <x:Double x:Key="ThemeAvatarSizeMd">40</x:Double>
+    <x:Double x:Key="ThemeAvatarSizeLg">64</x:Double>
+    <x:Double x:Key="ThemeAvatarSizeXl">80</x:Double>
+    <x:Double x:Key="ThemeIconSizeXs">12</x:Double>
+    <x:Double x:Key="ThemeIconSizeSm">16</x:Double>
+    <x:Double x:Key="ThemeIconSizeMd">20</x:Double>
+    <x:Double x:Key="ThemeIconSizeLg">24</x:Double>
+    <x:Double x:Key="ThemeIconSizeXl">32</x:Double>
+    <x:Double x:Key="ThemeStatusDotSize">8</x:Double>
+
+    <x:Double x:Key="ThemeSpacingXs">4</x:Double>
+    <x:Double x:Key="ThemeSpacingSm">8</x:Double>
+    <x:Double x:Key="ThemeSpacingMd">12</x:Double>
+    <x:Double x:Key="ThemeSpacingLg">16</x:Double>
+    <x:Double x:Key="ThemeSpacingXl">24</x:Double>
+    <x:Double x:Key="ThemeSpacing2Xl">32</x:Double>
+    <x:Double x:Key="ThemePageMaxWidth">1000</x:Double>
+    <x:Double x:Key="ThemeContentMaxWidth">800</x:Double>
+    <x:Double x:Key="ThemeContentWideMinWidth">600</x:Double>
+    <x:Double x:Key="ThemeContentWideMaxWidth">960</x:Double>
+    <x:Double x:Key="ThemeSectionSpacing">24</x:Double>
+
+    <Thickness x:Key="ThemeButtonPaddingSm">8,4</Thickness>
+    <Thickness x:Key="ThemeButtonPaddingMd">12,6</Thickness>
+    <Thickness x:Key="ThemeButtonPaddingLg">16,10</Thickness>
+    <x:Double x:Key="ThemeButtonMinHeight">32</x:Double>
+    <x:Double x:Key="ThemeButtonMinHeightLg">40</x:Double>
+
+    <Thickness x:Key="ThemeInputPadding">12,8</Thickness>
+    <x:Double x:Key="ThemeInputMinHeight">36</x:Double>
+    <x:Double x:Key="ThemeSearchBoxHeight">36</x:Double>
+
+    <FontFamily x:Key="ThemeFontSans">Inter, Segoe UI, -apple-system, Noto Sans, sans-serif, Segoe UI Emoji, Noto Color Emoji</FontFamily>
+    <FontFamily x:Key="ThemeFontMono">avares://PrivStack.Desktop/Assets/Fonts#JetBrains Mono, Consolas, Menlo, monospace</FontFamily>
+
+    <x:Double x:Key="ThemeFontSize2Xs">10</x:Double>
+    <x:Double x:Key="ThemeFontSizeXs">11</x:Double>
+    <x:Double x:Key="ThemeFontSizeXsSm">12</x:Double>
+    <x:Double x:Key="ThemeFontSizeSm">13</x:Double>
+    <x:Double x:Key="ThemeFontSizeSmMd">14</x:Double>
+    <x:Double x:Key="ThemeFontSizeMd">15</x:Double>
+    <x:Double x:Key="ThemeFontSizeLg">17</x:Double>
+    <x:Double x:Key="ThemeFontSizeLgXl">20</x:Double>
+    <x:Double x:Key="ThemeFontSizeXl">22</x:Double>
+    <x:Double x:Key="ThemeFontSize2Xl">26</x:Double>
+    <x:Double x:Key="ThemeFontSize3Xl">34</x:Double>
+    <x:Double x:Key="ThemeFontSize4Xl">48</x:Double>
+    <!-- Line Heights -->
+    <x:Double x:Key="ThemeLineHeightXs">14</x:Double>
+    <x:Double x:Key="ThemeLineHeightSm">22</x:Double>
+    <x:Double x:Key="ThemeLineHeightMd">24</x:Double>
+    <x:Double x:Key="ThemeLineHeightBase">26</x:Double>
+    <x:Double x:Key="ThemeLineHeightLg">30</x:Double>
+    <x:Double x:Key="ThemeLineHeightXl">44</x:Double>
+
+</ResourceDictionary>

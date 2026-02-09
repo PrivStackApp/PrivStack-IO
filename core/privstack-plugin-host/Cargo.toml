@@ -1,0 +1,52 @@
+[package]
+name = "privstack-plugin-host"
+description = "Wasmtime-based plugin host for PrivStack Wasm sandbox"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Wasm runtime
+wasmtime = { version = "33", features = ["component-model"] }
+wasmtime-wasi = "33"
+
+# WIT bindings generation
+wit-bindgen = { version = "0.38", default-features = false }
+
+# Internal crates
+privstack-types.workspace = true
+privstack-storage.workspace = true
+privstack-model.workspace = true
+privstack-vault.workspace = true
+privstack-blobstore.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Async
+tokio.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# HTTP (for network host import)
+reqwest = { version = "0.12", features = ["rustls-tls", "blocking"], default-features = false }
+
+# Hashing (compiled component cache)
+sha2 = "0.10"
+hex = "0.4"
+
+# Utils
+uuid.workspace = true
+chrono = "0.4"
+toml = "0.8"
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio-test.workspace = true
+pretty_assertions.workspace = true

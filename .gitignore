@@ -1,0 +1,77 @@
+# Build outputs
+bin/
+obj/
+out/
+build/
+dist/
+publish/
+
+# IDE / Editor
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.swp
+*~
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# .NET
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# NuGet
+packages/
+*.nuget.props
+*.nuget.targets
+
+# Rust
+target/
+
+# WASM
+*.wasm
+
+# Built plugin artifacts (dotnet publish output)
+plugins/
+
+# Isolated test data directory (--with-plugins)
+test-data/
+
+# Build stamps (incremental build tracking)
+.build-stamps/
+
+# Logs & temp
+*.log
+*.tmp
+*.temp
+*.pid
+
+# Secrets / env
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Claude Code local settings (may contain tokens)
+.claude/
+
+# Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# ONNX / ML models (large binaries)
+*.onnx
+*.bin
+*.safetensors

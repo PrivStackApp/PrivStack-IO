@@ -1,0 +1,47 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PrivStack.Desktop.Controls.RangeSlider">
+
+    <UserControl.Styles>
+        <Style Selector="Thumb.RangeThumb">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Cursor" Value="SizeWestEast"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{DynamicResource ThemePrimaryBrush}"
+                            CornerRadius="4"
+                            Width="16"
+                            Height="24"/>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Thumb.RangeThumb:pointerover /template/ Border">
+            <Setter Property="Background" Value="{DynamicResource ThemePrimaryHoverBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid Height="32">
+        <!-- Track background -->
+        <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                CornerRadius="4"
+                Height="8"
+                VerticalAlignment="Center"
+                Margin="8,0"/>
+
+        <!-- Selected range highlight -->
+        <Border x:Name="RangeHighlight"
+                Background="{DynamicResource ThemePrimaryBrush}"
+                Opacity="0.4"
+                CornerRadius="4"
+                Height="8"
+                VerticalAlignment="Center"
+                HorizontalAlignment="Left"/>
+
+        <!-- Canvas for thumbs -->
+        <Canvas x:Name="ThumbCanvas" Margin="0">
+            <Thumb x:Name="MinThumb" Classes="RangeThumb" Canvas.Top="4"/>
+            <Thumb x:Name="MaxThumb" Classes="RangeThumb" Canvas.Top="4"/>
+        </Canvas>
+    </Grid>
+</UserControl>

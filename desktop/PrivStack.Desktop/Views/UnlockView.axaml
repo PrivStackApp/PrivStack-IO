@@ -1,0 +1,145 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PrivStack.Desktop.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="400"
+             x:Class="PrivStack.Desktop.Views.UnlockView"
+             x:DataType="vm:UnlockViewModel">
+
+    <UserControl.Styles>
+        <!-- Error state styling -->
+        <Style Selector="TextBox.error">
+            <Setter Property="BorderBrush" Value="{DynamicResource ThemeDangerBrush}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid Background="{DynamicResource ThemeBorderBrush}">
+        <Border Background="{DynamicResource ThemeSurfaceBrush}"
+                CornerRadius="16"
+                Padding="40,32,40,36"
+                Margin="24"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                MinWidth="380"
+                MaxWidth="460">
+            <StackPanel Spacing="20">
+                <!-- Logo / Branding -->
+                <StackPanel HorizontalAlignment="Center" Spacing="8">
+                    <Border Width="64" Height="64"
+                            Background="{DynamicResource ThemePrimaryBrush}"
+                            CornerRadius="16">
+                        <TextBlock Text="P" FontSize="{DynamicResource ThemeFontSize3Xl}" FontWeight="Bold"
+                                   Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="PrivStack" FontSize="{DynamicResource ThemeFontSize2Xl}" FontWeight="Bold"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="Enter your master password to unlock"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                               HorizontalAlignment="Center"
+                               IsVisible="{Binding !IsAppLoading}"/>
+                </StackPanel>
+
+                <!-- Password Input (hidden during app loading) -->
+                <StackPanel Spacing="8" IsVisible="{Binding !IsAppLoading}">
+                    <TextBlock Text="Master Password" Classes="field-label"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                    <TextBox x:Name="PasswordBox"
+                             Text="{Binding MasterPassword}"
+                             PasswordChar="*"
+                             Watermark="Enter your master password"
+                             IsEnabled="{Binding !IsLoading}"
+                             Classes.error="{Binding HasError}">
+                        <TextBox.RenderTransform>
+                            <TranslateTransform/>
+                        </TextBox.RenderTransform>
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding UnlockCommand}"/>
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                </StackPanel>
+
+                <!-- Unlock Button (hidden during app loading) -->
+                <Button Command="{Binding UnlockCommand}"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        Classes="action-btn"
+                        Background="{DynamicResource ThemePrimaryBrush}"
+                        Foreground="White"
+                        Padding="16,12"
+                        IsVisible="{Binding !IsAppLoading}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Unlock"
+                                   IsVisible="{Binding !IsLoading}"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Unlocking..."
+                                   IsVisible="{Binding IsLoading}"
+                                   FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- App Loading State (shown after successful unlock) -->
+                <StackPanel IsVisible="{Binding IsAppLoading}" Spacing="16" HorizontalAlignment="Center">
+                    <ProgressBar IsIndeterminate="True"
+                                 Width="200" Height="3"
+                                 Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                 Foreground="{DynamicResource ThemePrimaryBrush}"
+                                 CornerRadius="2"/>
+                    <TextBlock Text="{Binding LoadingMessage}"
+                               FontSize="{DynamicResource ThemeFontSizeSm}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Info Text (hidden during app loading) -->
+                <TextBlock Text="Your data is encrypted and stored locally. The master password is required to decrypt your secure data."
+                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           Opacity="0.7"
+                           Margin="0,4,0,0"
+                           IsVisible="{Binding !IsAppLoading}"/>
+
+                <!-- Forgot password (hidden during app loading) -->
+                <StackPanel Spacing="8" IsVisible="{Binding !IsAppLoading}">
+                    <Button Command="{Binding ShowResetPromptCommand}"
+                            Background="Transparent" Padding="0" HorizontalAlignment="Center"
+                            Cursor="Hand"
+                            IsVisible="{Binding !ShowResetConfirmation}">
+                        <TextBlock Text="I forgot my password and need to reset"
+                                   FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                   Foreground="{DynamicResource ThemeDangerBrush}"
+                                   TextDecorations="Underline"/>
+                    </Button>
+
+                    <!-- Reset confirmation -->
+                    <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="8" Padding="12"
+                            IsVisible="{Binding ShowResetConfirmation}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="This will permanently delete all data in this workspace and return you to the setup wizard. Your license will remain active."
+                                       Foreground="{DynamicResource ThemeWarningBrush}" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       TextWrapping="Wrap" TextAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                <Button Command="{Binding ConfirmResetDataCommand}"
+                                        Background="{DynamicResource ThemeDangerBrush}" Foreground="White"
+                                        Padding="14,8" CornerRadius="6"
+                                        FontSize="{DynamicResource ThemeFontSizeXsSm}" FontWeight="SemiBold"
+                                        Content="Wipe Data &amp; Reset"/>
+                                <Button Command="{Binding CancelResetCommand}"
+                                        Background="{DynamicResource ThemeSurfaceElevatedBrush}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                        Padding="14,8" CornerRadius="6"
+                                        FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                        Content="Cancel"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

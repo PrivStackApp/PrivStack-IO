@@ -1,0 +1,20 @@
+# Clippy configuration for PrivStack
+# https://doc.rust-lang.org/clippy/
+
+# Cognitive complexity threshold
+cognitive-complexity-threshold = 25
+
+# Maximum allowed size of a function body (in lines)
+too-many-lines-threshold = 100
+
+# Maximum number of arguments a function can have
+too-many-arguments-threshold = 7
+
+# Type complexity threshold
+type-complexity-threshold = 250
+
+# Single char binding names to allow
+allowed-idents-below-min-chars = ["i", "j", "k", "n", "x", "y", "z", "id", "db"]
+
+# MSRV for compatibility lints
+msrv = "1.75"

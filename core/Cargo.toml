@@ -1,0 +1,79 @@
+[workspace]
+resolver = "2"
+members = [
+    "privstack-types",
+    "privstack-crdt",
+    "privstack-crypto",
+    "privstack-storage",
+    "privstack-vault",
+    "privstack-blobstore",
+    "privstack-sync",
+    "privstack-license",
+    "privstack-model",
+    "privstack-plugin-host",
+    "privstack-plugin-sdk",
+    "privstack-ppk",
+    "privstack-ffi",
+]
+
+[workspace.package]
+version = "1.3.1"
+edition = "2024"
+license = "Proprietary"
+repository = "https://github.com/privstack/privstack"
+rust-version = "1.85"
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Async runtime
+tokio = { version = "1.43", features = ["rt-multi-thread", "sync", "time", "macros", "io-util", "fs"] }
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# UUIDs (v4 for random, v7 for time-ordered)
+uuid = { version = "1.11", features = ["v4", "v7", "serde"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Testing
+proptest = "1.5"
+criterion = "0.5"
+tempfile = "3.14"
+tokio-test = "0.4"
+pretty_assertions = "1.4"
+
+# Internal crates
+privstack-types = { path = "privstack-types" }
+privstack-crdt = { path = "privstack-crdt" }
+privstack-crypto = { path = "privstack-crypto" }
+privstack-storage = { path = "privstack-storage" }
+privstack-vault = { path = "privstack-vault" }
+privstack-blobstore = { path = "privstack-blobstore" }
+privstack-sync = { path = "privstack-sync" }
+privstack-license = { path = "privstack-license" }
+privstack-model = { path = "privstack-model" }
+privstack-plugin-host = { path = "privstack-plugin-host" }
+privstack-plugin-sdk = { path = "privstack-plugin-sdk" }
+privstack-ppk = { path = "privstack-ppk" }
+
+[workspace.dependencies.duckdb]
+version = "1.1"
+features = ["bundled"]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true

@@ -1,0 +1,45 @@
+[package]
+name = "privstack-relay"
+version = "1.1.0"
+edition = "2024"
+description = "PrivStack P2P relay and bootstrap node"
+
+[lib]
+name = "privstack_relay"
+path = "src/lib.rs"
+
+[[bin]]
+name = "privstack-relay"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1.43", features = ["full"] }
+futures = "0.3"
+libp2p = { version = "0.56", features = [
+    "tokio",
+    "quic",
+    "mdns",
+    "kad",
+    "noise",
+    "yamux",
+    "macros",
+    "identify",
+    "relay",
+    "dcutr",
+] }
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+axum = "0.8"
+
+[dev-dependencies]
+reqwest = { version = "0.12", features = ["json"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -1,0 +1,42 @@
+[package]
+name = "privstack-ffi"
+description = "C ABI exports for PrivStack cross-platform integration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[features]
+default = ["wasm-plugins"]
+wasm-plugins = ["dep:privstack-plugin-host"]
+
+[dependencies]
+tracing-subscriber = { workspace = true }
+privstack-types.workspace = true
+privstack-crypto.workspace = true
+privstack-storage.workspace = true
+privstack-sync.workspace = true
+privstack-license.workspace = true
+# Generic vault + blob storage
+privstack-vault.workspace = true
+privstack-blobstore.workspace = true
+# Core entity model
+privstack-model.workspace = true
+privstack-plugin-host = { workspace = true, optional = true }
+privstack-ppk = { path = "../privstack-ppk" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+chrono = "0.4"
+
+# FFI utilities
+libc = "0.2"
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+hostname = "0.4"
+hex = "0.4"
+
+[dev-dependencies]
+serial_test = "3.1"
