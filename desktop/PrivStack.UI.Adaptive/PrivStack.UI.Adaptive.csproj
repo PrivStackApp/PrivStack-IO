@@ -4,7 +4,16 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>1.2.0</Version>
+    <Version>$(PrivStackSdkVersion)</Version>
+
+    <!-- NuGet package metadata -->
+    <PackageId>PrivStack.UI.Adaptive</PackageId>
+    <Authors>PrivStack</Authors>
+    <Description>Adaptive UI components for PrivStack plugins. Provides themed controls, editor integration, and layout primitives built on Avalonia.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/PrivStackApp/PrivStack-IO</RepositoryUrl>
+    <PackageProjectUrl>https://privstack.io</PackageProjectUrl>
+    <PackageTags>privstack;plugin;ui;avalonia</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
