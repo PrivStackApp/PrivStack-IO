@@ -29,7 +29,7 @@ chrono = { version = "0.4", features = ["serde"] }
 urlencoding = "2.1"
 
 # Policy persistence
-rusqlite = { version = "0.31", features = ["bundled"] }
+rusqlite = { version = "0.38", features = ["bundled"] }
 
 # Pairing / sync codes
 sha2 = "0.10"
