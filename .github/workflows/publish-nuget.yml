@@ -1,0 +1,72 @@
+name: Publish NuGet SDK Packages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/Directory.Build.props'
+
+env:
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Extract SDK version
+        id: version
+        run: |
+          VERSION=$(sed -n 's/.*<PrivStackSdkVersion>\([^<]*\)<\/PrivStackSdkVersion>.*/\1/p' desktop/Directory.Build.props | head -1)
+          echo "SDK_VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "SDK version: $VERSION"
+
+      - name: Check if already published
+        id: check
+        run: |
+          SDK_EXISTS=false
+          UI_EXISTS=false
+
+          if curl -sf "https://api.nuget.org/v3-flatcontainer/privstack.sdk/index.json" 2>/dev/null | grep -q '"${{ steps.version.outputs.SDK_VERSION }}"'; then
+            SDK_EXISTS=true
+          fi
+
+          if curl -sf "https://api.nuget.org/v3-flatcontainer/privstack.ui.adaptive/index.json" 2>/dev/null | grep -q '"${{ steps.version.outputs.SDK_VERSION }}"'; then
+            UI_EXISTS=true
+          fi
+
+          echo "SDK_EXISTS=$SDK_EXISTS" >> "$GITHUB_OUTPUT"
+          echo "UI_EXISTS=$UI_EXISTS" >> "$GITHUB_OUTPUT"
+          echo "PrivStack.Sdk published: $SDK_EXISTS"
+          echo "PrivStack.UI.Adaptive published: $UI_EXISTS"
+
+      - name: Pack PrivStack.Sdk
+        if: steps.check.outputs.SDK_EXISTS == 'false'
+        run: dotnet pack desktop/PrivStack.Sdk/PrivStack.Sdk.csproj -c Release --nologo -o nupkg
+
+      - name: Push PrivStack.Sdk
+        if: steps.check.outputs.SDK_EXISTS == 'false'
+        run: |
+          dotnet nuget push nupkg/PrivStack.Sdk.${{ steps.version.outputs.SDK_VERSION }}.nupkg \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --skip-duplicate
+
+      - name: Pack PrivStack.UI.Adaptive
+        if: steps.check.outputs.UI_EXISTS == 'false'
+        run: dotnet pack desktop/PrivStack.UI.Adaptive/PrivStack.UI.Adaptive.csproj -c Release --nologo -o nupkg
+
+      - name: Push PrivStack.UI.Adaptive
+        if: steps.check.outputs.UI_EXISTS == 'false'
+        run: |
+          dotnet nuget push nupkg/PrivStack.UI.Adaptive.${{ steps.version.outputs.SDK_VERSION }}.nupkg \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --skip-duplicate
