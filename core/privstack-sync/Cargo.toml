@@ -1,0 +1,44 @@
+[package]
+name = "privstack-sync"
+description = "P2P and cloud sync engine for PrivStack"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+privstack-types.workspace = true
+privstack-crdt.workspace = true
+privstack-crypto.workspace = true
+privstack-storage.workspace = true
+privstack-model.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+async-trait = "0.1"
+
+# P2P networking
+libp2p = { version = "0.56", features = ["tokio", "quic", "mdns", "kad", "noise", "yamux", "macros", "identify", "request-response"] }
+futures = "0.3"
+uuid.workspace = true
+
+# Cloud sync
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+chrono = { version = "0.4", features = ["serde"] }
+urlencoding = "2.1"
+
+# Policy persistence
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# Pairing / sync codes
+sha2 = "0.10"
+hex = "0.4"
+rand = "0.8"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "process"] }
+tempfile = "3.14"
+wiremock = "0.6.5"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serial_test = "3"

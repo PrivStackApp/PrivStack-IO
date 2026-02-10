@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap uap3 rescap desktop">
+
+  <Identity
+    Name="PrivStack.Desktop"
+    Publisher="CN=PrivStack"
+    Version="0.1.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>PrivStack</DisplayName>
+    <PublisherDisplayName>PrivStack</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Private, local-first productivity suite with encrypted notes, tasks, calendar, and P2P sync.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App"
+      Executable="PrivStack.Desktop.exe"
+      EntryPoint="Windows.FullTrustApplication">
+
+      <uap:VisualElements
+        DisplayName="PrivStack"
+        Description="Private productivity suite - Notes, Tasks, Calendar with E2E encryption"
+        BackgroundColor="#0D1117"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" Square310x310Logo="Assets\Square310x310Logo.png" Square71x71Logo="Assets\SmallTile.png">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo"/>
+            <uap:ShowOn Tile="wide310x150Logo"/>
+            <uap:ShowOn Tile="square310x310Logo"/>
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+        <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#0D1117"/>
+      </uap:VisualElements>
+
+      <!-- File type associations (optional - for opening .privstack files) -->
+      <!--
+      <uap:Extensions>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="privstack">
+            <uap:SupportedFileTypes>
+              <uap:FileType>.privstack</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </uap:Extensions>
+      -->
+
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Required for Win32 desktop apps in MSIX -->
+    <rescap:Capability Name="runFullTrust" />
+
+    <!-- Basic internet access for P2P sync -->
+    <Capability Name="internetClient" />
+    <Capability Name="internetClientServer" />
+    <Capability Name="privateNetworkClientServer" />
+
+    <!-- File system access for user data storage -->
+    <rescap:Capability Name="broadFileSystemAccess" />
+
+    <!-- Microphone for voice notes (Whisper speech-to-text) -->
+    <DeviceCapability Name="microphone" />
+  </Capabilities>
+
+</Package>

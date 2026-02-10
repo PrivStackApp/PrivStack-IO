@@ -1,0 +1,140 @@
+package privstack:plugin@0.1.0;
+
+interface types {
+    record plugin-metadata {
+        id: string,
+        name: string,
+        description: string,
+        version: string,
+        author: string,
+        icon: option<string>,
+        navigation-order: u32,
+        category: plugin-category,
+        can-disable: bool,
+        is-experimental: bool,
+    }
+
+    enum plugin-category {
+        productivity,
+        security,
+        communication,
+        information,
+        utility,
+        extension,
+    }
+
+    record navigation-item {
+        id: string,
+        display-name: string,
+        subtitle: option<string>,
+        icon: option<string>,
+        tooltip: option<string>,
+        order: u32,
+        show-badge: bool,
+        badge-count: u32,
+        shortcut-hint: option<string>,
+    }
+
+    record entity-schema {
+        entity-type: string,
+        indexed-fields: list<indexed-field>,
+        merge-strategy: merge-strategy,
+    }
+
+    record indexed-field {
+        field-path: string,
+        field-type: field-type,
+        searchable: bool,
+        vector-dim: option<u16>,
+        enum-options: option<list<string>>,
+    }
+
+    enum field-type {
+        text,
+        tag,
+        date-time,
+        number,
+        boolean,
+        vector,
+        counter,
+        relation,
+        decimal,
+        json,
+        enumeration,
+        geo-point,
+        duration,
+    }
+
+    enum merge-strategy {
+        lww-document,
+        lww-per-field,
+        custom,
+    }
+
+    record sdk-message {
+        action: sdk-action,
+        entity-type: string,
+        entity-id: option<string>,
+        payload: option<string>,
+        parameters: list<tuple<string, string>>,
+        source: option<string>,
+    }
+
+    enum sdk-action {
+        create,
+        read,
+        update,
+        delete,
+        list-all,
+        query,
+        trash,
+        restore,
+        link,
+        unlink,
+        get-links,
+        semantic-search,
+    }
+
+    record sdk-response {
+        success: bool,
+        error-code: option<u32>,
+        error-message: option<string>,
+        data: option<string>,
+    }
+
+    record linkable-item {
+        id: string,
+        link-type: string,
+        title: string,
+        subtitle: option<string>,
+        icon: option<string>,
+        modified-at: u64,
+    }
+
+    record command-definition {
+        name: string,
+        description: string,
+        keywords: string,
+        category: string,
+        icon: option<string>,
+    }
+
+    record link-provider-info {
+        plugin-id: string,
+        link-type: string,
+        display-name: string,
+        icon: option<string>,
+    }
+
+    record timer-state {
+        is-active: bool,
+        is-running: bool,
+        elapsed-ms: u64,
+        item-title: option<string>,
+    }
+
+    record timer-result {
+        item-id: string,
+        elapsed-ms: u64,
+    }
+}

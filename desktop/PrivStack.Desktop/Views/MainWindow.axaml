@@ -1,0 +1,498 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PrivStack.Desktop.ViewModels"
+        xmlns:views="using:PrivStack.Desktop.Views"
+        xmlns:controls="using:PrivStack.Desktop.Controls"
+        xmlns:plugin="using:PrivStack.Desktop.Services.Plugin"
+        xmlns:services="using:PrivStack.Desktop.Services"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
+        x:Class="PrivStack.Desktop.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="avares://PrivStack.Desktop/Assets/privstack-logo.png"
+        Title="{Binding WindowTitle}"
+        Width="1000" Height="700"
+        MinWidth="800" MinHeight="500"
+        Background="{DynamicResource ThemeBackgroundBrush}"
+        FontFamily="{DynamicResource ThemeFontSans}"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="PreferSystemChrome"
+        ExtendClientAreaTitleBarHeightHint="28">
+
+    <Window.Styles>
+        <!-- Timer pulse animation -->
+        <Style Selector="Border.timer-pulse">
+            <Style.Animations>
+                <Animation Duration="0:0:1.5" IterationCount="INFINITE">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Opacity" Value="1"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="50%">
+                        <Setter Property="Opacity" Value="0.3"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Opacity" Value="1"/>
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+
+        <!-- Sidebar width transitions -->
+        <Style Selector="views|NavigationSidebar">
+            <Setter Property="Width" Value="220"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Width" Duration="0:0:0.15" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <Style Selector="views|NavigationSidebar.collapsed">
+            <Setter Property="Width" Value="56"/>
+        </Style>
+
+        <!-- Info panel slide drawer animation -->
+        <Style Selector="StackPanel#InfoPanelDrawer">
+            <Setter Property="RenderTransform" Value="translate(700px, 0px)"/>
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.25" Easing="CubicEaseOut"/>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.2"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="StackPanel#InfoPanelDrawer.open">
+            <Setter Property="RenderTransform" Value="translate(0px, 0px)"/>
+            <Setter Property="Opacity" Value="1"/>
+            <Setter Property="IsHitTestVisible" Value="True"/>
+        </Style>
+    </Window.Styles>
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Panel>
+        <!-- Main layout: Title bar on top, then Sidebar + Content below -->
+        <Grid RowDefinitions="Auto,*">
+            <!-- Title bar drag region / spacer for macOS traffic lights -->
+            <Border Grid.Row="0" x:Name="TitleBarSpacer"
+                    Background="{DynamicResource ThemeBackgroundBrush}"
+                    Height="28"
+                    IsHitTestVisible="False"/>
+
+            <!-- Sidebar + Content area -->
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,*">
+                <!-- Navigation Sidebar -->
+                <views:NavigationSidebar Grid.Column="0"
+                                         Classes.collapsed="{Binding IsSidebarCollapsed}"
+                                         IsVisible="{Binding !IsFocusMode}"
+                                         DataContext="{Binding}"/>
+
+                <!-- Content Area -->
+                <Grid Grid.Column="1" RowDefinitions="*,Auto" ClipToBounds="True">
+                    <!-- Main Content Area + Info Panel overlay -->
+                    <Panel Grid.Row="0" ClipToBounds="True">
+                        <ContentControl Content="{Binding CurrentViewModel}" ClipToBounds="True"/>
+
+                        <!-- Info Panel: Collapsed side tab (visible when panel is closed and not on Graph/Nexus) -->
+                        <Button IsVisible="{Binding ShowInfoPanelTab}"
+                                Command="{Binding ToggleInfoPanelCommand}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource ThemeSurfaceBrush}"
+                                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                BorderThickness="1,1,0,1"
+                                CornerRadius="6,0,0,6"
+                                Padding="5,16"
+                                Cursor="Hand"
+                                ZIndex="10">
+                            <Button.Styles>
+                                <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                </Style>
+                            </Button.Styles>
+                            <StackPanel Spacing="16" VerticalAlignment="Center">
+                                <LayoutTransformControl>
+                                    <LayoutTransformControl.LayoutTransform>
+                                        <RotateTransform Angle="-90"/>
+                                    </LayoutTransformControl.LayoutTransform>
+                                    <TextBlock Text="Info"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               FontWeight="Medium"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                </LayoutTransformControl>
+                                <Border Width="3" Height="3" CornerRadius="2"
+                                        Background="{DynamicResource ThemeTextMutedBrush}"
+                                        Opacity="0.4"
+                                        HorizontalAlignment="Center"
+                                        IsVisible="{Binding InfoPanelVM.ShowGraphTab}"/>
+                                <LayoutTransformControl IsVisible="{Binding InfoPanelVM.ShowGraphTab}">
+                                    <LayoutTransformControl.LayoutTransform>
+                                        <RotateTransform Angle="-90"/>
+                                    </LayoutTransformControl.LayoutTransform>
+                                    <TextBlock Text="Graph"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               FontWeight="Medium"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                </LayoutTransformControl>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Info Panel: Slide Drawer (hidden on Graph/Nexus, animates in/out otherwise) -->
+                        <StackPanel x:Name="InfoPanelDrawer"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Stretch"
+                                    Margin="0,152,0,48"
+                                    ZIndex="10"
+                                    IsVisible="{Binding IsInfoPanelAvailable}"
+                                    Classes.open="{Binding InfoPanelVM.IsOpen}">
+
+                            <!-- Drag handle (grip indicator) -->
+                            <Border x:Name="InfoPanelDragHandle"
+                                    Width="10"
+                                    Cursor="SizeWestEast"
+                                    Background="Transparent"
+                                    Margin="-3,0,-3,0"
+                                    ZIndex="5">
+                                <Border Width="4" Height="40"
+                                        CornerRadius="2"
+                                        Background="{DynamicResource ThemeBorderBrush}"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Opacity="0.5">
+                                    <Border.Styles>
+                                        <Style Selector="Border:pointerover">
+                                            <Setter Property="Opacity" Value="0.9"/>
+                                        </Style>
+                                    </Border.Styles>
+                                </Border>
+                            </Border>
+
+                            <!-- Floating panel card: rounded left, flush right -->
+                            <Border CornerRadius="8,0,0,8"
+                                    Background="{DynamicResource ThemeSurfaceBrush}"
+                                    BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                    BorderThickness="1,1,0,1"
+                                    BoxShadow="-4 0 20 0 #40000000"
+                                    Width="{Binding InfoPanelVM.PanelWidth}"
+                                    ClipToBounds="True">
+                                <views:InfoPanel DataContext="{Binding InfoPanelVM}"/>
+                            </Border>
+                        </StackPanel>
+                    </Panel>
+
+                    <!-- Status Bar -->
+                    <Border Grid.Row="1" Background="{DynamicResource ThemeBackgroundBrush}"
+                            BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+                            BorderThickness="0,1,0,0"
+                            Padding="16,6"
+                            IsVisible="{Binding !IsFocusMode}">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <!-- Left side: Status message -->
+                            <TextBlock Text="{Binding StatusMessage}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       VerticalAlignment="Center"/>
+
+                            <!-- Center: Active Timer Indicator -->
+                            <Border Grid.Column="1"
+                                    IsVisible="{Binding HasActiveTimers}"
+                                    Background="{DynamicResource ThemePrimaryMutedBrush}"
+                                    CornerRadius="{DynamicResource ThemeRadiusSm}"
+                                    Padding="10,3"
+                                    Margin="16,0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <!-- Pulsing dot: green when running -->
+                                    <Border Classes="timer-pulse"
+                                            Width="7" Height="7" CornerRadius="4"
+                                            Background="{DynamicResource ThemeSuccessBrush}"
+                                            VerticalAlignment="Center"
+                                            IsVisible="{Binding IsTaskTimerRunning}"/>
+                                    <!-- Static dot: yellow when paused -->
+                                    <Border Width="7" Height="7" CornerRadius="4"
+                                            Background="{DynamicResource ThemeWarningBrush}"
+                                            VerticalAlignment="Center"
+                                            IsVisible="{Binding IsTaskTimerPaused}"/>
+
+                                    <!-- Task title (clickable to navigate) -->
+                                    <Button Command="{Binding NavigateToTimedTaskCommand}"
+                                            Background="Transparent" Padding="0" Margin="0"
+                                            Cursor="Hand" VerticalAlignment="Center"
+                                            BorderThickness="0" MinHeight="0" MinWidth="0">
+                                        <Button.Styles>
+                                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                            </Style>
+                                        </Button.Styles>
+                                        <TextBlock Text="{Binding TimedTaskTitle}"
+                                                   FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                   MaxWidth="200" TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center"/>
+                                    </Button>
+
+                                    <!-- Elapsed time -->
+                                    <TextBlock Text="{Binding TaskTimerDisplay}"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               FontWeight="SemiBold"
+                                               FontFamily="{DynamicResource ThemeFontMono}"
+                                               Foreground="{DynamicResource ThemePrimaryBrush}"
+                                               VerticalAlignment="Center"/>
+
+                                    <!-- Multi-timer count badge -->
+                                    <Border IsVisible="{Binding HasMultipleTimers}"
+                                            Background="{DynamicResource ThemeSecondaryMutedBrush}"
+                                            CornerRadius="{DynamicResource ThemeRadiusXs}"
+                                            Padding="5,1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding AdditionalTimerText}"
+                                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+
+                                    <!-- Separator -->
+                                    <Border Width="1" Height="12"
+                                            Background="{DynamicResource ThemeBorderSubtleBrush}"
+                                            VerticalAlignment="Center" Margin="2,0"/>
+
+                                    <!-- Pause button (visible when running) -->
+                                    <Button Command="{Binding PauseTaskTimerCommand}"
+                                            IsVisible="{Binding IsTaskTimerRunning}"
+                                            Background="Transparent" Padding="3,1" Margin="0"
+                                            BorderThickness="0" MinHeight="0" MinWidth="0"
+                                            Cursor="Hand" ToolTip.Tip="Pause timer"
+                                            VerticalAlignment="Center">
+                                        <Button.Styles>
+                                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                            </Style>
+                                        </Button.Styles>
+                                        <TextBlock Text="⏸" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                                    </Button>
+
+                                    <!-- Resume button (visible when paused) -->
+                                    <Button Command="{Binding ResumeTaskTimerCommand}"
+                                            IsVisible="{Binding IsTaskTimerPaused}"
+                                            Background="Transparent" Padding="3,1" Margin="0"
+                                            BorderThickness="0" MinHeight="0" MinWidth="0"
+                                            Cursor="Hand" ToolTip.Tip="Resume timer"
+                                            VerticalAlignment="Center">
+                                        <Button.Styles>
+                                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                            </Style>
+                                        </Button.Styles>
+                                        <TextBlock Text="▶" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                   Foreground="{DynamicResource ThemeSuccessBrush}"/>
+                                    </Button>
+
+                                    <!-- Stop button -->
+                                    <Button Command="{Binding StopTaskTimerCommand}"
+                                            Background="Transparent" Padding="3,1" Margin="0"
+                                            BorderThickness="0" MinHeight="0" MinWidth="0"
+                                            Cursor="Hand" ToolTip.Tip="Stop timer"
+                                            VerticalAlignment="Center">
+                                        <Button.Styles>
+                                            <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                            </Style>
+                                        </Button.Styles>
+                                        <TextBlock Text="■" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                   Foreground="{DynamicResource ThemeDangerBrush}"/>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Right side: Sync status + branding -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="16">
+                                <!-- Sync Status Indicator -->
+                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <Border Width="6" Height="6" CornerRadius="3">
+                                        <Border.Styles>
+                                            <Style Selector="Border">
+                                                <Setter Property="Background" Value="{DynamicResource ThemeTextMutedBrush}"/>
+                                            </Style>
+                                        </Border.Styles>
+                                    </Border>
+                                    <TextBlock FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="{DynamicResource ThemeTextMutedBrush}">
+                                        <TextBlock.Text>
+                                            <MultiBinding StringFormat="{}{0}">
+                                                <Binding Path="SyncVM.SyncStatusText" FallbackValue="Offline"/>
+                                            </MultiBinding>
+                                        </TextBlock.Text>
+                                    </TextBlock>
+                                </StackPanel>
+
+                                <!-- Branding -->
+                                <TextBlock Text="Local-First"
+                                           Foreground="{DynamicResource ThemeSuccessBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeXs}" FontWeight="Medium"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <!-- ============================================== -->
+        <!-- FLOATING OVERLAYS - Outside main Grid layout  -->
+        <!-- ============================================== -->
+
+        <!-- Click-outside overlay to close menus/panels -->
+        <Border IsVisible="{Binding IsUserMenuOpen}"
+                ZIndex="999"
+                Background="Transparent"
+                PointerPressed="OnOverlayPointerPressed"/>
+
+        <!-- User Dropdown Menu (positioned near bottom-left when sidebar is expanded) -->
+        <Border IsVisible="{Binding IsUserMenuOpen}"
+                ZIndex="999"
+                Background="{DynamicResource ThemeSurfaceBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="4"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"
+                Margin="64,0,0,60"
+                MinWidth="200"
+                BoxShadow="0 4 20 0 #40000000">
+            <StackPanel>
+                <!-- User Info Header -->
+                <Border Padding="12,8">
+                    <TextBlock Text="{Binding UserDisplayName}"
+                               FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeSmMd}"/>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Transparent backdrop to close panels on click-outside -->
+        <Border HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                ZIndex="999"
+                IsVisible="{Binding IsAnyOverlayPanelOpen}"
+                Background="Transparent"
+                PointerPressed="OnBackdropPointerPressed"/>
+
+        <!-- Sync Panel Overlay (anchored to sidebar, docked to bottom) -->
+        <Border HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                Width="520" MaxHeight="900"
+                ZIndex="1000"
+                IsVisible="{Binding IsSyncPanelOpen}"
+                Background="{DynamicResource ThemeSurfaceBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="0,8,0,0"
+                Margin="{Binding PanelLeftMargin}"
+                BoxShadow="4 0 16 0 #30000000">
+            <Grid RowDefinitions="Auto,*">
+                <!-- Header -->
+                <Border Grid.Row="0" Padding="16,12"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}"
+                        BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Sync" FontSize="{DynamicResource ThemeFontSizeLg}" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                        <Button Grid.Column="1"
+                                Content="×"
+                                Command="{Binding ToggleSyncPanelCommand}"
+                                Background="Transparent"
+                                FontSize="{DynamicResource ThemeFontSizeXl}"
+                                Padding="8,2"
+                                VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+                <views:SyncPanel Grid.Row="1" DataContext="{Binding SyncVM}"/>
+            </Grid>
+        </Border>
+
+        <!-- Update Panel Overlay -->
+        <Border HorizontalAlignment="Left" VerticalAlignment="Top"
+                Width="320"
+                ZIndex="1000"
+                IsVisible="{Binding IsUpdatePanelOpen}"
+                Background="{DynamicResource ThemeSurfaceBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Margin="64,100,0,0"
+                BoxShadow="0 4 20 0 #40000000">
+            <Grid RowDefinitions="Auto,*">
+                <!-- Header -->
+                <Border Grid.Row="0" Padding="16,12"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}"
+                        BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Updates" FontSize="{DynamicResource ThemeFontSizeLg}" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                        <Button Grid.Column="1"
+                                Content="×"
+                                Command="{Binding ToggleUpdatePanelCommand}"
+                                Background="Transparent"
+                                FontSize="{DynamicResource ThemeFontSizeXl}"
+                                Padding="8,2"
+                                VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+                <views:UpdatePanel Grid.Row="1" DataContext="{Binding UpdateVM}"/>
+            </Grid>
+        </Border>
+
+        <!-- Settings Panel Overlay (anchored to sidebar, docked to bottom) -->
+        <Border HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                Width="520"
+                ZIndex="1000"
+                IsVisible="{Binding IsSettingsPanelOpen}"
+                Background="{DynamicResource ThemeSurfaceBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="0,8,8,0"
+                Margin="{Binding PanelLeftMargin}"
+                BoxShadow="4 0 16 0 #30000000">
+            <Grid RowDefinitions="Auto,*">
+                <!-- Header with Close button -->
+                <Border Grid.Row="0" Padding="16,12"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}"
+                        BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Settings" FontSize="{DynamicResource ThemeFontSizeLg}" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                        <Button Grid.Column="1"
+                                Content="×"
+                                Command="{Binding CloseSettingsCommand}"
+                                Background="Transparent"
+                                FontSize="{DynamicResource ThemeFontSizeXl}"
+                                Padding="8,2"
+                                VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+                <!-- Settings Content -->
+                <views:SettingsPanel Grid.Row="1" DataContext="{Binding SettingsVM}"/>
+            </Grid>
+        </Border>
+
+        <!-- Manage Plugins Dialog Overlay -->
+        <views:ManagePluginsDialog DataContext="{Binding SettingsVM}" ZIndex="1001"/>
+
+        <!-- Property Template Manager Dialog Overlay -->
+        <views:PropertyTemplateDialog DataContext="{Binding InfoPanelVM.TemplateDialog}" ZIndex="1001"/>
+
+        <!-- Command Palette Overlay -->
+        <views:CommandPalette DataContext="{Binding CommandPaletteVM}" ZIndex="1001"/>
+
+        <!-- Speech Recording Overlay -->
+        <views:SpeechRecordingOverlay DataContext="{Binding SpeechRecordingVM}" ZIndex="1001"/>
+
+        <!-- Workspace Switcher Overlay -->
+        <views:WorkspaceSwitcherOverlay DataContext="{Binding WorkspaceSwitcherVM}" ZIndex="1002"/>
+
+    </Panel>
+</Window>

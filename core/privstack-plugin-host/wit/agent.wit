@@ -1,0 +1,18 @@
+package privstack:plugin@0.1.0;
+
+/// Agent plugins can query across entity types and issue commands to other plugins.
+/// All read operations are read-only. Write operations go through the agent's own sdk::send.
+interface agent {
+    use types.{sdk-response};
+
+    /// Read entities from other plugins' entity types (requires cross-entity-read permission).
+    query-entities: func(entity-type: string, query: string, limit: u32) -> sdk-response;
+
+    /// Run analytical DuckDB SELECT query against permitted entity types.
+    /// Only SELECT statements are allowed — DDL/DML is rejected.
+    /// Parameterized queries only (no raw string interpolation).
+    run-analytics: func(sql: string, params: list<string>) -> sdk-response;
+
+    /// Issue a command to another plugin (requires cross-plugin-command permission).
+    send-command: func(target-plugin-id: string, command: string, args: string) -> sdk-response;
+}

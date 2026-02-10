@@ -1,0 +1,241 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
+using PrivStack.Desktop.Models;
+using PrivStack.Desktop.ViewModels;
+
+namespace PrivStack.Desktop.Controls;
+
+public partial class PropertyEditorControl : UserControl
+{
+    public PropertyEditorControl()
+    {
+        InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        if (DataContext is PropertyValueViewModel vm)
+        {
+            BuildEditor(vm);
+            WireEditButton(vm);
+        }
+    }
+
+    private void WireEditButton(PropertyValueViewModel vm)
+    {
+        var editBtn = this.FindControl<Button>("EditDefButton");
+        if (editBtn == null) return;
+        editBtn.Click -= OnEditDefButtonClick;
+        editBtn.Click += OnEditDefButtonClick;
+    }
+
+    private void OnEditDefButtonClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is not PropertyValueViewModel propVm) return;
+
+        // Walk up the visual tree to find the InfoPanel's DataContext
+        var parent = this.Parent as Control;
+        while (parent != null)
+        {
+            if (parent.DataContext is ViewModels.InfoPanelViewModel infoPanelVm)
+            {
+                infoPanelVm.EditPropertyDefinitionCommand.Execute(propVm);
+                return;
+            }
+            parent = parent.Parent as Control;
+        }
+    }
+
+    private void BuildEditor(PropertyValueViewModel vm)
+    {
+        var host = this.FindControl<ContentControl>("EditorHost");
+        if (host == null) return;
+
+        host.Content = vm.Type switch
+        {
+            PropertyType.Text => BuildTextEditor(vm),
+            PropertyType.Number => BuildNumberEditor(vm),
+            PropertyType.Date => BuildDateEditor(vm),
+            PropertyType.Checkbox => BuildCheckboxEditor(vm),
+            PropertyType.Select => BuildSelectEditor(vm),
+            PropertyType.MultiSelect => BuildMultiSelectEditor(vm),
+            PropertyType.Url => BuildUrlEditor(vm),
+            _ => BuildTextEditor(vm),
+        };
+    }
+
+    private static Control BuildTextEditor(PropertyValueViewModel vm)
+    {
+        var textBox = new TextBox
+        {
+            [!TextBox.TextProperty] = new Avalonia.Data.Binding(nameof(vm.TextValue)) { Mode = Avalonia.Data.BindingMode.TwoWay },
+            Watermark = "Enter text...",
+            Classes = { "prop-input" },
+        };
+        return textBox;
+    }
+
+    private static Control BuildNumberEditor(PropertyValueViewModel vm)
+    {
+        var numericUpDown = new NumericUpDown
+        {
+            [!NumericUpDown.ValueProperty] = new Avalonia.Data.Binding(nameof(vm.NumberValue)) { Mode = Avalonia.Data.BindingMode.TwoWay },
+            FormatString = "G",
+            Increment = 1,
+            Minimum = decimal.MinValue,
+            Maximum = decimal.MaxValue,
+        };
+        numericUpDown.SetValue(BackgroundProperty, GetResource("ThemeSurfaceElevatedBrush") as IBrush ?? Brushes.Transparent);
+        numericUpDown.SetValue(ForegroundProperty, GetResource("ThemeTextPrimaryBrush") as IBrush ?? Brushes.White);
+        numericUpDown.SetValue(BorderBrushProperty, GetResource("ThemeBorderSubtleBrush") as IBrush ?? Brushes.Gray);
+        numericUpDown.BorderThickness = new Thickness(1);
+        numericUpDown.CornerRadius = new CornerRadius(4);
+        numericUpDown.Padding = new Thickness(6, 4);
+        numericUpDown.FontSize = ThemeDouble("ThemeFontSizeSmMd", 13);
+        return numericUpDown;
+    }
+
+    private static Control BuildDateEditor(PropertyValueViewModel vm)
+    {
+        var picker = new CalendarDatePicker
+        {
+            [!CalendarDatePicker.SelectedDateProperty] = new Avalonia.Data.Binding(nameof(vm.DateValue))
+            {
+                Mode = Avalonia.Data.BindingMode.TwoWay,
+                Converter = new DateTimeOffsetToDateTimeConverter(),
+            },
+            Watermark = "Select date...",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        picker.SetValue(ForegroundProperty, GetResource("ThemeTextPrimaryBrush") as IBrush ?? Brushes.White);
+        picker.FontSize = ThemeDouble("ThemeFontSizeSmMd", 13);
+        return picker;
+    }
+
+    private static Control BuildCheckboxEditor(PropertyValueViewModel vm)
+    {
+        var toggle = new ToggleSwitch
+        {
+            [!ToggleSwitch.IsCheckedProperty] = new Avalonia.Data.Binding(nameof(vm.CheckboxValue)) { Mode = Avalonia.Data.BindingMode.TwoWay },
+            OnContent = "Yes",
+            OffContent = "No",
+        };
+        toggle.SetValue(ForegroundProperty, GetResource("ThemeTextPrimaryBrush") as IBrush ?? Brushes.White);
+        toggle.FontSize = ThemeDouble("ThemeFontSizeSmMd", 13);
+        return toggle;
+    }
+
+    private static Control BuildSelectEditor(PropertyValueViewModel vm)
+    {
+        var comboBox = new ComboBox
+        {
+            ItemsSource = vm.Options ?? [],
+            [!ComboBox.SelectedItemProperty] = new Avalonia.Data.Binding(nameof(vm.SelectedOption)) { Mode = Avalonia.Data.BindingMode.TwoWay },
+            PlaceholderText = "Select...",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        comboBox.SetValue(BackgroundProperty, GetResource("ThemeSurfaceElevatedBrush") as IBrush ?? Brushes.Transparent);
+        comboBox.SetValue(ForegroundProperty, GetResource("ThemeTextPrimaryBrush") as IBrush ?? Brushes.White);
+        comboBox.SetValue(BorderBrushProperty, GetResource("ThemeBorderSubtleBrush") as IBrush ?? Brushes.Gray);
+        comboBox.BorderThickness = new Thickness(1);
+        comboBox.CornerRadius = new CornerRadius(4);
+        comboBox.Padding = new Thickness(6, 4);
+        comboBox.FontSize = ThemeDouble("ThemeFontSizeSmMd", 13);
+        return comboBox;
+    }
+
+    private static Control BuildMultiSelectEditor(PropertyValueViewModel vm)
+    {
+        // Multi-select uses checkboxes within a wrap panel
+        var panel = new WrapPanel { Orientation = Orientation.Horizontal };
+        if (vm.Options != null)
+        {
+            foreach (var option in vm.Options)
+            {
+                var isChecked = vm.SelectedOptions.Contains(option);
+                var cb = new CheckBox
+                {
+                    Content = new TextBlock
+                    {
+                        Text = option,
+                        FontSize = ThemeDouble("ThemeFontSizeSm", 12),
+                        Foreground = GetResource("ThemeTextPrimaryBrush") as IBrush ?? Brushes.White,
+                        VerticalAlignment = VerticalAlignment.Center,
+                    },
+                    IsChecked = isChecked,
+                    Margin = new Thickness(0, 2, 8, 2),
+                    Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
+                };
+                var capturedOption = option;
+                cb.IsCheckedChanged += (_, _) => _ = vm.ToggleMultiSelectOptionAsync(capturedOption);
+                panel.Children.Add(cb);
+            }
+        }
+        return panel;
+    }
+
+    private static Control BuildUrlEditor(PropertyValueViewModel vm)
+    {
+        var grid = new Grid
+        {
+            ColumnDefinitions = ColumnDefinitions.Parse("*,Auto"),
+        };
+
+        var textBox = new TextBox
+        {
+            [!TextBox.TextProperty] = new Avalonia.Data.Binding(nameof(vm.UrlValue)) { Mode = Avalonia.Data.BindingMode.TwoWay },
+            Watermark = "https://...",
+            Classes = { "prop-input" },
+        };
+        Grid.SetColumn(textBox, 0);
+
+        var linkIcon = new IconControl
+        {
+            Icon = "ExternalLink",
+            Size = 14,
+            StrokeThickness = 1.5,
+            Stroke = GetResource("ThemeTextMutedBrush") as IBrush ?? Brushes.Gray,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4, 0, 0, 0),
+        };
+        Grid.SetColumn(linkIcon, 1);
+
+        grid.Children.Add(textBox);
+        grid.Children.Add(linkIcon);
+        return grid;
+    }
+
+    private static object? GetResource(string key) =>
+        Application.Current?.FindResource(key);
+
+    private static double ThemeDouble(string key, double fallback)
+    {
+        var app = Application.Current;
+        if (app?.Resources.TryGetResource(key, app.ActualThemeVariant, out var v) == true && v is double d)
+            return d;
+        return fallback;
+    }
+}
+
+/// <summary>
+/// Converts between DateTimeOffset? (ViewModel) and DateTime? (CalendarDatePicker).
+/// </summary>
+internal sealed class DateTimeOffsetToDateTimeConverter : Avalonia.Data.Converters.IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture)
+    {
+        if (value is DateTimeOffset dto)
+            return dto.LocalDateTime;
+        return null;
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture)
+    {
+        if (value is DateTime dt)
+            return new DateTimeOffset(dt, TimeZoneInfo.Local.GetUtcOffset(dt));
+        return null;
+    }
+}

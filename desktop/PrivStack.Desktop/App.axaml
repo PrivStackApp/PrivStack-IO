@@ -1,0 +1,78 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PrivStack.Desktop.App"
+             xmlns:local="using:PrivStack.Desktop"
+             xmlns:converters="using:PrivStack.Desktop.Converters"
+             RequestedThemeVariant="Dark">
+
+    <Application.DataTemplates>
+        <local:ViewLocator/>
+    </Application.DataTemplates>
+
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" />
+
+        <!-- Custom PrivStack Theme Overrides -->
+        <StyleInclude Source="avares://PrivStack.Desktop/Styles/PrivStackTheme.axaml"/>
+    </Application.Styles>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- PrivStack Theme Colors -->
+                <ResourceInclude Source="avares://PrivStack.Desktop/Styles/Themes/DarkTheme.axaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Converters -->
+            <converters:BoolToColorConverter x:Key="BoolToColorConverter"/>
+            <converters:LinkTypeColorConverter x:Key="LinkTypeColorConverter"/>
+            <converters:LayoutModeToVisibilityConverter x:Key="LayoutModeToVisibility"/>
+            <converters:LayoutModeToGridLengthConverter x:Key="LayoutModeToGridLength"/>
+            <converters:LayoutModeEqualsConverter x:Key="LayoutModeEquals"/>
+            <converters:LayoutModeNotEqualsConverter x:Key="LayoutModeNotEquals"/>
+
+            <!-- Responsive layout mode flags (overridden at runtime by ResponsiveLayoutService) -->
+            <x:Boolean x:Key="ThemeIsCompactMode">False</x:Boolean>
+            <x:Boolean x:Key="ThemeIsNotCompactMode">True</x:Boolean>
+
+            <!-- ═══════════════════════════════════════════════════════════════════ -->
+            <!-- LEGACY COMPATIBILITY ALIASES                                         -->
+            <!-- These map old Catppuccin names to new theme resources                -->
+            <!-- Remove these once all files are migrated to new naming              -->
+            <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+            <!-- Old Catppuccin Color Aliases (map to closest new theme color) -->
+            <StaticResource x:Key="CatppuccinBase" ResourceKey="ThemeBorder"/>
+            <StaticResource x:Key="CatppuccinMantle" ResourceKey="ThemeSurface"/>
+            <StaticResource x:Key="CatppuccinCrust" ResourceKey="ThemeBackground"/>
+            <StaticResource x:Key="CatppuccinSurface0" ResourceKey="ThemeSurfaceElevated"/>
+            <StaticResource x:Key="CatppuccinSurface1" ResourceKey="ThemeHover"/>
+            <StaticResource x:Key="CatppuccinSurface2" ResourceKey="ThemePressed"/>
+            <StaticResource x:Key="CatppuccinOverlay0" ResourceKey="ThemeTextMuted"/>
+            <StaticResource x:Key="CatppuccinOverlay1" ResourceKey="ThemeTextSecondary"/>
+            <StaticResource x:Key="CatppuccinText" ResourceKey="ThemeTextPrimary"/>
+            <StaticResource x:Key="CatppuccinSubtext0" ResourceKey="ThemeTextSecondary"/>
+            <StaticResource x:Key="CatppuccinSubtext1" ResourceKey="ThemeTextSecondary"/>
+            <StaticResource x:Key="CatppuccinBlue" ResourceKey="ThemePrimary"/>
+            <StaticResource x:Key="CatppuccinGreen" ResourceKey="ThemeSuccess"/>
+            <StaticResource x:Key="CatppuccinRed" ResourceKey="ThemeDanger"/>
+            <StaticResource x:Key="CatppuccinYellow" ResourceKey="ThemeWarning"/>
+            <StaticResource x:Key="CatppuccinPeach" ResourceKey="ThemeWarning"/>
+            <StaticResource x:Key="CatppuccinMauve" ResourceKey="ThemeSecondary"/>
+            <StaticResource x:Key="CatppuccinTeal" ResourceKey="ThemePrimary"/>
+            <StaticResource x:Key="CatppuccinLavender" ResourceKey="ThemeSecondary"/>
+
+            <!-- Old Brush Aliases -->
+            <StaticResource x:Key="PrimaryBrush" ResourceKey="ThemePrimaryBrush"/>
+            <StaticResource x:Key="SuccessBrush" ResourceKey="ThemeSuccessBrush"/>
+            <StaticResource x:Key="DangerBrush" ResourceKey="ThemeDangerBrush"/>
+            <StaticResource x:Key="WarningBrush" ResourceKey="ThemeWarningBrush"/>
+            <StaticResource x:Key="BackgroundBrush" ResourceKey="ThemeBackgroundBrush"/>
+            <StaticResource x:Key="SurfaceBrush" ResourceKey="ThemeSurfaceBrush"/>
+            <StaticResource x:Key="Surface1Brush" ResourceKey="ThemeSurfaceElevatedBrush"/>
+            <StaticResource x:Key="TextBrush" ResourceKey="ThemeTextPrimaryBrush"/>
+            <StaticResource x:Key="SubtextBrush" ResourceKey="ThemeTextMutedBrush"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

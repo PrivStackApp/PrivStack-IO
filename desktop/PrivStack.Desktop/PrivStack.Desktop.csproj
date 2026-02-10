@@ -1,0 +1,142 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType Condition="'$(Configuration)' == 'Debug'">Exe</OutputType>
+    <OutputType Condition="'$(Configuration)' != 'Debug'">WinExe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationIcon>Assets\privstack-icon.ico</ApplicationIcon>
+
+    <!-- macOS Application Name (shown in menu bar) -->
+    <CFBundleName>PrivStack</CFBundleName>
+    <CFBundleDisplayName>PrivStack</CFBundleDisplayName>
+    <AssemblyTitle>PrivStack</AssemblyTitle>
+    <Product>PrivStack</Product>
+    <Version>1.4.2</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PrivStack.Desktop.Tests" />
+  </ItemGroup>
+
+  <!-- Performance optimizations -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <!-- ReadyToRun for faster startup -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <!-- Enable tiered compilation for better long-running performance -->
+    <TieredCompilation>true</TieredCompilation>
+    <!-- Trimming disabled — incompatible with plugin architecture (dynamic assembly loading) and causes
+         MissingMethodException for BCL types like DateOnly, DateTimeOffset.AddMonths, etc. -->
+    <!-- Single file packaging for cleaner distribution -->
+    <PublishSingleFile>false</PublishSingleFile>
+  </PropertyGroup>
+
+  <!-- Runtime identifiers for platform builds -->
+  <PropertyGroup>
+    <RuntimeIdentifiers>osx-x64;osx-arm64;win-x64;linux-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <!-- MSIX/Microsoft Store packaging configuration -->
+  <PropertyGroup Condition="'$(BuildMsix)' == 'true'">
+    <WindowsPackageType>MSIX</WindowsPackageType>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
+    <AppxBundle>Never</AppxBundle>
+    <AppxPackageDir>$(MSBuildProjectDirectory)\..\..\dist\msix\</AppxPackageDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PrivStack.Sdk\PrivStack.Sdk.csproj" />
+    <ProjectReference Include="..\PrivStack.UI.Adaptive\PrivStack.UI.Adaptive.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Models\" />
+    <AvaloniaResource Include="Assets\**" Exclude="Assets\Dictionaries\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.11" />
+    <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.11">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.1" />
+    <PackageReference Include="Avalonia.AvaloniaEdit" Version="11.3.0" />
+    <PackageReference Include="AvaloniaEdit.TextMate" Version="11.3.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2" />
+    <PackageReference Include="SmartReader" Version="0.11.0" />
+    <PackageReference Include="System.ServiceModel.Syndication" Version="9.0.1" />
+    <!-- Logging -->
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
+    <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <PackageReference Include="WebView.Avalonia" Version="11.0.0.1" />
+    <PackageReference Include="WebView.Avalonia.Desktop" Version="11.0.0.1" />
+    <!-- Spell Checking -->
+    <PackageReference Include="WeCantSpell.Hunspell" Version="7.0.1" />
+    <!-- Speech-to-Text (Whisper) -->
+    <PackageReference Include="Whisper.net" Version="1.8.0" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <!-- Calendar ICS Import/Export -->
+    <PackageReference Include="Ical.Net" Version="4.2.0" />
+    <!-- LaTeX Math Rendering -->
+    <PackageReference Include="CSharpMath.SkiaSharp" Version="0.5.1" />
+    <!-- Diagram Layout (for Mermaid-style diagrams) -->
+    <PackageReference Include="Microsoft.Msagl" Version="1.1.6" />
+    <PackageReference Include="Microsoft.Msagl.Drawing" Version="1.1.6" />
+    <!-- LiveCharts2 for budget reports and visualizations -->
+    <PackageReference Include="LiveChartsCore.SkiaSharpView.Avalonia" Version="2.0.0-rc5.4" />
+  </ItemGroup>
+
+  <!-- Whisper runtime - use CPU runtime on all platforms for reliability -->
+  <ItemGroup>
+    <PackageReference Include="Whisper.net.Runtime" Version="1.8.0" />
+  </ItemGroup>
+
+  <!-- Dictionary and thesaurus files — copied to output, loaded from disk at runtime -->
+  <ItemGroup>
+    <Content Include="Assets\Dictionaries\**" CopyToOutputDirectory="PreserveNewest" Link="Dictionaries\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- Native library configuration - using runtimes folder for cross-platform builds -->
+  <PropertyGroup>
+    <RustLibraryPath>..\..\core\target\release</RustLibraryPath>
+  </PropertyGroup>
+
+  <!-- Native libraries are included based on the current build machine OS -->
+  <!-- The build script manually copies the correct native library for cross-compilation -->
+
+  <!-- macOS builds (when building on macOS, local dev only — skip when cross-compiling via dist/) -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) And '$(RuntimeIdentifier)' == ''">
+    <None Include="$(RustLibraryPath)\libprivstack_ffi.dylib" CopyToOutputDirectory="PreserveNewest" Link="libprivstack_ffi.dylib" Condition="Exists('$(RustLibraryPath)\libprivstack_ffi.dylib')" />
+  </ItemGroup>
+
+  <!-- Windows builds (when building on Windows) -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <None Include="$(RustLibraryPath)\privstack_ffi.dll" CopyToOutputDirectory="PreserveNewest" Link="privstack_ffi.dll" Condition="Exists('$(RustLibraryPath)\privstack_ffi.dll')" />
+  </ItemGroup>
+
+  <!-- Linux builds (when building on Linux) -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+    <None Include="$(RustLibraryPath)\libprivstack_ffi.so" CopyToOutputDirectory="PreserveNewest" Link="libprivstack_ffi.so" Condition="Exists('$(RustLibraryPath)\libprivstack_ffi.so')" />
+  </ItemGroup>
+
+  <!-- Cross-compiled native libraries from dist folder (used by build script) -->
+  <!-- These take priority if present, allowing cross-compilation from any platform -->
+  <ItemGroup>
+    <None Include="..\..\dist\windows-x64\native\privstack_ffi.dll" CopyToOutputDirectory="PreserveNewest" Link="privstack_ffi.dll" Condition="'$(RuntimeIdentifier)' == 'win-x64' And Exists('..\..\dist\windows-x64\native\privstack_ffi.dll')" />
+    <None Include="..\..\dist\linux-x64\native\libprivstack_ffi.so" CopyToOutputDirectory="PreserveNewest" Link="libprivstack_ffi.so" Condition="'$(RuntimeIdentifier)' == 'linux-x64' And Exists('..\..\dist\linux-x64\native\libprivstack_ffi.so')" />
+    <None Include="..\..\dist\macos-arm64\native\libprivstack_ffi.dylib" CopyToOutputDirectory="PreserveNewest" Link="libprivstack_ffi.dylib" Condition="'$(RuntimeIdentifier)' == 'osx-arm64' And Exists('..\..\dist\macos-arm64\native\libprivstack_ffi.dylib')" />
+    <None Include="..\..\dist\macos-x64\native\libprivstack_ffi.dylib" CopyToOutputDirectory="PreserveNewest" Link="libprivstack_ffi.dylib" Condition="'$(RuntimeIdentifier)' == 'osx-x64' And Exists('..\..\dist\macos-x64\native\libprivstack_ffi.dylib')" />
+  </ItemGroup>
+</Project>
