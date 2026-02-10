@@ -31,7 +31,7 @@
     </PackageReference>
 
     <!-- Assertions -->
-    <PackageReference Include="FluentAssertions" Version="7.0.0" />
+    <PackageReference Include="FluentAssertions" Version="8.8.0" />
 
     <!-- Avalonia Testing -->
     <PackageReference Include="Avalonia.Headless.XUnit" Version="11.2.3" />
