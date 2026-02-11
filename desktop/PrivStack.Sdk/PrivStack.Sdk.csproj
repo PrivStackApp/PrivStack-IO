@@ -4,7 +4,16 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>PrivStack.Sdk</RootNamespace>
-    <Version>1.5.0</Version>
+    <Version>$(PrivStackSdkVersion)</Version>
+
+    <!-- NuGet package metadata -->
+    <PackageId>PrivStack.Sdk</PackageId>
+    <Authors>PrivStack</Authors>
+    <Description>SDK for building PrivStack plugins. Provides base classes, entity schemas, messaging, and capability interfaces.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/PrivStackApp/PrivStack-IO</RepositoryUrl>
+    <PackageProjectUrl>https://privstack.io</PackageProjectUrl>
+    <PackageTags>privstack;plugin;sdk</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
