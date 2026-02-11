@@ -3,12 +3,12 @@ updates:
   - package-ecosystem: "cargo"
     directory: "/core"
     schedule:
-      interval: "weekly"
+      interval: "daily"
   - package-ecosystem: "cargo"
     directory: "/relay"
     schedule:
-      interval: "weekly"
+      interval: "daily"
   - package-ecosystem: "nuget"
     directory: "/desktop"
     schedule:
-      interval: "weekly"
+      interval: "daily"
