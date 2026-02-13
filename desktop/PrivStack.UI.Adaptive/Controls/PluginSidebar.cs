@@ -52,6 +52,9 @@ public sealed class PluginSidebar : Border
     public static readonly StyledProperty<bool> IsContentScrollableProperty =
         AvaloniaProperty.Register<PluginSidebar, bool>(nameof(IsContentScrollable), true);
 
+    public static readonly StyledProperty<object?> CollapsedContentProperty =
+        AvaloniaProperty.Register<PluginSidebar, object?>(nameof(CollapsedContent));
+
     public static readonly StyledProperty<object?> FooterContentProperty =
         AvaloniaProperty.Register<PluginSidebar, object?>(nameof(FooterContent));
 
@@ -119,6 +122,16 @@ public sealed class PluginSidebar : Border
         set => SetValue(IsContentScrollableProperty, value);
     }
 
+    /// <summary>
+    /// Content shown below the collapse button when the sidebar is collapsed.
+    /// Use for minimal collapsed-mode actions (e.g. icon-only buttons).
+    /// </summary>
+    public object? CollapsedContent
+    {
+        get => GetValue(CollapsedContentProperty);
+        set => SetValue(CollapsedContentProperty, value);
+    }
+
     public object? FooterContent
     {
         get => GetValue(FooterContentProperty);
@@ -141,6 +154,7 @@ public sealed class PluginSidebar : Border
     private readonly ContentPresenter _headerPresenter;
     private readonly ContentPresenter _contentPresenter;
     private readonly ContentPresenter _footerPresenter;
+    private readonly ContentPresenter _collapsedPresenter;
     private readonly ScrollViewer _scrollViewer;
     private readonly Border _contentContainer;
 
@@ -179,6 +193,7 @@ public sealed class PluginSidebar : Border
         _headerPresenter = new ContentPresenter();
         _contentPresenter = new ContentPresenter();
         _footerPresenter = new ContentPresenter();
+        _collapsedPresenter = new ContentPresenter { IsVisible = false };
 
         _scrollViewer = new ScrollViewer
         {
@@ -191,6 +206,8 @@ public sealed class PluginSidebar : Border
         var innerPanel = new DockPanel { LastChildFill = true };
         DockPanel.SetDock(_collapseRow, Dock.Top);
         innerPanel.Children.Add(_collapseRow);
+        DockPanel.SetDock(_collapsedPresenter, Dock.Top);
+        innerPanel.Children.Add(_collapsedPresenter);
         DockPanel.SetDock(_footerPresenter, Dock.Bottom);
         innerPanel.Children.Add(_footerPresenter);
         DockPanel.SetDock(_headerPresenter, Dock.Top);
@@ -285,6 +302,8 @@ public sealed class PluginSidebar : Border
             _headerPresenter.Content = change.GetNewValue<object?>();
         else if (change.Property == SidebarContentProperty)
             _contentPresenter.Content = change.GetNewValue<object?>();
+        else if (change.Property == CollapsedContentProperty)
+            _collapsedPresenter.Content = change.GetNewValue<object?>();
         else if (change.Property == FooterContentProperty)
             _footerPresenter.Content = change.GetNewValue<object?>();
         else if (change.Property == IsContentScrollableProperty)
@@ -295,6 +314,7 @@ public sealed class PluginSidebar : Border
     {
         var collapsed = IsCollapsed;
         Width = collapsed ? CollapsedWidth : ExpandedWidth;
+        _collapsedPresenter.IsVisible = collapsed;
         _headerPresenter.IsVisible = !collapsed;
         _contentContainer.IsVisible = !collapsed;
         _footerPresenter.IsVisible = !collapsed;
