@@ -1,12 +1,14 @@
 // ============================================================================
 // File: TableGridColumnDrag.cs
 // Description: Column drag reorder for the TableGrid. Attaches drag behavior
-//              to header cells and fires reorder callback on drop.
+//              to header cells with pointer capture, drop indicator, and
+//              slot-based drop position calculation.
 // ============================================================================
 
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Layout;
 using PrivStack.UI.Adaptive.Models;
 
 namespace PrivStack.UI.Adaptive.Controls;
@@ -16,28 +18,33 @@ internal sealed class TableGridColumnDrag
     private bool _isDragging;
     private int _dragColIndex = -1;
     private Point _dragStartPoint;
+    private Border? _dropIndicator;
     private const double DragThreshold = 10;
 
     private readonly Func<Grid> _getGrid;
     private readonly Func<int> _getColumnCount;
     private readonly Func<ITableGridDataSource?> _getSource;
     private readonly Action _onReorder;
+    private readonly Func<Control> _getThemeSource;
 
     public TableGridColumnDrag(
         Func<Grid> getGrid,
         Func<int> getColumnCount,
         Func<ITableGridDataSource?> getSource,
-        Action onReorder)
+        Action onReorder,
+        Func<Control> getThemeSource)
     {
         _getGrid = getGrid;
         _getColumnCount = getColumnCount;
         _getSource = getSource;
         _onReorder = onReorder;
+        _getThemeSource = getThemeSource;
     }
 
     /// <summary>
-    /// Attaches drag behavior to a header cell border. Sorting is handled
-    /// separately via sort arrow indicators in the header cells.
+    /// Attaches drag behavior to a header cell border. Captures pointer on
+    /// drag start (after threshold), shows drop indicator during drag, and
+    /// fires reorder on release.
     /// </summary>
     public void AttachToHeader(Border headerBorder, int colIndex, Control relativeTo)
     {
@@ -53,65 +60,87 @@ internal sealed class TableGridColumnDrag
 
         headerBorder.PointerMoved += (_, e) =>
         {
-            if (_dragColIndex >= 0 && !_isDragging)
+            if (_dragColIndex < 0) return;
+
+            var pos = e.GetPosition(relativeTo);
+
+            if (!_isDragging)
             {
-                var pos = e.GetPosition(relativeTo);
                 if (Math.Abs(pos.X - _dragStartPoint.X) > DragThreshold)
+                {
                     _isDragging = true;
+                    e.Pointer.Capture(headerBorder);
+                }
+                else
+                    return;
             }
+
+            var grid = _getGrid();
+            var dropSlot = GetDropColumnSlot(pos.X, grid);
+            ShowDropIndicator(dropSlot, grid);
+            e.Handled = true;
         };
 
         headerBorder.PointerReleased += (_, e) =>
         {
-            if (_isDragging && _dragColIndex >= 0)
-            {
-                var pos = e.GetPosition(relativeTo);
-                var dropCol = GetDropColumnIndex(pos.X, relativeTo);
-                _isDragging = false;
+            if (_dragColIndex < 0) return;
 
-                if (dropCol >= 0 && dropCol != _dragColIndex)
+            var wasDragging = _isDragging;
+            var dragFrom = _dragColIndex;
+
+            _isDragging = false;
+            _dragColIndex = -1;
+
+            if (wasDragging)
+            {
+                e.Pointer.Capture(null);
+                var grid = _getGrid();
+                RemoveDropIndicator(grid);
+
+                var pos = e.GetPosition(relativeTo);
+                var dropSlot = GetDropColumnSlot(pos.X, grid);
+
+                if (dropSlot >= 0 && dropSlot != dragFrom && dropSlot != dragFrom + 1)
                 {
                     var source = _getSource();
                     if (source != null)
                     {
-                        _ = source.OnColumnReorderedAsync(_dragColIndex, dropCol);
+                        var toIndex = dropSlot > dragFrom ? dropSlot - 1 : dropSlot;
+                        _ = source.OnColumnReorderedAsync(dragFrom, toIndex);
                         _onReorder();
                     }
-                    _dragColIndex = -1;
-                    e.Handled = true;
-                    return;
                 }
+
+                e.Handled = true;
             }
-            _dragColIndex = -1;
         };
     }
 
-    private int GetDropColumnIndex(double x, Control relativeTo)
+    /// <summary>
+    /// Returns the drop slot (0 through colCount) for the given X position.
+    /// Slot N means "insert before column N" (slot colCount = after last column).
+    /// </summary>
+    private int GetDropColumnSlot(double x, Grid grid)
     {
-        var grid = _getGrid();
         var colCount = _getColumnCount();
-        var cumulativeWidth = 0.0;
 
-        // Skip drag handle column (column 0)
-        if (grid.ColumnDefinitions.Count > 0)
-            cumulativeWidth = grid.ColumnDefinitions[0].ActualWidth;
+        // Start after drag handle column (column 0)
+        double cumulativeWidth = grid.ColumnDefinitions.Count > 0
+            ? grid.ColumnDefinitions[0].ActualWidth : 0;
 
         for (var c = 0; c < colCount; c++)
         {
-            var gridCol = c * 2 + 1;
-            var colWidth = gridCol < grid.ColumnDefinitions.Count
-                ? grid.ColumnDefinitions[gridCol].ActualWidth
-                : 100;
-
-            var gripWidth = 0.0;
+            // Add grip width before this column (grip after previous column)
             if (c > 0)
             {
                 var gripCol = (c - 1) * 2 + 2;
                 if (gripCol < grid.ColumnDefinitions.Count)
-                    gripWidth = grid.ColumnDefinitions[gripCol].ActualWidth;
+                    cumulativeWidth += grid.ColumnDefinitions[gripCol].ActualWidth;
             }
 
-            cumulativeWidth += gripWidth;
+            var gridCol = c * 2 + 1;
+            var colWidth = gridCol < grid.ColumnDefinitions.Count
+                ? grid.ColumnDefinitions[gridCol].ActualWidth : 100;
 
             if (x < cumulativeWidth + colWidth / 2)
                 return c;
@@ -119,6 +148,59 @@ internal sealed class TableGridColumnDrag
             cumulativeWidth += colWidth;
         }
 
-        return colCount - 1;
+        return colCount;
+    }
+
+    private void ShowDropIndicator(int dropSlot, Grid grid)
+    {
+        RemoveDropIndicator(grid);
+
+        var colCount = _getColumnCount();
+        var themeSource = _getThemeSource();
+
+        _dropIndicator = new Border
+        {
+            Width = 2,
+            Background = TableGridCellFactory.GetBrush(themeSource, "ThemePrimaryBrush"),
+            VerticalAlignment = VerticalAlignment.Stretch,
+            IsHitTestVisible = false,
+            ZIndex = 10
+        };
+
+        int gridCol;
+        HorizontalAlignment hAlign;
+
+        if (dropSlot <= 0)
+        {
+            gridCol = 1; // first data column
+            hAlign = HorizontalAlignment.Left;
+        }
+        else if (dropSlot >= colCount)
+        {
+            gridCol = (colCount - 1) * 2 + 1; // last data column
+            hAlign = HorizontalAlignment.Right;
+        }
+        else
+        {
+            // Place on the grip column between dropSlot-1 and dropSlot
+            gridCol = (dropSlot - 1) * 2 + 2;
+            hAlign = HorizontalAlignment.Center;
+        }
+
+        Grid.SetRow(_dropIndicator, 0);
+        Grid.SetColumn(_dropIndicator, gridCol);
+        Grid.SetRowSpan(_dropIndicator, grid.RowDefinitions.Count);
+        _dropIndicator.HorizontalAlignment = hAlign;
+
+        grid.Children.Add(_dropIndicator);
+    }
+
+    private void RemoveDropIndicator(Grid grid)
+    {
+        if (_dropIndicator != null)
+        {
+            grid.Children.Remove(_dropIndicator);
+            _dropIndicator = null;
+        }
     }
 }
