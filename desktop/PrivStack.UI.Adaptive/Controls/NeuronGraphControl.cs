@@ -1178,6 +1178,8 @@ public sealed class NeuronGraphControl : Control
             && _highlightedNodeId != null
             && _highlightDistances != null;
 
+        var dataChanged = false;
+
         if (shouldFilter)
         {
             var filtered = new GraphData();
@@ -1196,6 +1198,7 @@ public sealed class NeuronGraphControl : Control
                 _fullGraphData.Nodes.Count - filtered.Nodes.Count, filtered.Nodes.Count,
                 _highlightDepth, _highlightedNodeId);
 
+            dataChanged = _graphData != filtered;
             _graphData = filtered;
         }
         else
@@ -1204,12 +1207,14 @@ public sealed class NeuronGraphControl : Control
             if (_graphData != _fullGraphData)
             {
                 _log.Debug("NeuronGraph: Restoring all {Count} nodes", _fullGraphData.Nodes.Count);
+                dataChanged = true;
                 _graphData = _fullGraphData;
             }
         }
 
-        // Update engine with current node set and gently reheat
-        if (_engine != null)
+        // Only reheat when the node set actually changed (filter toggled);
+        // pure highlight changes (clicking a node) just need a repaint.
+        if (dataChanged && _engine != null)
         {
             _engine.SetGraphData(_graphData, preservePositions: true);
             _engine.Reheat(0.3);
