@@ -154,14 +154,11 @@ internal static class TableGridRenderer
                 if (supportsSorting && cell is Border sortBorderCell)
                     AddSortArrowToHeaderCell(sortBorderCell, c, sortState, onHeaderClick, themeSource);
 
-                // Column drag reorder
-                if (supportsColumnReorder && !isReadOnly && columnDrag != null)
+                // Column drag reorder (all tables)
+                if (columnDrag != null && cell is Border dragBorderCell)
                 {
-                    if (cell is Border borderCell)
-                    {
-                        columnDrag.AttachToHeader(borderCell, c, themeSource);
-                        cell.Cursor = new Cursor(StandardCursorType.Hand);
-                    }
+                    columnDrag.AttachToHeader(dragBorderCell, c, themeSource);
+                    cell.Cursor = new Cursor(StandardCursorType.Hand);
                 }
 
                 // Context menu on header cells
