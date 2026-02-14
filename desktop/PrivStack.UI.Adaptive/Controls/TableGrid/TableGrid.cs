@@ -438,18 +438,12 @@ public sealed class TableGrid : Border
             _rowDrag = null;
         }
 
-        if (source.SupportsColumnReorder)
-        {
-            _columnDrag = new TableGridColumnDrag(
-                () => _grid,
-                () => GetColumnCount(),
-                () => DataSource,
-                Rebuild);
-        }
-        else
-        {
-            _columnDrag = null;
-        }
+        _columnDrag = new TableGridColumnDrag(
+            () => _grid,
+            () => GetColumnCount(),
+            () => DataSource,
+            Rebuild,
+            () => this);
     }
 
     private int GetColumnCount()
