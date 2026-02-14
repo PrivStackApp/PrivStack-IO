@@ -60,6 +60,18 @@ public partial class PropertyTemplateDialogViewModel : ViewModelBase
     [ObservableProperty]
     private ObservableCollection<TemplateEntryViewModel> _selectedTemplateEntries = [];
 
+    [ObservableProperty]
+    private string _customPropertyName = "";
+
+    [ObservableProperty]
+    private PropertyType _customPropertyType = PropertyType.Text;
+
+    [ObservableProperty]
+    private bool _isCreatingCustomProperty;
+
+    public static IReadOnlyList<PropertyType> PropertyTypeOptions { get; } =
+        Enum.GetValues<PropertyType>().ToList();
+
     public PropertyTemplateDialogViewModel(EntityMetadataService metadataService)
     {
         _metadataService = metadataService;
@@ -283,6 +295,50 @@ public partial class PropertyTemplateDialogViewModel : ViewModelBase
         catch (Exception ex)
         {
             _log.Error(ex, "Failed to remove property from template");
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleCustomPropertyForm()
+    {
+        IsCreatingCustomProperty = !IsCreatingCustomProperty;
+        if (!IsCreatingCustomProperty)
+        {
+            CustomPropertyName = "";
+            CustomPropertyType = PropertyType.Text;
+        }
+    }
+
+    [RelayCommand]
+    private async Task CreateCustomProperty()
+    {
+        var name = CustomPropertyName.Trim();
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        try
+        {
+            var def = await _metadataService.CreatePropertyDefinitionAsync(
+                new PropertyDefinition
+                {
+                    Name = name,
+                    Type = CustomPropertyType,
+                    SortOrder = AllPropertyDefs.Count > 0
+                        ? AllPropertyDefs.Max(d => d.SortOrder) + 10
+                        : 10
+                });
+
+            await LoadPropertyDefsAsync();
+
+            if (SelectedTemplate != null)
+                await AddDefToTemplate(def);
+
+            CustomPropertyName = "";
+            CustomPropertyType = PropertyType.Text;
+            IsCreatingCustomProperty = false;
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "Failed to create custom property '{Name}'", name);
         }
     }
 }
