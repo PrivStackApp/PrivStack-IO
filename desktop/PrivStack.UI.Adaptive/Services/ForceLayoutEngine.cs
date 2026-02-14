@@ -11,12 +11,12 @@ namespace PrivStack.UI.Adaptive.Services;
 public sealed class PhysicsParameters
 {
     public double RepulsionStrength { get; set; } = -4000;
-    public double LinkDistance { get; set; } = 350;
+    public double LinkDistance { get; set; } = 500;
     public double LinkStrength { get; set; } = 0.25;
     public double CollisionStrength { get; set; } = 0.7;
     public double CenterStrength { get; set; } = 0.03;
     public double VelocityDecay { get; set; } = 0.55;
-    public double MinSeparation { get; set; } = 140.0;
+    public double MinSeparation { get; set; } = 60.0;
     public double Alpha { get; set; } = 1.0;
     public double AlphaMin { get; set; } = 0.001;
     public double AlphaDecay { get; set; } = 0.028;
