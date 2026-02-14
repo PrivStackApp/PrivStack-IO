@@ -323,6 +323,48 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+
+                                <!-- Create custom property -->
+                                <Button Command="{Binding ToggleCustomPropertyFormCommand}"
+                                        Background="Transparent" HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left" Padding="8,6"
+                                        CornerRadius="4" Cursor="Hand" Margin="0,4,0,0">
+                                    <Button.Styles>
+                                        <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                            <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                        </Style>
+                                    </Button.Styles>
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <controls:IconControl Icon="Plus" Size="10" StrokeThickness="2"
+                                                              Stroke="{DynamicResource ThemePrimaryBrush}"/>
+                                        <TextBlock Text="Create custom property"
+                                                   FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                   Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <!-- Custom property form (collapsible) -->
+                                <Border IsVisible="{Binding IsCreatingCustomProperty}"
+                                        Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                        CornerRadius="6" Padding="10,8" Margin="0,4,0,0">
+                                    <StackPanel Spacing="6">
+                                        <TextBox Text="{Binding CustomPropertyName, Mode=TwoWay}"
+                                                 Watermark="Property name..."
+                                                 FontSize="{DynamicResource ThemeFontSizeSmMd}" />
+                                        <ComboBox ItemsSource="{Binding PropertyTypeOptions}"
+                                                  SelectedItem="{Binding CustomPropertyType}"
+                                                  MinWidth="120" HorizontalAlignment="Stretch"
+                                                  FontSize="{DynamicResource ThemeFontSizeSmMd}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Button Content="Create" Command="{Binding CreateCustomPropertyCommand}"
+                                                    Classes="accent" Padding="10,4"
+                                                    FontSize="{DynamicResource ThemeFontSizeSmMd}" />
+                                            <Button Content="Cancel" Command="{Binding ToggleCustomPropertyFormCommand}"
+                                                    Background="Transparent" Padding="10,4"
+                                                    FontSize="{DynamicResource ThemeFontSizeSmMd}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
