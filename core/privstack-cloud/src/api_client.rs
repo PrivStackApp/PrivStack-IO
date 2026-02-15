@@ -516,7 +516,7 @@ impl CloudApiClient {
             "/api/cloud/keys/public",
             &serde_json::json!({
                 "public_key": encoded,
-                "key_fingerprint": fingerprint,
+                "fingerprint": fingerprint,
             }),
         )
         .await?
