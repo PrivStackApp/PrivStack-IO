@@ -366,6 +366,23 @@ public sealed partial class WorkspaceService : IWorkspaceService
     }
 
     /// <summary>
+    /// Replaces a workspace record in the registry (matched by <see cref="Workspace.Id"/>).
+    /// </summary>
+    public void UpdateWorkspace(Workspace workspace)
+    {
+        var workspaces = _registry.Workspaces.Select(w =>
+            w.Id == workspace.Id ? workspace : w).ToList();
+
+        if (!workspaces.Any(w => w.Id == workspace.Id))
+            throw new InvalidOperationException($"Workspace not found: {workspace.Id}");
+
+        _registry = _registry with { Workspaces = workspaces };
+        SaveRegistry();
+
+        _log.Information("Updated workspace: {Name} ({Id})", workspace.Name, workspace.Id);
+    }
+
+    /// <summary>
     /// Deletes a workspace. Cannot delete the active workspace.
     /// </summary>
     public void DeleteWorkspace(string workspaceId)

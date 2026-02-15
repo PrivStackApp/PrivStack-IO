@@ -174,7 +174,11 @@ public class CloudSyncSettingsViewModelTests
         await vm.EnableForWorkspaceCommand.ExecuteAsync(null);
 
         vm.ShowRecoveryKit.Should().BeFalse();
-        cloudSync.Received(1).StartSync("ws1");
+        // RegisterWorkspace + StartSync are called with a generated UUID (not the slug)
+        cloudSync.Received(1).RegisterWorkspace(Arg.Any<string>(), "Test");
+        cloudSync.Received(1).StartSync(Arg.Any<string>());
+        workspaceService.Received(1).UpdateWorkspace(Arg.Is<Workspace>(w =>
+            w.Id == "ws1" && w.CloudWorkspaceId != null && w.SyncTier == SyncTier.PrivStackCloud));
         vm.IsSyncing.Should().BeTrue();
     }
 
@@ -212,7 +216,10 @@ public class CloudSyncSettingsViewModelTests
         cloudSync.ListDevices().Returns([]);
 
         var workspaceService = Substitute.For<IWorkspaceService>();
-        workspaceService.GetActiveWorkspace().Returns(new Workspace { Id = "ws1", Name = "Test" });
+        workspaceService.GetActiveWorkspace().Returns(new Workspace
+        {
+            Id = "ws1", Name = "Test", CloudWorkspaceId = "cloud-ws-1"
+        });
 
         var vm = CreateVm(cloudSync, workspaceService);
         vm.ShowRecoveryKit = true;
@@ -222,7 +229,7 @@ public class CloudSyncSettingsViewModelTests
 
         vm.ShowRecoveryKit.Should().BeFalse();
         vm.RecoveryWords.Should().BeEmpty();
-        cloudSync.Received(1).StartSync("ws1");
+        cloudSync.Received(1).StartSync("cloud-ws-1");
     }
 
     [Fact]
@@ -333,7 +340,7 @@ public class CloudSyncSettingsViewModelTests
             Name = "Test",
             CloudWorkspaceId = "cloud-ws-1"
         });
-        cloudSync.GetQuota("ws1").Returns(new CloudQuota
+        cloudSync.GetQuota("cloud-ws-1").Returns(new CloudQuota
         {
             StorageUsedBytes = 1024 * 1024,
             StorageQuotaBytes = 10UL * 1024 * 1024 * 1024,
@@ -357,12 +364,15 @@ public class CloudSyncSettingsViewModelTests
         cloudSync.GetStatus().Returns(new CloudSyncStatus { IsSyncing = true });
         cloudSync.ListDevices().Returns([]);
         var workspaceService = Substitute.For<IWorkspaceService>();
-        workspaceService.GetActiveWorkspace().Returns(new Workspace { Id = "ws1", Name = "Test" });
+        workspaceService.GetActiveWorkspace().Returns(new Workspace
+        {
+            Id = "ws1", Name = "Test", CloudWorkspaceId = "cloud-ws-1"
+        });
 
         var vm = CreateVm(cloudSync, workspaceService);
         await vm.StartSyncCommand.ExecuteAsync(null);
 
-        cloudSync.Received(1).StartSync("ws1");
+        cloudSync.Received(1).StartSync("cloud-ws-1");
         vm.IsSyncing.Should().BeTrue();
     }
 
@@ -388,7 +398,7 @@ public class CloudSyncSettingsViewModelTests
     {
         var cloudSync = Substitute.For<ICloudSyncService>();
         cloudSync.GetStatus().Returns(new CloudSyncStatus());
-        cloudSync.GetQuota("ws1").Returns(new CloudQuota
+        cloudSync.GetQuota("cws1").Returns(new CloudQuota
         {
             StorageUsedBytes = 2UL * 1024 * 1024 * 1024,
             StorageQuotaBytes = 10UL * 1024 * 1024 * 1024,
