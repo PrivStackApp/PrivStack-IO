@@ -415,6 +415,11 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
             // Persist latest tokens (may have been rotated by Rust on 401 refresh)
             PersistCurrentTokens();
         }
+        catch (PrivStackException ex) when (ex.ErrorCode == PrivStackError.CloudAuthError)
+        {
+            Log.Warning("Cloud session expired — clearing stale tokens");
+            HandleSessionExpired();
+        }
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to refresh cloud sync status");
@@ -534,6 +539,25 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
     // ========================================
     // Helpers
     // ========================================
+
+    /// <summary>
+    /// Clears stale auth state when the cloud session has expired (refresh token rejected).
+    /// Transitions the UI back to the "Connect" state so the user can re-authenticate.
+    /// </summary>
+    private void HandleSessionExpired()
+    {
+        IsAuthenticated = false;
+        IsSyncing = false;
+        Quota = null;
+        Devices.Clear();
+
+        _appSettings.Settings.CloudSyncAccessToken = null;
+        _appSettings.Settings.CloudSyncRefreshToken = null;
+        _appSettings.Settings.CloudSyncUserId = null;
+        _appSettings.Save();
+
+        AuthError = "Cloud session expired. Please reconnect.";
+    }
 
     private async Task StartSyncForWorkspace(Workspace workspace)
     {

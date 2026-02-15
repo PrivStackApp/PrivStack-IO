@@ -18,6 +18,9 @@ struct AuthState {
     access_token: Option<String>,
     refresh_token: Option<String>,
     user_id: Option<i64>,
+    /// Monotonically increasing counter bumped on every successful refresh.
+    /// Used to detect when a concurrent refresh has already updated tokens.
+    refresh_generation: u64,
 }
 
 /// HTTP client for the PrivStack cloud control plane.
@@ -25,6 +28,10 @@ pub struct CloudApiClient {
     client: Client,
     config: CloudConfig,
     auth: Arc<RwLock<AuthState>>,
+    /// Serializes refresh operations to prevent rotation race conditions.
+    /// Without this, concurrent 401s all read the same old refresh token;
+    /// the server rotates on the first call, and subsequent calls fail.
+    refresh_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 #[derive(Deserialize)]
@@ -54,7 +61,9 @@ impl CloudApiClient {
                 access_token: None,
                 refresh_token: None,
                 user_id: None,
+                refresh_generation: 0,
             })),
+            refresh_lock: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
 
@@ -120,6 +129,25 @@ impl CloudApiClient {
     }
 
     pub async fn refresh_access_token(&self) -> CloudResult<String> {
+        // Capture the generation before acquiring the lock so we can
+        // detect if a concurrent refresh already completed.
+        let pre_gen = self.auth.read().await.refresh_generation;
+
+        // Serialize all refresh operations — only one HTTP refresh at a time.
+        let _guard = self.refresh_lock.lock().await;
+
+        // Double-check: if the generation advanced while we waited,
+        // a concurrent refresh already succeeded. Use its token.
+        {
+            let auth = self.auth.read().await;
+            if auth.refresh_generation > pre_gen {
+                return auth
+                    .access_token
+                    .clone()
+                    .ok_or(CloudError::AuthRequired);
+            }
+        }
+
         let refresh_token = {
             let auth = self.auth.read().await;
             auth.refresh_token
@@ -128,12 +156,24 @@ impl CloudApiClient {
         };
 
         let url = format!("{}/api/auth/refresh", self.config.api_base_url);
-        let resp: TokenResponse = self
+        let resp = self
             .client
             .post(&url)
             .json(&serde_json::json!({ "refresh_token": refresh_token }))
             .send()
-            .await?
+            .await?;
+
+        if resp.status() == reqwest::StatusCode::UNAUTHORIZED
+            || resp.status() == reqwest::StatusCode::FORBIDDEN
+        {
+            // Refresh token is expired/revoked — clear stale session
+            self.logout().await;
+            return Err(CloudError::AuthFailed(
+                "token refresh failed: session expired, re-authentication required".to_string(),
+            ));
+        }
+
+        let resp: TokenResponse = resp
             .error_for_status()
             .map_err(|e| CloudError::AuthFailed(format!("token refresh failed: {e}")))?
             .json()
@@ -143,6 +183,7 @@ impl CloudApiClient {
         auth.access_token = Some(resp.access_token.clone());
         auth.refresh_token = Some(resp.refresh_token);
         auth.user_id = Some(resp.user.id);
+        auth.refresh_generation += 1;
 
         Ok(resp.access_token)
     }
