@@ -15,7 +15,7 @@ fn default_s3_bucket() {
 #[test]
 fn default_s3_region() {
     let config = CloudConfig::default();
-    assert_eq!(config.s3_region, "us-east-1");
+    assert_eq!(config.s3_region, "us-east-2");
 }
 
 #[test]
