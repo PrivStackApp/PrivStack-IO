@@ -52,4 +52,8 @@ public interface ICloudSyncService
     void UploadBlob(string workspaceId, string blobId, string? entityId, byte[] data, byte[] dek);
     byte[] DownloadBlob(string s3Key, byte[] dek);
     List<CloudBlobMeta> GetEntityBlobs(string entityId);
+
+    // ── Compaction ──
+    bool NeedsCompaction(int batchCount);
+    void RequestCompaction(string entityId, string workspaceId);
 }
