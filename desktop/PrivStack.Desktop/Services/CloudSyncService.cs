@@ -217,6 +217,18 @@ public sealed class CloudSyncService : ICloudSyncService, IDisposable
         return DeserializeAndFree<List<CloudBlobMeta>>(ptr);
     }
 
+    // ── Compaction ──
+
+    public bool NeedsCompaction(int batchCount)
+    {
+        return NativeLib.CloudSyncNeedsCompaction((nuint)batchCount);
+    }
+
+    public void RequestCompaction(string entityId, string workspaceId)
+    {
+        ThrowIfError(NativeLib.CloudSyncRequestCompaction(entityId, workspaceId));
+    }
+
     // ── OS Lifecycle Hooks ──
 
     private void RegisterLifecycleHooks()

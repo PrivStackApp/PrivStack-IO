@@ -521,6 +521,15 @@ internal static partial class NativeLibrary
     [LibraryImport(LibraryName, EntryPoint = "privstack_cloudsync_get_entity_blobs", StringMarshalling = StringMarshalling.Utf8)]
     public static partial PrivStackError CloudSyncGetEntityBlobs(string entityId, out nint outJson);
 
+    // ── Cloud Sync Compaction ──
+
+    [LibraryImport(LibraryName, EntryPoint = "privstack_cloudsync_needs_compaction")]
+    [return: MarshalAs(UnmanagedType.U1)]
+    public static partial bool CloudSyncNeedsCompaction(nuint batchCount);
+
+    [LibraryImport(LibraryName, EntryPoint = "privstack_cloudsync_request_compaction", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial PrivStackError CloudSyncRequestCompaction(string entityId, string workspaceId);
+
     // ============================================================
     // License Functions
     // ============================================================

@@ -1,8 +1,9 @@
 //! Cloud sync engine start/stop/status/flush FFI exports.
 
-use super::{parse_cstr, write_json_out};
+use super::{cloud_err, parse_cstr, write_json_out};
 use crate::{lock_handle, PrivStackError, HANDLE};
 use privstack_cloud::blob_sync::BlobSyncManager;
+use privstack_cloud::compaction;
 use privstack_cloud::credential_manager::CredentialManager;
 use privstack_cloud::s3_transport::S3Transport;
 use privstack_cloud::sync_engine;
@@ -182,5 +183,52 @@ pub extern "C" fn privstack_cloudsync_force_flush() -> PrivStackError {
     match handle.runtime.block_on(sync_handle.force_flush()) {
         Ok(()) => PrivStackError::Ok,
         Err(_) => PrivStackError::CloudSyncError,
+    }
+}
+
+// ── Compaction ──
+
+/// Returns true if the given batch count exceeds the compaction threshold.
+#[unsafe(no_mangle)]
+pub extern "C" fn privstack_cloudsync_needs_compaction(batch_count: usize) -> bool {
+    compaction::needs_compaction(batch_count)
+}
+
+/// Requests server-side compaction for an entity.
+///
+/// The client should call this after uploading a snapshot via `create_snapshot`.
+/// The API deletes old batch records and triggers async S3 cleanup.
+///
+/// # Safety
+/// - `entity_id` and `workspace_id` must be valid null-terminated UTF-8 strings.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn privstack_cloudsync_request_compaction(
+    entity_id: *const c_char,
+    workspace_id: *const c_char,
+) -> PrivStackError {
+    let ent_id = match unsafe { parse_cstr(entity_id) } {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+    let ws_id = match unsafe { parse_cstr(workspace_id) } {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+
+    let handle = HANDLE.lock().unwrap();
+    let handle = match handle.as_ref() {
+        Some(h) => h,
+        None => return PrivStackError::NotInitialized,
+    };
+
+    let api = match handle.cloud_api.as_ref() {
+        Some(a) => a.clone(),
+        None => return PrivStackError::NotInitialized,
+    };
+
+    // notify_snapshot doubles as the compaction request endpoint
+    match handle.runtime.block_on(api.notify_snapshot(ent_id, ws_id, "", 0)) {
+        Ok(()) => PrivStackError::Ok,
+        Err(e) => cloud_err(&e),
     }
 }
