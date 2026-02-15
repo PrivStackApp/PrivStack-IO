@@ -184,7 +184,7 @@ async fn bidirectional_sync_shared_dek() {
     let creds = support::fake_minio_creds();
     let prefix = support::unique_prefix();
 
-    let owner = generate_cloud_keypair();
+    let _owner = generate_cloud_keypair();
     let recipient = generate_cloud_keypair();
     let dek = generate_random_key();
 
