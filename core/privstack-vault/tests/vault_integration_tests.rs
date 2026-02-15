@@ -37,6 +37,8 @@ fn vault_error_display() {
         VaultError::VaultNotFound("v1".to_string()),
         VaultError::Storage("db error".to_string()),
         VaultError::Crypto("key error".to_string()),
+        VaultError::RecoveryNotConfigured,
+        VaultError::InvalidRecoveryMnemonic,
     ];
 
     for err in &errors {
@@ -858,6 +860,8 @@ fn vault_error_source_trait() {
         VaultError::VaultNotFound("x".into()),
         VaultError::Storage("x".into()),
         VaultError::Crypto("x".into()),
+        VaultError::RecoveryNotConfigured,
+        VaultError::InvalidRecoveryMnemonic,
     ];
     for e in &errors {
         let _ = e.source();
@@ -1100,4 +1104,184 @@ fn vault_manager_unlock_all_with_mixed_state() {
     mgr.unlock_all("password123").unwrap();
     assert!(mgr.is_unlocked("default"));
     assert!(mgr.is_unlocked("extra"));
+}
+
+// ── Recovery (Emergency Kit) ─────────────────────────────────────
+
+#[test]
+fn setup_recovery_returns_mnemonic() {
+    let mgr = VaultManager::open_in_memory().unwrap();
+    mgr.create_vault("v").unwrap();
+    mgr.initialize("v", "password123").unwrap();
+
+    let mnemonic = mgr.setup_recovery("v").unwrap();
+    let words: Vec<&str> = mnemonic.split_whitespace().collect();
+    assert_eq!(words.len(), 12);
+}
+
+#[test]
+fn has_recovery_false_before_setup() {
+    let mgr = VaultManager::open_in_memory().unwrap();
+    mgr.create_vault("v").unwrap();
+    mgr.initialize("v", "password123").unwrap();
+
+    assert!(!mgr.has_recovery("v").unwrap());
+}
+
+#[test]
+fn has_recovery_true_after_setup() {
+    let mgr = VaultManager::open_in_memory().unwrap();
+    mgr.create_vault("v").unwrap();
+    mgr.initialize("v", "password123").unwrap();
+
+    mgr.setup_recovery("v").unwrap();
+    assert!(mgr.has_recovery("v").unwrap());
+}
+
+#[test]
+fn setup_recovery_on_locked_vault_fails() {
+    let mgr = VaultManager::open_in_memory().unwrap();
+    mgr.create_vault("v").unwrap();
+    mgr.initialize("v", "password123").unwrap();
+    mgr.lock("v");
+
+    let result = mgr.setup_recovery("v");
+    assert!(matches!(result, Err(VaultError::Locked)));
+}
+
+#[test]
+fn reset_password_with_recovery_full_flow() {
+    let mgr = VaultManager::open_in_memory().unwrap();
+    mgr.create_vault("v").unwrap();
+    mgr.initialize("v", "password123").unwrap();
+    mgr.store_blob("v", "secret", b"my secret data").unwrap();
+
+    let mnemonic = mgr.setup_recovery("v").unwrap();
+
+    // Reset password using mnemonic
+    let (old_kb, new_kb) = mgr
+        .reset_password_with_recovery("v", &mnemonic, "newpass12")
+        .unwrap();
+    assert_eq!(old_kb.len(), 32);
+    assert_eq!(new_kb.len(), 32);
+    assert_ne!(old_kb, new_kb);
+
+    // Old password should no longer work
+    mgr.lock("v");
+    assert!(mgr.unlock("v", "password123").is_err());
+
+    // New password should work
+    mgr.unlock("v", "newpass12").unwrap();
+
+    // Data should be intact
+    assert_eq!(mgr.read_blob("v", "secret").unwrap(), b"my secret data");
+}
+
+#[test]
+fn reset_password_preserves_multiple_blobs() {
+    let mgr = VaultManager::open_in_memory().unwrap();
+    mgr.create_vault("v").unwrap();
+    mgr.initialize("v", "password123").unwrap();
+
+    mgr.store_blob("v", "a", b"alpha").unwrap();
+    mgr.store_blob("v", "b", b"beta").unwrap();
+    mgr.store_blob("v", "c", b"gamma").unwrap();
+
+    let mnemonic = mgr.setup_recovery("v").unwrap();
+    mgr.reset_password_with_recovery("v", &mnemonic, "newpass12")
+        .unwrap();
+
+    mgr.lock("v");
+    mgr.unlock("v", "newpass12").unwrap();
+
+    assert_eq!(mgr.read_blob("v", "a").unwrap(), b"alpha");
+    assert_eq!(mgr.read_blob("v", "b").unwrap(), b"beta");
+    assert_eq!(mgr.read_blob("v", "c").unwrap(), b"gamma");
+}
+
+#[test]
+fn reset_password_mnemonic_remains_valid() {
+    let mgr = VaultManager::open_in_memory().unwrap();
+    mgr.create_vault("v").unwrap();
+    mgr.initialize("v", "password123").unwrap();
+
+    let mnemonic = mgr.setup_recovery("v").unwrap();
+    mgr.reset_password_with_recovery("v", &mnemonic, "newpass12")
+        .unwrap();
+
+    // Same mnemonic should work for a second reset
+    mgr.reset_password_with_recovery("v", &mnemonic, "thirdpw1")
+        .unwrap();
+
+    mgr.lock("v");
+    mgr.unlock("v", "thirdpw1").unwrap();
+    assert!(mgr.is_unlocked("v"));
+}
+
+#[test]
+fn reset_password_wrong_mnemonic_fails() {
+    let mgr = VaultManager::open_in_memory().unwrap();
+    mgr.create_vault("v").unwrap();
+    mgr.initialize("v", "password123").unwrap();
+    mgr.setup_recovery("v").unwrap();
+
+    let wrong = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+    let result = mgr.reset_password_with_recovery("v", wrong, "newpass12");
+    assert!(matches!(result, Err(VaultError::InvalidRecoveryMnemonic)));
+}
+
+#[test]
+fn reset_password_too_short_fails() {
+    let mgr = VaultManager::open_in_memory().unwrap();
+    mgr.create_vault("v").unwrap();
+    mgr.initialize("v", "password123").unwrap();
+    let mnemonic = mgr.setup_recovery("v").unwrap();
+
+    let result = mgr.reset_password_with_recovery("v", &mnemonic, "short");
+    assert!(matches!(result, Err(VaultError::PasswordTooShort)));
+}
+
+#[test]
+fn reset_password_without_recovery_configured_fails() {
+    let mgr = VaultManager::open_in_memory().unwrap();
+    mgr.create_vault("v").unwrap();
+    mgr.initialize("v", "password123").unwrap();
+
+    let dummy = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+    let result = mgr.reset_password_with_recovery("v", dummy, "newpass12");
+    assert!(matches!(result, Err(VaultError::RecoveryNotConfigured)));
+}
+
+#[test]
+fn regenerate_recovery_invalidates_old_mnemonic() {
+    let mgr = VaultManager::open_in_memory().unwrap();
+    mgr.create_vault("v").unwrap();
+    mgr.initialize("v", "password123").unwrap();
+
+    let old_mnemonic = mgr.setup_recovery("v").unwrap();
+    let new_mnemonic = mgr.setup_recovery("v").unwrap();
+
+    // Old mnemonic should no longer work
+    let result = mgr.reset_password_with_recovery("v", &old_mnemonic, "newpass12");
+    assert!(result.is_err());
+
+    // New mnemonic should work
+    mgr.reset_password_with_recovery("v", &new_mnemonic, "newpass12")
+        .unwrap();
+}
+
+#[test]
+fn reset_password_with_empty_vault_no_blobs() {
+    let mgr = VaultManager::open_in_memory().unwrap();
+    mgr.create_vault("v").unwrap();
+    mgr.initialize("v", "password123").unwrap();
+    let mnemonic = mgr.setup_recovery("v").unwrap();
+
+    // Reset with no blobs — empty re-encryption loop should succeed
+    mgr.reset_password_with_recovery("v", &mnemonic, "newpass12")
+        .unwrap();
+
+    mgr.lock("v");
+    mgr.unlock("v", "newpass12").unwrap();
+    assert!(mgr.is_unlocked("v"));
 }
