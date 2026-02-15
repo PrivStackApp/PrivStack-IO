@@ -10,7 +10,7 @@ fn make_creds(expires_in_secs: i64) -> StsCredentials {
         session_token: "token".into(),
         expires_at: Utc::now() + Duration::seconds(expires_in_secs),
         bucket: "test-bucket".into(),
-        region: "us-east-1".into(),
+        region: "us-east-2".into(),
     }
 }
 

@@ -16,7 +16,7 @@ pub fn fake_minio_creds() -> StsCredentials {
         session_token: String::new(),
         expires_at: Utc::now() + Duration::hours(1),
         bucket: "privstack-cloud".into(),
-        region: "us-east-1".into(),
+        region: "us-east-2".into(),
     }
 }
 
@@ -28,7 +28,7 @@ pub fn expired_minio_creds() -> StsCredentials {
         session_token: String::new(),
         expires_at: Utc::now() - Duration::seconds(10),
         bucket: "privstack-cloud".into(),
-        region: "us-east-1".into(),
+        region: "us-east-2".into(),
     }
 }
 
@@ -36,7 +36,7 @@ pub fn expired_minio_creds() -> StsCredentials {
 pub fn test_transport() -> S3Transport {
     S3Transport::new(
         "privstack-cloud".into(),
-        "us-east-1".into(),
+        "us-east-2".into(),
         Some("http://localhost:9000".into()),
     )
 }
