@@ -7,9 +7,9 @@
 
 use duckdb::params;
 use privstack_crypto::recovery::{create_recovery_blob, open_recovery_blob, reencrypt_recovery_blob, RecoveryBlob};
-use privstack_crypto::{decrypt, derive_key, encrypt, DerivedKey, EncryptedData, KdfParams, Salt};
+use privstack_crypto::{decrypt, derive_key, encrypt, EncryptedData, KdfParams, Salt};
 
-use crate::{sanitize_for_sql, Vault, VaultError, VaultManager, VaultResult, VERIFICATION_PLAINTEXT};
+use crate::{Vault, VaultError, VaultManager, VaultResult, VERIFICATION_PLAINTEXT};
 
 // ============================================================================
 // Vault recovery methods
