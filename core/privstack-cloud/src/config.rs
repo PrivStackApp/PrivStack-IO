@@ -29,7 +29,7 @@ impl Default for CloudConfig {
         Self {
             api_base_url: "https://api.privstack.io".to_string(),
             s3_bucket: "privstack-cloud".to_string(),
-            s3_region: "us-east-1".to_string(),
+            s3_region: "us-east-2".to_string(),
             s3_endpoint_override: None,
             credential_refresh_margin_secs: 300, // 5 minutes before expiry
             poll_interval_secs: 30,
@@ -44,7 +44,7 @@ impl CloudConfig {
         Self {
             api_base_url: "http://localhost:3002".to_string(),
             s3_bucket: "privstack-cloud".to_string(),
-            s3_region: "us-east-1".to_string(),
+            s3_region: "us-east-2".to_string(),
             s3_endpoint_override: Some("http://localhost:9000".to_string()),
             credential_refresh_margin_secs: 60,
             poll_interval_secs: 5,
