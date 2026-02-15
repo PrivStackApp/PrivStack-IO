@@ -254,7 +254,14 @@ public partial class WorkspaceSwitcherViewModel : ViewModelBase
         {
             try
             {
-                _cloudSync.RegisterWorkspace(workspace.Id, workspace.Name);
+                var cloudWsId = Guid.NewGuid().ToString();
+                _cloudSync.RegisterWorkspace(cloudWsId, workspace.Name);
+                workspace = workspace with
+                {
+                    CloudWorkspaceId = cloudWsId,
+                    SyncTier = SyncTier.PrivStackCloud,
+                };
+                _workspaceService.UpdateWorkspace(workspace);
             }
             catch (Exception ex)
             {

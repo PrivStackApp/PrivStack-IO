@@ -21,6 +21,12 @@ public interface IWorkspaceService
     Task MigrateWorkspaceStorageAsync(string workspaceId, StorageLocation newLocation, IProgress<WorkspaceMigrationProgress>? progress = null);
 
     /// <summary>
+    /// Replaces a workspace record in the registry (matched by <see cref="Workspace.Id"/>).
+    /// Use <c>with { ... }</c> on the existing record to produce the updated version.
+    /// </summary>
+    void UpdateWorkspace(Workspace workspace);
+
+    /// <summary>
     /// Resolves the event store directory for file-based sync.
     /// Returns null for Default storage (no file sync needed).
     /// </summary>

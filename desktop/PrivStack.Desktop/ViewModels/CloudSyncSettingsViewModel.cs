@@ -278,8 +278,17 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
             var workspace = _workspaceService.GetActiveWorkspace();
             if (workspace == null) return;
 
-            // 1. Register workspace (creates S3 prefix)
-            await Task.Run(() => _cloudSync.RegisterWorkspace(workspace.Id, workspace.Name));
+            // 1. Register workspace (creates S3 prefix) — API requires a UUID
+            var cloudWsId = workspace.CloudWorkspaceId ?? Guid.NewGuid().ToString();
+            await Task.Run(() => _cloudSync.RegisterWorkspace(cloudWsId, workspace.Name));
+
+            // Persist the cloud workspace ID + sync tier
+            workspace = workspace with
+            {
+                CloudWorkspaceId = cloudWsId,
+                SyncTier = SyncTier.PrivStackCloud,
+            };
+            _workspaceService.UpdateWorkspace(workspace);
 
             // 2. Auto-setup encryption keypair using vault password
             if (!_cloudSync.HasKeypair)
@@ -381,7 +390,7 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
 
             var workspace = _workspaceService.GetActiveWorkspace();
             if (workspace?.CloudWorkspaceId != null)
-                Quota = await Task.Run(() => _cloudSync.GetQuota(workspace.Id));
+                Quota = await Task.Run(() => _cloudSync.GetQuota(workspace.CloudWorkspaceId));
 
             var devices = await Task.Run(() => _cloudSync.ListDevices());
             Devices.Clear();
@@ -414,7 +423,7 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
         try
         {
             var workspace = _workspaceService.GetActiveWorkspace();
-            if (workspace == null) return;
+            if (workspace?.CloudWorkspaceId == null) return;
 
             // Auto-unlock keypair if needed
             if (_cloudSync.HasKeypair)
@@ -427,7 +436,7 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
                 }
             }
 
-            await Task.Run(() => _cloudSync.StartSync(workspace.Id));
+            await Task.Run(() => _cloudSync.StartSync(workspace.CloudWorkspaceId));
             IsSyncing = true;
             await RefreshStatusAsync();
         }
@@ -487,12 +496,15 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
 
     private async Task StartSyncForWorkspace(Workspace workspace)
     {
-        await Task.Run(() => _cloudSync.StartSync(workspace.Id));
+        var cloudId = workspace.CloudWorkspaceId
+            ?? throw new InvalidOperationException("Workspace has no CloudWorkspaceId");
+        await Task.Run(() => _cloudSync.StartSync(cloudId));
         IsSyncing = true;
         OnPropertyChanged(nameof(ShowEnableForWorkspace));
         OnPropertyChanged(nameof(IsWorkspaceCloudEnabled));
         await RefreshStatusAsync();
-        Log.Information("Cloud sync enabled for workspace {WorkspaceId}", workspace.Id);
+        Log.Information("Cloud sync enabled for workspace {WorkspaceId} (cloud={CloudId})",
+            workspace.Id, cloudId);
     }
 
     private void LoadState()
