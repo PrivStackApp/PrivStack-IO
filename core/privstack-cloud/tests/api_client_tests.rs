@@ -9,7 +9,7 @@ async fn setup(server: &MockServer) -> CloudApiClient {
     let config = CloudConfig {
         api_base_url: server.uri(),
         s3_bucket: "test-bucket".into(),
-        s3_region: "us-east-1".into(),
+        s3_region: "us-east-2".into(),
         s3_endpoint_override: None,
         credential_refresh_margin_secs: 60,
         poll_interval_secs: 5,
@@ -204,7 +204,7 @@ async fn get_sts_credentials_success() {
             "session_token": "token",
             "expires_at": "2099-01-01T00:00:00Z",
             "bucket": "test-bucket",
-            "region": "us-east-1"
+            "region": "us-east-2"
         })))
         .mount(&server)
         .await;
