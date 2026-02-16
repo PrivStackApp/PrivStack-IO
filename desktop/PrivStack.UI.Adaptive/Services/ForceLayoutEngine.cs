@@ -1,9 +1,8 @@
 // ============================================================================
 // File: ForceLayoutEngine.cs
-// Description: Two-phase graph layout engine:
-//              Phase 1: Fermat spiral placement (uniform density, BFS order)
-//              Phase 2: Obsidian-style 4-force physics refinement
-//                       (center, repel, link, link distance)
+// Description: Spiral placement + simple radius-based repel.
+//              Nodes repel anything within RepelRadius. No springs, no center
+//              force, no velocity. Connections are purely visual.
 // ============================================================================
 
 using PrivStack.UI.Adaptive.Models;
@@ -12,6 +11,10 @@ namespace PrivStack.UI.Adaptive.Services;
 
 public sealed class PhysicsParameters
 {
+    /// <summary>Repel radius — nodes within this distance push apart.</summary>
+    public double RepelRadius { get; set; } = 120.0;
+
+    // Kept for interface compat (unused by engine)
     public double RepulsionStrength { get; set; } = -8000;
     public double LinkDistance { get; set; } = 900;
     public double LinkStrength { get; set; } = 0.15;
@@ -26,7 +29,6 @@ public sealed class PhysicsParameters
 
 public sealed class ForceLayoutEngine
 {
-    private const double MaxVelocity = 50.0;
     private static readonly double GoldenAngle = Math.PI * (3 - Math.Sqrt(5));
 
     private readonly PhysicsParameters _params;
@@ -39,23 +41,11 @@ public sealed class ForceLayoutEngine
 
     public void UpdateParameters(PhysicsParameters source)
     {
-        _params.RepulsionStrength = source.RepulsionStrength;
-        _params.LinkDistance = source.LinkDistance;
-        _params.LinkStrength = source.LinkStrength;
-        _params.CollisionStrength = source.CollisionStrength;
-        _params.CenterStrength = source.CenterStrength;
-        _params.VelocityDecay = source.VelocityDecay;
-        _params.MinSeparation = source.MinSeparation;
+        _params.RepelRadius = source.RepelRadius;
     }
 
     public bool IsRunning => _params.Alpha > _params.AlphaMin;
 
-    /// <summary>
-    /// Phase 1: Place nodes on a Fermat spiral in BFS order.
-    /// Connected nodes end up adjacent in the sequence → nearby on the spiral.
-    /// This gives the physics a well-spread starting position instead of a
-    /// random cluster.
-    /// </summary>
     public void SetGraphData(GraphData data, bool preservePositions = false)
     {
         _graphData = data;
@@ -67,7 +57,8 @@ public sealed class ForceLayoutEngine
 
         var ordered = ComputeBfsOrder(data);
 
-        var spacing = _params.MinSeparation * 2.5;
+        // Spiral spacing based on repel radius — guarantees no initial overlaps
+        var spacing = _params.RepelRadius * 2.0;
 
         for (var i = 0; i < ordered.Count; i++)
         {
@@ -93,12 +84,6 @@ public sealed class ForceLayoutEngine
 
     public void Reheat(double alpha) => _params.Alpha = Math.Clamp(alpha, _params.AlphaMin, 1.0);
 
-    /// <summary>
-    /// Phase 2: Obsidian-style 4-force physics refinement.
-    /// All forces accumulate into velocity, then velocity updates position.
-    /// Forces: repel (N-body), link (spring), center (gravity).
-    /// MinSeparation runs last as a hard safety floor.
-    /// </summary>
     public void Tick()
     {
         if (_graphData is null || !IsRunning) return;
@@ -106,147 +91,19 @@ public sealed class ForceLayoutEngine
         var nodes = _graphData.Nodes.Values.ToList();
         if (nodes.Count == 0) return;
 
-        // 4-force physics (velocity-based)
-        ApplyRepulsion(nodes);
-        ApplyLinkForce(nodes);
-        ApplyCenterForce(nodes);
-        UpdatePositions(nodes);
-
-        // Hard safety floor (direct displacement)
-        EnforceMinSeparation(nodes);
+        ApplyRepel(nodes);
 
         _params.Alpha += (_params.AlphaMin - _params.Alpha) * _params.AlphaDecay;
     }
 
-    // ------------------------------------------------------------------
-    // Force 1: Repel — N-body inverse-square repulsion
-    // ------------------------------------------------------------------
-
-    private void ApplyRepulsion(List<GraphNode> nodes)
+    /// <summary>
+    /// Any two nodes closer than RepelRadius get pushed apart to exactly
+    /// RepelRadius. Direct displacement, no velocity, no springs.
+    /// </summary>
+    private void ApplyRepel(List<GraphNode> nodes)
     {
-        for (var i = 0; i < nodes.Count; i++)
-        {
-            for (var j = i + 1; j < nodes.Count; j++)
-            {
-                var dx = nodes[j].X - nodes[i].X;
-                var dy = nodes[j].Y - nodes[i].Y;
-                var distSq = dx * dx + dy * dy;
-                if (distSq < 1) distSq = 1;
-                var dist = Math.Sqrt(distSq);
+        var radius = _params.RepelRadius;
 
-                // RepulsionStrength is negative → pushes apart
-                var force = _params.RepulsionStrength * _params.Alpha / distSq;
-                var fx = dx / dist * force;
-                var fy = dy / dist * force;
-
-                if (!nodes[i].IsDragging && !nodes[i].IsPinned)
-                {
-                    nodes[i].Vx += fx;
-                    nodes[i].Vy += fy;
-                }
-                if (!nodes[j].IsDragging && !nodes[j].IsPinned)
-                {
-                    nodes[j].Vx -= fx;
-                    nodes[j].Vy -= fy;
-                }
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Force 2 & 3: Link force + Link distance — spring toward LinkDistance
-    // ------------------------------------------------------------------
-
-    private void ApplyLinkForce(List<GraphNode> nodes)
-    {
-        if (_graphData is null) return;
-        var nodeMap = _graphData.Nodes;
-
-        foreach (var edge in _graphData.Edges)
-        {
-            if (!nodeMap.TryGetValue(edge.SourceId, out var source) ||
-                !nodeMap.TryGetValue(edge.TargetId, out var target))
-                continue;
-
-            var dx = target.X - source.X;
-            var dy = target.Y - source.Y;
-            var dist = Math.Sqrt(dx * dx + dy * dy);
-            if (dist < 1) dist = 1;
-
-            // Spring: pull toward LinkDistance
-            var displacement = dist - _params.LinkDistance;
-            var force = displacement * _params.LinkStrength * _params.Alpha;
-            var fx = dx / dist * force;
-            var fy = dy / dist * force;
-
-            if (!source.IsDragging && !source.IsPinned)
-            {
-                source.Vx += fx;
-                source.Vy += fy;
-            }
-            if (!target.IsDragging && !target.IsPinned)
-            {
-                target.Vx -= fx;
-                target.Vy -= fy;
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Force 4: Center — pull centroid toward origin
-    // ------------------------------------------------------------------
-
-    private void ApplyCenterForce(List<GraphNode> nodes)
-    {
-        double cx = 0, cy = 0;
-        foreach (var n in nodes) { cx += n.X; cy += n.Y; }
-        cx /= nodes.Count;
-        cy /= nodes.Count;
-
-        foreach (var n in nodes)
-        {
-            if (n.IsDragging || n.IsPinned) continue;
-            n.Vx -= cx * _params.CenterStrength;
-            n.Vy -= cy * _params.CenterStrength;
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Velocity integration
-    // ------------------------------------------------------------------
-
-    private void UpdatePositions(List<GraphNode> nodes)
-    {
-        var decay = 1 - _params.VelocityDecay;
-
-        foreach (var n in nodes)
-        {
-            if (n.IsDragging || n.IsPinned) continue;
-
-            n.Vx *= decay;
-            n.Vy *= decay;
-
-            // Clamp velocity to prevent explosions
-            var speed = Math.Sqrt(n.Vx * n.Vx + n.Vy * n.Vy);
-            if (speed > MaxVelocity)
-            {
-                var ratio = MaxVelocity / speed;
-                n.Vx *= ratio;
-                n.Vy *= ratio;
-            }
-
-            n.X += n.Vx;
-            n.Y += n.Vy;
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Hard safety floor — MinSeparation exclusion zone
-    // ------------------------------------------------------------------
-
-    private void EnforceMinSeparation(List<GraphNode> nodes)
-    {
-        var minSep = _params.MinSeparation;
         for (var i = 0; i < nodes.Count; i++)
         {
             for (var j = i + 1; j < nodes.Count; j++)
@@ -255,10 +112,9 @@ public sealed class ForceLayoutEngine
                 var dy = nodes[j].Y - nodes[i].Y;
                 var dist = Math.Sqrt(dx * dx + dy * dy);
 
-                if (dist >= minSep || dist <= 0) continue;
+                if (dist >= radius) continue;
 
-                var deficit = (minSep - dist) * 0.5;
-
+                // Jitter coincident nodes
                 if (dist < 1)
                 {
                     var angle = (i * 7 + j * 13) % 360 * Math.PI / 180.0;
@@ -267,6 +123,8 @@ public sealed class ForceLayoutEngine
                     dist = 1;
                 }
 
+                // Push apart so they're exactly RepelRadius away
+                var deficit = (radius - dist) * 0.5;
                 var mx = dx / dist * deficit;
                 var my = dy / dist * deficit;
 
@@ -283,10 +141,6 @@ public sealed class ForceLayoutEngine
             }
         }
     }
-
-    // ------------------------------------------------------------------
-    // BFS ordering for spiral placement
-    // ------------------------------------------------------------------
 
     private static List<GraphNode> ComputeBfsOrder(GraphData data)
     {
