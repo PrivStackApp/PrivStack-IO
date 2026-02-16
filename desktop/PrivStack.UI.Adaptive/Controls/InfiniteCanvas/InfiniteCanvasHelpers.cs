@@ -110,6 +110,154 @@ public sealed partial class InfiniteCanvasControl
     }
 
     // ================================================================
+    // Element Operations
+    // ================================================================
+
+    /// <summary>
+    /// Returns the currently selected connector, or null.
+    /// </summary>
+    public CanvasConnector? GetSelectedConnector()
+    {
+        var data = Data;
+        if (data == null || _selectedConnectorId == null) return null;
+        return data.FindConnector(_selectedConnectorId);
+    }
+
+    /// <summary>
+    /// Returns the currently selected elements.
+    /// </summary>
+    public IReadOnlyList<CanvasElement> GetSelectedElements()
+    {
+        var data = Data;
+        if (data == null) return [];
+        return _selectedElementIds
+            .Select(id => data.FindElement(id))
+            .Where(e => e != null)
+            .ToList()!;
+    }
+
+    /// <summary>
+    /// Moves all selected elements to the top of the Z-order.
+    /// </summary>
+    public void BringSelectedToFront()
+    {
+        var data = Data;
+        if (data == null || _selectedElementIds.Count == 0) return;
+
+        var maxZ = data.Elements.Count > 0 ? data.Elements.Max(e => e.ZIndex) : 0;
+        foreach (var id in _selectedElementIds)
+        {
+            var el = data.FindElement(id);
+            if (el != null) el.ZIndex = ++maxZ;
+        }
+
+        NotifyDataChanged();
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Moves all selected elements to the bottom of the Z-order.
+    /// </summary>
+    public void SendSelectedToBack()
+    {
+        var data = Data;
+        if (data == null || _selectedElementIds.Count == 0) return;
+
+        var minZ = data.Elements.Count > 0 ? data.Elements.Min(e => e.ZIndex) : 0;
+        foreach (var id in _selectedElementIds)
+        {
+            var el = data.FindElement(id);
+            if (el != null) el.ZIndex = --minZ;
+        }
+
+        // Renormalize so no negative indices persist
+        var offset = data.Elements.Count > 0 ? data.Elements.Min(e => e.ZIndex) : 0;
+        if (offset < 0)
+        {
+            foreach (var el in data.Elements)
+                el.ZIndex -= offset;
+        }
+
+        NotifyDataChanged();
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Deep-clones selected elements with +20px offset and new IDs.
+    /// Also duplicates connectors between selected elements with remapped IDs.
+    /// </summary>
+    public void DuplicateSelected()
+    {
+        var data = Data;
+        if (data == null || _selectedElementIds.Count == 0) return;
+
+        var idMap = new Dictionary<string, string>();
+        var newElements = new List<CanvasElement>();
+
+        foreach (var id in _selectedElementIds)
+        {
+            var el = data.FindElement(id);
+            if (el == null) continue;
+
+            var json = System.Text.Json.JsonSerializer.Serialize(el);
+            var clone = System.Text.Json.JsonSerializer.Deserialize<CanvasElement>(json);
+            if (clone == null) continue;
+
+            var newId = Guid.NewGuid().ToString();
+            idMap[id] = newId;
+            clone.Id = newId;
+            clone.X += 20;
+            clone.Y += 20;
+            clone.ZIndex = data.NextZIndex();
+            newElements.Add(clone);
+        }
+
+        data.Elements.AddRange(newElements);
+
+        // Duplicate connectors between selected elements
+        foreach (var conn in data.Connectors.ToList())
+        {
+            if (idMap.ContainsKey(conn.SourceId) && idMap.ContainsKey(conn.TargetId))
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(conn);
+                var clone = System.Text.Json.JsonSerializer.Deserialize<CanvasConnector>(json);
+                if (clone == null) continue;
+
+                clone.Id = Guid.NewGuid().ToString();
+                clone.SourceId = idMap[conn.SourceId];
+                clone.TargetId = idMap[conn.TargetId];
+                data.Connectors.Add(clone);
+            }
+        }
+
+        // Select the new elements
+        _selectedElementIds.Clear();
+        foreach (var newEl in newElements)
+            _selectedElementIds.Add(newEl.Id);
+
+        NotifyDataChanged();
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Sets the color on all selected elements.
+    /// </summary>
+    public void SetSelectedElementColor(string? color)
+    {
+        var data = Data;
+        if (data == null || _selectedElementIds.Count == 0) return;
+
+        foreach (var id in _selectedElementIds)
+        {
+            var el = data.FindElement(id);
+            if (el != null) el.Color = color ?? "";
+        }
+
+        NotifyDataChanged();
+        InvalidateVisual();
+    }
+
+    // ================================================================
     // Connector Property Helpers
     // ================================================================
 
@@ -126,6 +274,7 @@ public sealed partial class InfiniteCanvasControl
 
         connector.Style = style;
         NotifyDataChanged();
+        ConnectorPropertyChanged?.Invoke(connector);
         InvalidateVisual();
     }
 
@@ -142,6 +291,7 @@ public sealed partial class InfiniteCanvasControl
 
         connector.ArrowMode = mode;
         NotifyDataChanged();
+        ConnectorPropertyChanged?.Invoke(connector);
         InvalidateVisual();
     }
 
@@ -158,6 +308,7 @@ public sealed partial class InfiniteCanvasControl
 
         connector.Color = color;
         NotifyDataChanged();
+        ConnectorPropertyChanged?.Invoke(connector);
         InvalidateVisual();
     }
 
