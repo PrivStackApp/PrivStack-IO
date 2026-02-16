@@ -1,8 +1,8 @@
 // ============================================================================
 // File: ForceLayoutEngine.cs
-// Description: Spiral placement + simple radius-based repel.
-//              Nodes repel anything within RepelRadius. No springs, no center
-//              force, no velocity. Connections are purely visual.
+// Description: Spiral placement + radius-based repel + anchor springs.
+//              Nodes repel within RepelRadius. Each node remembers its initial
+//              spiral position and springs back toward it when displaced.
 // ============================================================================
 
 using PrivStack.UI.Adaptive.Models;
@@ -13,6 +13,9 @@ public sealed class PhysicsParameters
 {
     /// <summary>Repel radius — nodes within this distance push apart.</summary>
     public double RepelRadius { get; set; } = 120.0;
+
+    /// <summary>Spring strength pulling nodes back to their anchor (0-1).</summary>
+    public double SpringStrength { get; set; } = 0.08;
 
     // Kept for interface compat (unused by engine)
     public double RepulsionStrength { get; set; } = -8000;
@@ -33,6 +36,7 @@ public sealed class ForceLayoutEngine
 
     private readonly PhysicsParameters _params;
     private GraphData? _graphData;
+    private Dictionary<string, (double X, double Y)> _anchors = new();
 
     public ForceLayoutEngine(PhysicsParameters? parameters = null)
     {
@@ -78,6 +82,11 @@ public sealed class ForceLayoutEngine
             ordered[i].Vx = 0;
             ordered[i].Vy = 0;
         }
+
+        // Store initial positions as anchor points (resting positions)
+        _anchors.Clear();
+        foreach (var node in ordered)
+            _anchors[node.Id] = (node.X, node.Y);
     }
 
     public void Reheat() => _params.Alpha = 1.0;
@@ -92,6 +101,7 @@ public sealed class ForceLayoutEngine
         if (nodes.Count == 0) return;
 
         ApplyRepel(nodes);
+        ApplySpringToAnchor(nodes);
 
         _params.Alpha += (_params.AlphaMin - _params.Alpha) * _params.AlphaDecay;
     }
@@ -139,6 +149,27 @@ public sealed class ForceLayoutEngine
                     nodes[j].Y += my;
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Pull each node back toward its initial spiral position (anchor).
+    /// Strength is proportional to displacement — classic spring force.
+    /// </summary>
+    private void ApplySpringToAnchor(List<GraphNode> nodes)
+    {
+        var strength = _params.SpringStrength;
+
+        foreach (var node in nodes)
+        {
+            if (node.IsDragging || node.IsPinned) continue;
+            if (!_anchors.TryGetValue(node.Id, out var anchor)) continue;
+
+            var dx = anchor.X - node.X;
+            var dy = anchor.Y - node.Y;
+
+            node.X += dx * strength;
+            node.Y += dy * strength;
         }
     }
 
