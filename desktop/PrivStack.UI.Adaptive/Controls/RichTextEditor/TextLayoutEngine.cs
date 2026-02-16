@@ -162,7 +162,7 @@ public sealed class TextLayoutEngine
 
             // Add right padding for emoji runs so they don't feel cramped
             if (IsEmojiOnly(chunk.Text))
-                w += 2;
+                w += 6;
 
             var isSuperscript = chunk.Style.HasFlag(InlineStyle.Superscript);
             var runFontSize = isSuperscript ? FontSize * 0.7 : FontSize;
