@@ -135,6 +135,12 @@ public sealed partial class InfiniteCanvasControl : Control
     /// <summary>Fired when element count exceeds PerformanceWarningThreshold.</summary>
     public event Action<int>? PerformanceWarning;
 
+    /// <summary>Fired when a connector is selected.</summary>
+    public event Action<CanvasConnector>? ConnectorSelected;
+
+    /// <summary>Fired after a selected connector's properties are changed.</summary>
+    public event Action<CanvasConnector>? ConnectorPropertyChanged;
+
     // ================================================================
     // Internal State
     // ================================================================

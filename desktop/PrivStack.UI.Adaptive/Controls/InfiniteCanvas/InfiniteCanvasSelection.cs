@@ -56,6 +56,10 @@ public sealed partial class InfiniteCanvasControl
         _selectedElementIds.Clear();
         _selectedConnectorId = connectorId;
         InvalidateVisual();
+
+        var connector = Data?.FindConnector(connectorId);
+        if (connector != null)
+            ConnectorSelected?.Invoke(connector);
     }
 
     internal void ClearConnectorSelection()
@@ -63,6 +67,7 @@ public sealed partial class InfiniteCanvasControl
         if (_selectedConnectorId == null) return;
         _selectedConnectorId = null;
         InvalidateVisual();
+        SelectionCleared?.Invoke();
     }
 
     internal void SelectAll()

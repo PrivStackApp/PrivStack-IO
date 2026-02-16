@@ -30,6 +30,14 @@ public sealed partial class InfiniteCanvasControl
             return;
         }
 
+        // Right-click opens context menu
+        if (point.Properties.IsRightButtonPressed)
+        {
+            HandleRightClick(pos, Data);
+            e.Handled = true;
+            return;
+        }
+
         if (!point.Properties.IsLeftButtonPressed) return;
 
         // Space+click pans
