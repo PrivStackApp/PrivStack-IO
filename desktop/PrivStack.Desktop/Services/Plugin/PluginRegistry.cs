@@ -1659,6 +1659,12 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
                 HostFactory.CapabilityBroker.Register<IGraphDataProvider>(graphProvider);
             }
 
+            // Auto-register vault consumers with the capability broker
+            if (plugin is IVaultConsumer vaultConsumer)
+            {
+                HostFactory.CapabilityBroker.Register<IVaultConsumer>(vaultConsumer);
+            }
+
             _log.Debug("Plugin activated: {PluginId}", plugin.Metadata.Id);
             RaisePluginStateChanged(plugin, PluginState.Active);
         }
