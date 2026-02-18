@@ -222,18 +222,34 @@ impl CloudSyncEngine {
         loop {
             tokio::select! {
                 _ = flush_interval.tick() => {
+                    if self.api.is_rate_limited().await {
+                        if let Some(remaining) = self.api.rate_limit_remaining().await {
+                            debug!("flush skipped: rate limited for {remaining:?}");
+                        }
+                        continue;
+                    }
                     if self.outbox.should_flush() {
                         if let Err(e) = self.flush_outbox().await {
-                            error!("outbox flush failed: {e}");
+                            if !e.is_rate_limited() {
+                                error!("outbox flush failed: {e}");
+                            }
                         }
                     }
                 }
                 _ = poll_interval.tick() => {
+                    if self.api.is_rate_limited().await {
+                        continue;
+                    }
                     if let Err(e) = self.poll_and_apply().await {
-                        warn!("poll failed: {e}");
+                        if !e.is_rate_limited() {
+                            warn!("poll failed: {e}");
+                        }
                     }
                 }
                 _ = cred_check_interval.tick() => {
+                    if self.api.is_rate_limited().await {
+                        continue;
+                    }
                     if !self.cred_manager.has_valid_credentials().await {
                         debug!("proactively refreshing STS credentials");
                         if let Err(e) = self.cred_manager.refresh().await {
@@ -248,15 +264,21 @@ impl CloudSyncEngine {
                     match cmd {
                         Some(CloudCommand::Stop) => {
                             info!("cloud sync engine stopping");
-                            if !self.outbox.is_empty() {
+                            if !self.outbox.is_empty() && !self.api.is_rate_limited().await {
                                 let _ = self.flush_outbox().await;
                             }
                             break;
                         }
                         Some(CloudCommand::ForceFlush) => {
+                            if self.api.is_rate_limited().await {
+                                warn!("force flush skipped: rate limited");
+                                continue;
+                            }
                             if !self.outbox.is_empty() {
                                 if let Err(e) = self.flush_outbox().await {
-                                    error!("force flush failed: {e}");
+                                    if !e.is_rate_limited() {
+                                        error!("force flush failed: {e}");
+                                    }
                                 }
                             }
                         }
@@ -317,7 +339,9 @@ impl CloudSyncEngine {
         let inter_delay = Duration::from_millis(self.rate_limits.inter_entity_delay_ms);
         let mut is_first = true;
 
-        for (entity_id, entity_events) in entities_to_flush {
+        while !entities_to_flush.is_empty() {
+            let (entity_id, entity_events) = entities_to_flush.remove(0);
+
             // Delay between entities to stay under rate limits.
             if is_first {
                 is_first = false;
@@ -328,7 +352,6 @@ impl CloudSyncEngine {
                 Ok(dek) => dek,
                 Err(e) => {
                     warn!("skipping flush for entity {entity_id} (no DEK): {e}");
-                    // Re-queue events so they aren't lost
                     for ev in entity_events {
                         self.outbox.push(ev);
                     }
@@ -368,37 +391,33 @@ impl CloudSyncEngine {
                 event_count: event_count as u32,
             };
 
-            // Retry cursor advance with backoff (handles 429 rate limiting)
-            let mut cursor_ok = false;
-            for attempt in 0..3 {
-                match self.api.advance_cursor(&cursor_req).await {
-                    Ok(()) => {
-                        cursor_ok = true;
-                        break;
+            match self.api.advance_cursor(&cursor_req).await {
+                Ok(()) => {
+                    self.cursors.insert(entity_id.clone(), cursor_end);
+                    if let Err(e) = self.entity_store.save_cloud_cursor(&entity_id, cursor_end) {
+                        warn!("failed to persist cursor for entity {entity_id}: {e}");
                     }
-                    Err(e) if e.is_rate_limited() && attempt < 2 => {
-                        let backoff = Duration::from_millis(500 * (1 << attempt));
-                        warn!("cursor advance rate-limited, retrying in {backoff:?}");
-                        tokio::time::sleep(backoff).await;
+                    debug!("flushed {event_count} events for entity {entity_id} (cursor -> {cursor_end})");
+                }
+                Err(e) if e.is_rate_limited() => {
+                    warn!("rate limited during flush, re-queuing current + {} remaining entities", entities_to_flush.len());
+                    for ev in entity_events {
+                        self.outbox.push(ev);
                     }
-                    Err(e) => {
-                        warn!("cursor advance failed for entity {entity_id}: {e}");
-                        for ev in entity_events {
+                    for (_, remaining_events) in entities_to_flush {
+                        for ev in remaining_events {
                             self.outbox.push(ev);
                         }
-                        last_err = Some(e);
-                        cursor_ok = false;
-                        break;
                     }
+                    return Err(e);
                 }
-            }
-
-            if cursor_ok {
-                self.cursors.insert(entity_id.clone(), cursor_end);
-                if let Err(e) = self.entity_store.save_cloud_cursor(&entity_id, cursor_end) {
-                    warn!("failed to persist cursor for entity {entity_id}: {e}");
+                Err(e) => {
+                    warn!("cursor advance failed for entity {entity_id}: {e}");
+                    for ev in entity_events {
+                        self.outbox.push(ev);
+                    }
+                    last_err = Some(e);
                 }
-                debug!("flushed {event_count} events for entity {entity_id} (cursor -> {cursor_end})");
             }
         }
 
