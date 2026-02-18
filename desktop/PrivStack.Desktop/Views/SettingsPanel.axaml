@@ -830,6 +830,42 @@
                                        TextWrapping="Wrap"/>
                         </StackPanel>
 
+                        <!-- Intent Engine toggle -->
+                        <Border Classes="card" Padding="16,14" IsVisible="{Binding AiEnabled}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="AI Intent Engine"
+                                               FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Medium"/>
+                                    <TextBlock Text="Detect actionable intents in your content and suggest cross-plugin actions"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding AiIntentEnabled}"
+                                              OnContent="" OffContent=""
+                                              VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Auto-analyze toggle -->
+                        <Border Classes="card" Padding="16,14" IsVisible="{Binding AiIntentEnabled}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="Auto-Analyze Content"
+                                               FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Medium"/>
+                                    <TextBlock Text="Automatically analyze saved content for actionable intents"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding AiIntentAutoAnalyze}"
+                                              OnContent="" OffContent=""
+                                              VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
                         <TextBlock Text="API keys are stored encrypted in your local vault. They never leave your device unencrypted."
                                    Foreground="{DynamicResource ThemeTextMutedBrush}"
                                    FontSize="{DynamicResource ThemeFontSizeXs}"
