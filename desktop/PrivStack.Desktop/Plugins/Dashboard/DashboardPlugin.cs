@@ -46,8 +46,9 @@ public sealed class DashboardPlugin : PluginBase<DashboardViewModel>
         var entityMetadataService = App.Services.GetRequiredService<EntityMetadataService>();
         var linkProviderCache = App.Services.GetRequiredService<LinkProviderCacheService>();
         var workspaceService = App.Services.GetRequiredService<IWorkspaceService>();
+        var runtime = App.Services.GetRequiredService<Native.IPrivStackRuntime>();
         return new DashboardViewModel(installService, pluginRegistry, metricsService, sdk,
-            entityMetadataService, linkProviderCache, workspaceService);
+            entityMetadataService, linkProviderCache, workspaceService, runtime);
     }
 
     public override async Task OnNavigatedToAsync(CancellationToken cancellationToken = default)
