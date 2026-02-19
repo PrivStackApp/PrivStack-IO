@@ -88,14 +88,6 @@
             <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
         </Style>
-        <Style Selector="Button.nav-item:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
-        </Style>
-        <Style Selector="Button.nav-item:pressed /template/ ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource ThemeNavSelectedBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
-        </Style>
         <Style Selector="Button.nav-item.active">
             <Setter Property="Background" Value="{DynamicResource ThemePrimaryMutedBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource ThemeNavTextHoverBrush}"/>
@@ -120,9 +112,6 @@
                     <BrushTransition Property="Background" Duration="0:0:0.12"/>
                 </Transitions>
             </Setter>
-        </Style>
-        <Style Selector="Button.nav-item:pointerover Border.nav-icon-bubble">
-            <Setter Property="Background" Value="{DynamicResource ThemeNavHoverBrush}"/>
         </Style>
         <Style Selector="Button.nav-item.active Border.nav-icon-bubble">
             <Setter Property="Background" Value="{DynamicResource ThemePrimaryMutedBrush}"/>
