@@ -1206,7 +1206,8 @@
 
                             <!-- ── Google ────────────────────────────── -->
                             <Border Background="{DynamicResource ThemeSurfaceBrush}"
-                                    CornerRadius="10" Padding="14">
+                                    CornerRadius="10" Padding="14"
+                                    IsVisible="{Binding IsGoogleRequired}">
                                 <StackPanel Spacing="10">
                                     <Grid ColumnDefinitions="*,Auto">
                                         <TextBlock Grid.Column="0" Text="Google"
@@ -1271,7 +1272,8 @@
 
                             <!-- ── Microsoft ─────────────────────────── -->
                             <Border Background="{DynamicResource ThemeSurfaceBrush}"
-                                    CornerRadius="10" Padding="14">
+                                    CornerRadius="10" Padding="14"
+                                    IsVisible="{Binding IsMicrosoftRequired}">
                                 <StackPanel Spacing="10">
                                     <Grid ColumnDefinitions="*,Auto">
                                         <TextBlock Grid.Column="0" Text="Microsoft"
@@ -1332,6 +1334,17 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
                                 </StackPanel>
+                            </Border>
+
+                            <!-- ── Empty State (no plugins need OAuth) ── -->
+                            <Border Background="{DynamicResource ThemeSurfaceBrush}"
+                                    CornerRadius="10" Padding="24"
+                                    IsVisible="{Binding !HasAnyOAuthProvider}">
+                                <TextBlock Text="Add different plugins for different connections."
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           HorizontalAlignment="Center"
+                                           TextAlignment="Center"/>
                             </Border>
 
                             <TextBlock Text="{Binding ConnectionError}"
