@@ -156,6 +156,7 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
             Slots = finalSlots,
             SourceEntityId = suggestion.SourceSignal.EntityId,
             SourcePluginId = suggestion.SourceSignal.SourcePluginId,
+            SourceLinkType = MapEntityTypeToLinkType(suggestion.SourceSignal.EntityType),
         };
 
         try
@@ -244,6 +245,29 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
                 _log.Error(ex, "Error processing intent signal from {Plugin}", signal.SourcePluginId);
             }
         }
+    }
+
+    // ── Entity Type → Link Type Mapping ─────────────────────────────
+
+    private static readonly Dictionary<string, string> EntityTypeToLinkType = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["email_message"] = "email",
+        ["page"] = "note",
+        ["task"] = "task",
+        ["event"] = "calendar_event",
+        ["contact"] = "contact",
+        ["journal_entry"] = "journal",
+        ["vault_file"] = "file",
+        ["file"] = "file",
+        ["snippet"] = "snippet",
+        ["feed"] = "rss_feed",
+        ["web_clip"] = "web_clip",
+    };
+
+    private static string? MapEntityTypeToLinkType(string? entityType)
+    {
+        if (string.IsNullOrEmpty(entityType)) return null;
+        return EntityTypeToLinkType.GetValueOrDefault(entityType);
     }
 
     // ── Private Helpers ──────────────────────────────────────────────
