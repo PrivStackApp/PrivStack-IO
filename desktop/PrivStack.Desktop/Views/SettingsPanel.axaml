@@ -956,6 +956,20 @@
                                                    IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DataDirectoryType.ICloud}}"/>
                                     </Grid>
                                 </Button>
+                                <Button IsEnabled="False"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="12,8" CornerRadius="8">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <PathIcon Grid.Column="0"
+                                                 Data="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"
+                                                 Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                 Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                                        <TextBlock Grid.Column="1" Text="PrivStack Cloud" FontSize="{DynamicResource ThemeFontSizeXsSm}" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="&#x2713;" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                   Foreground="{DynamicResource ThemePrimaryBrush}"
+                                                   IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DataDirectoryType.PrivStackCloud}}"/>
+                                    </Grid>
+                                </Button>
                                 <Button Command="{Binding SelectStorageLocationCommand}"
                                         CommandParameter="{x:Static models:DataDirectoryType.Custom}"
                                         HorizontalContentAlignment="Stretch"
