@@ -12,10 +12,10 @@
 //! - Schema migrations are handled automatically on startup
 
 mod error;
-mod entity_store;
+pub mod entity_store;
 mod event_store;
 
-pub use entity_store::EntityStore;
+pub use entity_store::{EntityStore, scan_duckdb_file, scan_duckdb_connection};
 pub use event_store::EventStore;
 pub use error::{StorageError, StorageResult};
 
