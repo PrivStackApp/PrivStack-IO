@@ -5,6 +5,7 @@
 
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 using PrivStack.Desktop.Services;
 
@@ -207,42 +208,43 @@ public class IconControl : Control
     public static readonly StyledProperty<IBrush?> StrokeProperty =
         AvaloniaProperty.Register<IconControl, IBrush?>(nameof(Stroke));
 
+    /// <summary>
+    /// Inherits Foreground from parent controls (Button, TemplatedControl).
+    /// Used as a fallback stroke color when Stroke is not explicitly set.
+    /// </summary>
+    public static readonly StyledProperty<IBrush?> ForegroundProperty =
+        TemplatedControl.ForegroundProperty.AddOwner<IconControl>();
+
     public static readonly StyledProperty<double> StrokeThicknessProperty =
         AvaloniaProperty.Register<IconControl, double>(nameof(StrokeThickness), 2.0);
 
     public static readonly StyledProperty<double> SizeProperty =
         AvaloniaProperty.Register<IconControl, double>(nameof(Size), 20.0);
 
-    /// <summary>
-    /// The icon name to render (e.g., "Document", "Lock", "Settings").
-    /// </summary>
     public string? Icon
     {
         get => GetValue(IconProperty);
         set => SetValue(IconProperty, value);
     }
 
-    /// <summary>
-    /// The stroke brush for the icon.
-    /// </summary>
     public IBrush? Stroke
     {
         get => GetValue(StrokeProperty);
         set => SetValue(StrokeProperty, value);
     }
 
-    /// <summary>
-    /// The stroke thickness (default 2.0).
-    /// </summary>
+    public IBrush? Foreground
+    {
+        get => GetValue(ForegroundProperty);
+        set => SetValue(ForegroundProperty, value);
+    }
+
     public double StrokeThickness
     {
         get => GetValue(StrokeThicknessProperty);
         set => SetValue(StrokeThicknessProperty, value);
     }
 
-    /// <summary>
-    /// The size of the icon (width and height).
-    /// </summary>
     public double Size
     {
         get => GetValue(SizeProperty);
@@ -251,7 +253,7 @@ public class IconControl : Control
 
     static IconControl()
     {
-        AffectsRender<IconControl>(IconProperty, StrokeProperty, StrokeThicknessProperty, SizeProperty);
+        AffectsRender<IconControl>(IconProperty, StrokeProperty, ForegroundProperty, StrokeThicknessProperty, SizeProperty);
         AffectsMeasure<IconControl>(SizeProperty);
     }
 
@@ -300,7 +302,10 @@ public class IconControl : Control
         var size = Size;
         var scale = size / 24.0; // Icons are designed for 24x24 viewbox
 
-        var stroke = Stroke ?? ThemeHelper.GetBrush("ThemeTextPrimaryBrush", Brushes.White);
+        // Stroke > inherited Foreground (from parent Button/control) > neutral fallback.
+        // Foreground is registered as an AddOwner of TemplatedControl.ForegroundProperty
+        // (which inherits: true) so it automatically flows from the parent Button's Foreground.
+        var stroke = Stroke ?? Foreground ?? Brushes.Gray;
         var pen = new Pen(stroke, StrokeThickness / scale)
         {
             LineCap = PenLineCap.Round,
