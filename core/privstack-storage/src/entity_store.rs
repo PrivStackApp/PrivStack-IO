@@ -827,69 +827,138 @@ impl EntityStore {
         Ok(())
     }
 
-    /// Returns per-table diagnostics as JSON: row counts and estimated sizes.
-    pub fn db_diagnostics(&self) -> StorageResult<String> {
+    /// Returns diagnostics for the entity store's own DuckDB connection.
+    pub fn db_diagnostics(&self) -> StorageResult<serde_json::Value> {
         let conn = self.conn.lock().unwrap();
+        Ok(scan_duckdb_connection(&conn))
+    }
+}
 
-        let mut stmt = conn.prepare(
-            "SELECT table_name, estimated_size, column_count
-             FROM duckdb_tables()
-             WHERE schema_name = 'main'"
-        )?;
+/// Scans a DuckDB connection and returns diagnostics: all tables, views, indexes, block info.
+pub fn scan_duckdb_connection(conn: &duckdb::Connection) -> serde_json::Value {
+    let mut tables = Vec::new();
 
-        let table_info: Vec<(String, i64, i64)> = stmt
+    if let Ok(mut stmt) = conn.prepare(
+        "SELECT schema_name, table_name, estimated_size, column_count FROM duckdb_tables()"
+    ) {
+        let rows: Vec<(String, String, i64, i64)> = stmt
             .query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
-                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(1)?,
                     row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
                 ))
-            })?
-            .filter_map(|r| r.ok())
-            .collect();
+            })
+            .ok()
+            .map(|iter| iter.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default();
 
-        let mut tables = Vec::new();
-        for (name, estimated_size, column_count) in &table_info {
-            let mut count_stmt = conn.prepare(&format!(
-                "SELECT COUNT(*) FROM \"{}\"", name
-            ))?;
-            let row_count: i64 = count_stmt
-                .query_row([], |row| row.get(0))
+        for (schema, name, estimated_size, column_count) in &rows {
+            let qualified = if schema == "main" {
+                format!("\"{}\"", name)
+            } else {
+                format!("\"{}\".\"{}\"", schema, name)
+            };
+            let row_count: i64 = conn
+                .prepare(&format!("SELECT COUNT(*) FROM {}", qualified))
+                .and_then(|mut s| s.query_row([], |r| r.get(0)))
                 .unwrap_or(0);
 
+            let display_name = if schema == "main" {
+                name.clone()
+            } else {
+                format!("{}.{}", schema, name)
+            };
+
             tables.push(serde_json::json!({
-                "table": name,
+                "table": display_name,
+                "schema": schema,
                 "row_count": row_count,
                 "estimated_size": estimated_size,
                 "column_count": column_count,
             }));
         }
-
-        // Also get the WAL size info
-        let db_size_info = conn
-            .prepare("SELECT * FROM pragma_database_size()")
-            .and_then(|mut s| {
-                s.query_row([], |row| {
-                    Ok(serde_json::json!({
-                        "database_name": row.get::<_, String>(0).unwrap_or_default(),
-                        "database_size": row.get::<_, String>(1).unwrap_or_default(),
-                        "block_size": row.get::<_, i64>(2).unwrap_or(0),
-                        "total_blocks": row.get::<_, i64>(3).unwrap_or(0),
-                        "used_blocks": row.get::<_, i64>(4).unwrap_or(0),
-                        "free_blocks": row.get::<_, i64>(5).unwrap_or(0),
-                        "wal_size": row.get::<_, String>(6).unwrap_or_default(),
-                    }))
-                })
-            })
-            .unwrap_or(serde_json::json!({}));
-
-        let result = serde_json::json!({
-            "tables": tables,
-            "database": db_size_info,
-        });
-
-        Ok(result.to_string())
     }
+
+    // Block-level allocation
+    let mut db_sizes = Vec::new();
+    if let Ok(mut size_stmt) = conn.prepare("SELECT * FROM pragma_database_size()") {
+        db_sizes = size_stmt
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "database_name": row.get::<_, String>(0).unwrap_or_default(),
+                    "database_size": row.get::<_, String>(1).unwrap_or_default(),
+                    "block_size": row.get::<_, i64>(2).unwrap_or(0),
+                    "total_blocks": row.get::<_, i64>(3).unwrap_or(0),
+                    "used_blocks": row.get::<_, i64>(4).unwrap_or(0),
+                    "free_blocks": row.get::<_, i64>(5).unwrap_or(0),
+                    "wal_size": row.get::<_, String>(6).unwrap_or_default(),
+                }))
+            })
+            .ok()
+            .map(|iter| iter.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default();
+    }
+
+    // Views
+    let mut views = Vec::new();
+    if let Ok(mut stmt) = conn.prepare("SELECT schema_name, view_name FROM duckdb_views()") {
+        views = stmt
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "schema": row.get::<_, String>(0).unwrap_or_default(),
+                    "view": row.get::<_, String>(1).unwrap_or_default(),
+                }))
+            })
+            .ok()
+            .map(|iter| iter.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default();
+    }
+
+    // Indexes
+    let mut indexes = Vec::new();
+    if let Ok(mut stmt) = conn.prepare(
+        "SELECT schema_name, table_name, index_name FROM duckdb_indexes()"
+    ) {
+        indexes = stmt
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "schema": row.get::<_, String>(0).unwrap_or_default(),
+                    "table": row.get::<_, String>(1).unwrap_or_default(),
+                    "index": row.get::<_, String>(2).unwrap_or_default(),
+                }))
+            })
+            .ok()
+            .map(|iter| iter.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default();
+    }
+
+    serde_json::json!({
+        "tables": tables,
+        "databases": db_sizes,
+        "views": views,
+        "indexes": indexes,
+    })
+}
+
+/// Opens a DuckDB file read-only and returns diagnostics.
+/// Returns None if the file doesn't exist or can't be opened.
+pub fn scan_duckdb_file(path: &std::path::Path) -> Option<serde_json::Value> {
+    if !path.exists() {
+        return None;
+    }
+    let file_size = std::fs::metadata(path).map(|m| m.len() as i64).unwrap_or(0);
+    let conn = duckdb::Connection::open_with_flags(
+        path,
+        duckdb::Config::default(),
+    ).ok()?;
+
+    let mut diag = scan_duckdb_connection(&conn);
+    if let Some(obj) = diag.as_object_mut() {
+        obj.insert("file_size".to_string(), serde_json::json!(file_size));
+    }
+    Some(diag)
 }
 
 // -- Field extraction helpers --
