@@ -183,7 +183,7 @@ internal sealed class LocalLlamaProvider : IAiProvider
         // Phi-3 chat template (default)
         {
             var prompt = $"<|system|>\n{systemPrompt}<|end|>\n<|user|>\n{userPrompt}<|end|>\n<|assistant|>\n";
-            return (prompt, ["<|end|>", "<|user|>", "<|assistant|>", "<|endoftext|>"]);
+            return (prompt, ["<|end|>", "<|user|>", "<|endoftext|>"]);
         }
     }
 
