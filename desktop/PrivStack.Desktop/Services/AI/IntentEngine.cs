@@ -248,6 +248,40 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
     };
 
+    /// <summary>
+    /// Extracts the outermost JSON object from potentially noisy LLM output.
+    /// Local models often append explanatory text or BOM bytes after the JSON.
+    /// </summary>
+    private static string? ExtractJsonObject(string raw)
+    {
+        var start = raw.IndexOf('{');
+        if (start < 0) return null;
+
+        var depth = 0;
+        var inString = false;
+        var escape = false;
+
+        for (var i = start; i < raw.Length; i++)
+        {
+            var c = raw[i];
+
+            if (escape) { escape = false; continue; }
+            if (c == '\\' && inString) { escape = true; continue; }
+            if (c == '"') { inString = !inString; continue; }
+            if (inString) continue;
+
+            if (c == '{') depth++;
+            else if (c == '}')
+            {
+                depth--;
+                if (depth == 0)
+                    return raw[start..(i + 1)];
+            }
+        }
+
+        return null; // unbalanced braces
+    }
+
     private void ParseAndAddSuggestions(
         string aiContent,
         IntentSignalMessage signal,
@@ -256,13 +290,21 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
         try
         {
             // Strip markdown fences if present
-            var json = aiContent.Trim();
-            if (json.StartsWith("```"))
+            var cleaned = aiContent.Trim();
+            if (cleaned.StartsWith("```"))
             {
-                var firstNewline = json.IndexOf('\n');
-                if (firstNewline >= 0) json = json[(firstNewline + 1)..];
-                if (json.EndsWith("```")) json = json[..^3];
-                json = json.Trim();
+                var firstNewline = cleaned.IndexOf('\n');
+                if (firstNewline >= 0) cleaned = cleaned[(firstNewline + 1)..];
+                if (cleaned.EndsWith("```")) cleaned = cleaned[..^3];
+                cleaned = cleaned.Trim();
+            }
+
+            // Extract just the JSON object — local LLMs often append extra text/BOM bytes
+            var json = ExtractJsonObject(cleaned);
+            if (json == null)
+            {
+                _log.Debug("No JSON object found in intent classification response");
+                return;
             }
 
             using var doc = JsonDocument.Parse(json);
