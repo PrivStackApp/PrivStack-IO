@@ -307,20 +307,24 @@
     <!-- BORDER STYLES                                                            -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
-    <!-- Hoverable border effect -->
+    <!-- Hoverable border effect: subtle background + lift on hover -->
     <Style Selector="Border.hoverable">
         <Setter Property="Transitions">
             <Transitions>
                 <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CubicEaseOut"/>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2"/>
             </Transitions>
         </Setter>
     </Style>
 
     <Style Selector="Border.hoverable:pointerover">
         <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+        <Setter Property="RenderTransform" Value="translateY(-2px)"/>
+        <Setter Property="BoxShadow" Value="0 4 16 0 #20000000, 0 1 4 0 #10000000"/>
     </Style>
 
-    <!-- Card: subtle shadow + border -->
+    <!-- Card: subtle shadow + border, lifts on hover -->
     <Style Selector="Border.card">
         <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBrush}"/>
         <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusLg}"/>
@@ -328,6 +332,17 @@
         <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderSubtleBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="BoxShadow" Value="0 1 3 0 #10000000, 0 0 1 0 #0C000000"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CubicEaseOut"/>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Border.card:pointerover">
+        <Setter Property="RenderTransform" Value="translateY(-2px)"/>
+        <Setter Property="BoxShadow" Value="0 6 20 0 #22000000, 0 2 6 0 #14000000"/>
     </Style>
 
     <!-- Surface card: border + medium shadow -->
@@ -350,7 +365,7 @@
         <Setter Property="BoxShadow" Value="0 4 12 0 #20000000, 0 1 4 0 #14000000"/>
     </Style>
 
-    <!-- Stat card: elevated background for dashboard metric tiles -->
+    <!-- Stat card: elevated background for dashboard metric tiles, lifts on hover -->
     <Style Selector="Border.stat-card">
         <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
         <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusLg}"/>
@@ -358,6 +373,17 @@
         <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderSubtleBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="BoxShadow" Value="0 1 3 0 #10000000, 0 0 1 0 #0C000000"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CubicEaseOut"/>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Border.stat-card:pointerover">
+        <Setter Property="RenderTransform" Value="translateY(-2px)"/>
+        <Setter Property="BoxShadow" Value="0 6 20 0 #22000000, 0 2 6 0 #14000000"/>
     </Style>
 
     <!-- Nav accent bar: 3px left accent strip for active nav items -->
