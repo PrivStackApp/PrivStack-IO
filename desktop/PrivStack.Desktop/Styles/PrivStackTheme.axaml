@@ -891,6 +891,37 @@
     </Style>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- VIEW TOGGLE STYLES (global — used by all plugin view mode toggles)       -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="Button.view-toggle">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextMutedBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="10,6"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusSm}"/>
+        <Setter Property="FontSize" Value="{DynamicResource ThemeFontSizeSm}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.12"/>
+                <BrushTransition Property="Foreground" Duration="0:0:0.12"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button.view-toggle:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="Button.view-toggle.active">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryMutedBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryBrush}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- FLYOUT / POPUP STYLES                                                    -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
 

@@ -24,15 +24,15 @@
                         Spacing="12"
                         HorizontalAlignment="Left"
                         VerticalAlignment="Center">
-                <StackPanel VerticalAlignment="Center" Spacing="-2">
+                <StackPanel VerticalAlignment="Center" Spacing="2">
                     <TextBlock x:Name="TitleBlock"
                                Text="{Binding Title, ElementName=CommandBarRoot}"
-                               FontSize="{DynamicResource ThemeFontSizeLg}"
-                               FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               FontWeight="Medium"
                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                     <TextBlock x:Name="SubtitleBlock"
                                Text="{Binding Subtitle, ElementName=CommandBarRoot}"
-                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
                                Foreground="{DynamicResource ThemeTextMutedBrush}"
                                IsVisible="{Binding Subtitle, ElementName=CommandBarRoot, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                 </StackPanel>
