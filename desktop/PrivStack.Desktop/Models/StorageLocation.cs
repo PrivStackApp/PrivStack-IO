@@ -10,7 +10,8 @@ public enum DataDirectoryType
     Default,
     Custom,
     GoogleDrive,
-    ICloud
+    ICloud,
+    PrivStackCloud
 }
 
 /// <summary>

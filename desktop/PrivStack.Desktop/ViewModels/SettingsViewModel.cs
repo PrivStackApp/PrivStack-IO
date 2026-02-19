@@ -404,6 +404,7 @@ public partial class SettingsViewModel : ViewModelBase
         DataDirectoryType.Custom => string.IsNullOrEmpty(DataDirectory) ? "Select a folder..." : DataDirectory,
         DataDirectoryType.GoogleDrive => GetGoogleDrivePath() ?? "Not available",
         DataDirectoryType.ICloud => GetICloudPath() ?? "Not available",
+        DataDirectoryType.PrivStackCloud => Services.DataPaths.WorkspaceDataDir ?? GetDefaultDataPath(),
         _ => GetDefaultDataPath()
     };
 
@@ -1267,13 +1268,20 @@ public partial class SettingsViewModel : ViewModelBase
         var activeWorkspace = workspaceService.GetActiveWorkspace();
         var storageLocation = activeWorkspace?.StorageLocation;
 
-        if (storageLocation != null && Enum.TryParse<DataDirectoryType>(storageLocation.Type, out var dirType))
+        // Cloud sync tier overrides the storage location display
+        if (activeWorkspace?.SyncTier == SyncTier.PrivStackCloud)
+        {
+            SelectedDirectoryType = DataDirectoryType.PrivStackCloud;
+        }
+        else if (storageLocation != null && Enum.TryParse<DataDirectoryType>(storageLocation.Type, out var dirType))
             SelectedDirectoryType = dirType;
         else
             SelectedDirectoryType = DataDirectoryType.Default;
 
         var defaultDataDir = Services.DataPaths.BaseDir;
-        DataDirectory = storageLocation?.CustomPath ?? defaultDataDir;
+        DataDirectory = Services.DataPaths.WorkspaceDataDir
+            ?? storageLocation?.CustomPath
+            ?? defaultDataDir;
 
         // Backup settings
         var defaultBackupDir = Path.Combine(defaultDataDir, "backups");
