@@ -10,8 +10,9 @@ use privstack_crypto::SealedEnvelope;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::RwLock;
-use tracing::debug;
+use tracing::{debug, warn};
 
 /// State shared across API client clones.
 struct AuthState {
@@ -32,6 +33,9 @@ pub struct CloudApiClient {
     /// Without this, concurrent 401s all read the same old refresh token;
     /// the server rotates on the first call, and subsequent calls fail.
     refresh_lock: Arc<tokio::sync::Mutex<()>>,
+    /// Global rate-limit gate: when set, all API requests are blocked until
+    /// the deadline passes. Set on any 429 response, cleared automatically.
+    rate_limited_until: Arc<RwLock<Option<Instant>>>,
 }
 
 #[derive(Deserialize)]
@@ -64,6 +68,7 @@ impl CloudApiClient {
                 refresh_generation: 0,
             })),
             refresh_lock: Arc::new(tokio::sync::Mutex::new(())),
+            rate_limited_until: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -190,6 +195,7 @@ impl CloudApiClient {
 
     /// Makes an authenticated GET request, retrying once on 401.
     async fn auth_get(&self, path: &str) -> CloudResult<reqwest::Response> {
+        self.enforce_rate_limit().await?;
         let url = format!("{}{}", self.config.api_base_url, path);
         let token = self.get_token().await?;
 
@@ -200,10 +206,18 @@ impl CloudApiClient {
             .send()
             .await?;
 
+        if let Some(err) = self.check_rate_limit_response(&resp).await {
+            return Err(err);
+        }
+
         if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
             debug!("401 on GET {path}, refreshing token");
             let new_token = self.refresh_access_token().await?;
-            return Ok(self.client.get(&url).bearer_auth(&new_token).send().await?);
+            let retry_resp = self.client.get(&url).bearer_auth(&new_token).send().await?;
+            if let Some(err) = self.check_rate_limit_response(&retry_resp).await {
+                return Err(err);
+            }
+            return Ok(retry_resp);
         }
 
         Ok(resp)
@@ -215,6 +229,7 @@ impl CloudApiClient {
         path: &str,
         body: &impl Serialize,
     ) -> CloudResult<reqwest::Response> {
+        self.enforce_rate_limit().await?;
         let url = format!("{}{}", self.config.api_base_url, path);
         let token = self.get_token().await?;
 
@@ -226,16 +241,24 @@ impl CloudApiClient {
             .send()
             .await?;
 
+        if let Some(err) = self.check_rate_limit_response(&resp).await {
+            return Err(err);
+        }
+
         if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
             debug!("401 on POST {path}, refreshing token");
             let new_token = self.refresh_access_token().await?;
-            return Ok(self
+            let retry_resp = self
                 .client
                 .post(&url)
                 .bearer_auth(&new_token)
                 .json(body)
                 .send()
-                .await?);
+                .await?;
+            if let Some(err) = self.check_rate_limit_response(&retry_resp).await {
+                return Err(err);
+            }
+            return Ok(retry_resp);
         }
 
         Ok(resp)
@@ -243,6 +266,7 @@ impl CloudApiClient {
 
     /// Makes an authenticated DELETE request, retrying once on 401.
     async fn auth_delete(&self, path: &str) -> CloudResult<reqwest::Response> {
+        self.enforce_rate_limit().await?;
         let url = format!("{}{}", self.config.api_base_url, path);
         let token = self.get_token().await?;
 
@@ -253,15 +277,23 @@ impl CloudApiClient {
             .send()
             .await?;
 
+        if let Some(err) = self.check_rate_limit_response(&resp).await {
+            return Err(err);
+        }
+
         if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
             debug!("401 on DELETE {path}, refreshing token");
             let new_token = self.refresh_access_token().await?;
-            return Ok(self
+            let retry_resp = self
                 .client
                 .delete(&url)
                 .bearer_auth(&new_token)
                 .send()
-                .await?);
+                .await?;
+            if let Some(err) = self.check_rate_limit_response(&retry_resp).await {
+                return Err(err);
+            }
+            return Ok(retry_resp);
         }
 
         Ok(resp)
@@ -274,6 +306,64 @@ impl CloudApiClient {
             .access_token
             .clone()
             .ok_or(CloudError::AuthRequired)
+    }
+
+    // ── Rate Limit Gate ──
+
+    /// Returns true if the client is currently paused due to a 429 response.
+    pub async fn is_rate_limited(&self) -> bool {
+        let guard = self.rate_limited_until.read().await;
+        guard.is_some_and(|deadline| Instant::now() < deadline)
+    }
+
+    /// Returns remaining pause duration, or `None` if not rate-limited.
+    pub async fn rate_limit_remaining(&self) -> Option<std::time::Duration> {
+        let guard = self.rate_limited_until.read().await;
+        guard.and_then(|deadline| deadline.checked_duration_since(Instant::now()))
+    }
+
+    /// Pre-flight gate: returns `RateLimited` error if the global pause is active.
+    async fn enforce_rate_limit(&self) -> CloudResult<()> {
+        let guard = self.rate_limited_until.read().await;
+        if let Some(deadline) = *guard {
+            let now = Instant::now();
+            if now < deadline {
+                let remaining = deadline - now;
+                return Err(CloudError::RateLimited {
+                    retry_after_secs: remaining.as_secs().max(1),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Checks a response for 429 status, sets the global pause, and returns
+    /// a `RateLimited` error. Only extends the deadline, never shortens it.
+    async fn check_rate_limit_response(
+        &self,
+        resp: &reqwest::Response,
+    ) -> Option<CloudError> {
+        if resp.status() != reqwest::StatusCode::TOO_MANY_REQUESTS {
+            return None;
+        }
+
+        let retry_after_secs = resp
+            .headers()
+            .get("retry-after")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(60);
+
+        let new_deadline = Instant::now() + std::time::Duration::from_secs(retry_after_secs);
+
+        let mut guard = self.rate_limited_until.write().await;
+        let should_extend = guard.map_or(true, |existing| new_deadline > existing);
+        if should_extend {
+            *guard = Some(new_deadline);
+        }
+
+        warn!("429 rate limited — pausing all API requests for {retry_after_secs}s");
+        Some(CloudError::RateLimited { retry_after_secs })
     }
 
     // ── Workspaces ──
