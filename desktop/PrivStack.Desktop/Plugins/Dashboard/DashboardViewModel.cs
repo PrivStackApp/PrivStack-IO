@@ -567,32 +567,67 @@ public partial class DashboardViewModel : ViewModelBase
             IsRunningMaintenance = true;
             StatusMessage = null;
 
+            var dbDir = Path.GetDirectoryName(_workspaceService.GetActiveDataPath());
+            var entityDb = dbDir != null ? Path.Combine(dbDir, "data.entities.duckdb") : null;
+            var sizeBefore = entityDb != null && File.Exists(entityDb) ? new FileInfo(entityDb).Length : 0;
+
+            _log.Information("Maintenance: entity DB size before = {Size} bytes, path = {Path}",
+                sizeBefore, entityDb);
+
             // 1. Run normal VACUUM via Rust FFI
+            StatusMessage = "Running vacuum...";
             await _sdk.RunDatabaseMaintenance();
 
-            // 2. Check if entity DB is still bloated with 0 entities
-            var metrics = await _metricsService.GetDataMetricsAsync(_pluginRegistry, _workspaceService);
-            var totalEntities = metrics.PluginDataItems.Sum(m => m.EntityCount);
-            var dbDir = Path.GetDirectoryName(_workspaceService.GetActiveDataPath());
+            // 2. Check entity count via diagnostics (more reliable than plugin metrics)
+            var diagJson = await Task.Run(() => _sdk.GetDatabaseDiagnostics());
+            _log.Information("Maintenance diagnostics: {Json}", diagJson);
 
-            if (totalEntities == 0 && dbDir != null)
+            long totalRows = 0;
+            try
             {
-                var entityDb = Path.Combine(dbDir, "data.entities.duckdb");
-                var entityDbSize = File.Exists(entityDb) ? new FileInfo(entityDb).Length : 0;
-
-                // If 0 entities but DB > 1 MB, VACUUM didn't reclaim — force recreate
-                if (entityDbSize > 1_048_576)
+                var doc = System.Text.Json.JsonDocument.Parse(diagJson);
+                if (doc.RootElement.TryGetProperty("tables", out var tables))
                 {
-                    _log.Information("Force-compacting empty entity DB ({Size} bytes)", entityDbSize);
-                    await ForceRecreateDatabase(dbDir);
+                    foreach (var table in tables.EnumerateArray())
+                    {
+                        var name = table.GetProperty("table").GetString() ?? "";
+                        var rows = table.GetProperty("row_count").GetInt64();
+                        _log.Information("  Table {Name}: {Rows} rows", name, rows);
+                        totalRows += rows;
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                _log.Warning(ex, "Failed to parse diagnostics JSON");
+            }
+
+            _log.Information("Maintenance: total rows across all tables = {TotalRows}", totalRows);
+
+            // 3. Force-recreate if all tables are empty but file is bloated
+            if (totalRows == 0 && dbDir != null && sizeBefore > 1_048_576)
+            {
+                StatusMessage = "Recreating empty database...";
+                _log.Information("Force-recreating empty entity DB ({Size} bytes, 0 rows)", sizeBefore);
+                await ForceRecreateDatabase(dbDir);
+
+                var sizeAfter = entityDb != null && File.Exists(entityDb) ? new FileInfo(entityDb).Length : 0;
+                _log.Information("Maintenance: entity DB size after recreate = {Size} bytes", sizeAfter);
+                StatusMessage = $"Database recreated. {FormatBytes(sizeBefore)} → {FormatBytes(sizeAfter)}";
+            }
+            else
+            {
+                var sizeAfter = entityDb != null && File.Exists(entityDb) ? new FileInfo(entityDb).Length : 0;
+                StatusMessage = totalRows == 0
+                    ? $"Database is empty ({FormatBytes(sizeAfter)}). Vacuum complete."
+                    : $"Vacuum complete. {totalRows:N0} rows across all tables.";
             }
 
             await LoadDataMetricsAsync();
-            StatusMessage = "Database maintenance completed.";
         }
         catch (Exception ex)
         {
+            _log.Error(ex, "Database maintenance failed");
             StatusMessage = $"Maintenance failed: {ex.Message}";
         }
         finally
@@ -613,7 +648,12 @@ public partial class DashboardViewModel : ViewModelBase
         };
 
         // Shutdown the Rust core (closes all DuckDB connections)
+        _log.Information("Shutting down Rust runtime...");
         await Task.Run(() => _runtime.Shutdown());
+        _log.Information("Rust runtime shut down");
+
+        // Small delay to ensure OS releases file handles
+        await Task.Delay(500);
 
         // Delete the empty database files
         foreach (var file in dbFiles)
@@ -621,15 +661,32 @@ public partial class DashboardViewModel : ViewModelBase
             var path = Path.Combine(dbDir, file);
             if (File.Exists(path))
             {
-                File.Delete(path);
-                _log.Information("Deleted empty DB file: {File}", file);
+                try
+                {
+                    File.Delete(path);
+                    _log.Information("Deleted DB file: {File} (existed={Exists})", file, File.Exists(path));
+                }
+                catch (Exception ex)
+                {
+                    _log.Error(ex, "Failed to delete DB file: {File}", file);
+                    throw;
+                }
             }
         }
 
         // Re-initialize (Rust will recreate schemas on fresh files)
+        _log.Information("Re-initializing Rust runtime with: {Path}", dbPath);
         await Task.Run(() => _runtime.Initialize(dbPath));
         _log.Information("Database re-initialized after force compact");
     }
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+        < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024.0):F1} MB",
+        _ => $"{bytes / (1024.0 * 1024.0 * 1024.0):F2} GB",
+    };
 
     [RelayCommand]
     private async Task ValidateMetadataAsync()
