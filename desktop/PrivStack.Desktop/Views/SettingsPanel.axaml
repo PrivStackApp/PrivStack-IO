@@ -7,1298 +7,1332 @@
              xmlns:svc="using:PrivStack.Desktop.Services"
              xmlns:views="using:PrivStack.Desktop.Views"
              xmlns:controls="using:PrivStack.Desktop.Controls"
-             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="600"
+             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="600"
              x:Class="PrivStack.Desktop.Views.SettingsPanel"
              x:DataType="vm:SettingsViewModel">
 
     <UserControl.Styles>
-        <Style Selector="Expander.settings-section">
-            <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBrush}"/>
-            <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusLg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderSubtleBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <!-- Category sidebar list -->
+        <Style Selector="ListBox.settings-categories">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="8"/>
         </Style>
-        <Style Selector="Expander.settings-section /template/ ToggleButton">
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Padding" Value="16,14"/>
+        <Style Selector="ListBox.settings-categories ListBoxItem">
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="0,1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ListBox.settings-categories ListBoxItem:pointerover">
+            <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+        </Style>
+        <Style Selector="ListBox.settings-categories ListBoxItem:selected">
+            <Setter Property="Background" Value="{DynamicResource ThemePrimaryMutedBrush}"/>
+        </Style>
+        <Style Selector="ListBox.settings-categories ListBoxItem:selected TextBlock.cat-label">
+            <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryBrush}"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+        </Style>
+        <Style Selector="ListBox.settings-categories ListBoxItem:selected Border.cat-icon-bubble">
+            <Setter Property="Background" Value="{DynamicResource ThemePrimaryMutedBrush}"/>
+        </Style>
+        <Style Selector="ListBox.settings-categories ListBoxItem:selected Border.cat-icon-bubble controls|IconControl">
+            <Setter Property="Stroke" Value="{DynamicResource ThemePrimaryBrush}"/>
+        </Style>
+
+        <!-- Category icon bubble -->
+        <Style Selector="Border.cat-icon-bubble">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.cat-icon-bubble controls|IconControl">
+            <Setter Property="Stroke" Value="{DynamicResource ThemeTextMutedBrush}"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Stroke" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <!-- Danger category: red bubble -->
+        <Style Selector="Border.cat-icon-bubble.danger">
+            <Setter Property="Background" Value="{DynamicResource ThemeDangerMutedBrush}"/>
+        </Style>
+        <Style Selector="Border.cat-icon-bubble.danger controls|IconControl">
+            <Setter Property="Stroke" Value="{DynamicResource ThemeDangerBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.cat-label.danger">
+            <Setter Property="Foreground" Value="{DynamicResource ThemeDangerBrush}"/>
+        </Style>
+
+        <!-- Settings content section heading -->
+        <Style Selector="TextBlock.settings-section-title">
+            <Setter Property="FontSize" Value="{DynamicResource ThemeFontSizeHeading2}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.settings-section-subtitle">
+            <Setter Property="FontSize" Value="{DynamicResource ThemeFontSizeSm}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextMutedBrush}"/>
+        </Style>
+
+        <!-- Field group label -->
+        <Style Selector="TextBlock.field-label">
+            <Setter Property="FontSize" Value="{DynamicResource ThemeFontSizeSm}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextMutedBrush}"/>
         </Style>
     </UserControl.Styles>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="8" Margin="20" MaxWidth="480">
+    <Grid ColumnDefinitions="190,*">
 
-            <!-- Profile Section -->
-            <Expander IsExpanded="True" Classes="settings-section">
-                <Expander.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Border Width="28" Height="28" CornerRadius="6"
-                                Background="{DynamicResource ThemePrimaryMutedBrush}">
-                            <controls:IconControl Icon="User" Size="14"
-                                                  Stroke="{DynamicResource ThemePrimaryBrush}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Profile" FontWeight="SemiBold"
-                                   FontSize="{DynamicResource ThemeFontSizeMd}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Expander.Header>
-                <StackPanel Spacing="12" Margin="16,0,16,16">
-                    <!-- Profile Image -->
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <!-- Circular preview -->
-                        <Border Width="48" Height="48" CornerRadius="24"
-                                ClipToBounds="True"
-                                Background="{DynamicResource ThemePrimaryBrush}">
-                            <Panel>
-                                <!-- Image (shown when set) -->
-                                <Image Source="{Binding ProfileImageBitmap}"
-                                       IsVisible="{Binding HasProfileImage}"
-                                       Width="48" Height="48"
-                                       Stretch="UniformToFill"/>
-                                <!-- Initial fallback (shown when no image) -->
-                                <TextBlock Text="{Binding UserInitial}"
-                                           IsVisible="{Binding !HasProfileImage}"
-                                           FontSize="{DynamicResource ThemeFontSizeXl}" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
-                            </Panel>
-                        </Border>
-                        <!-- Buttons -->
-                        <StackPanel VerticalAlignment="Center" Spacing="6">
-                            <Button Content="Choose Image"
-                                    x:Name="ChooseProfileImageButton"
-                                    Click="OnChooseProfileImageClick"
-                                    Padding="12,6"
-                                    FontSize="{DynamicResource ThemeFontSizeSm}"/>
-                            <Button Content="Remove"
-                                    Command="{Binding RemoveProfileImageCommand}"
-                                    IsVisible="{Binding HasProfileImage}"
-                                    Padding="12,6"
-                                    FontSize="{DynamicResource ThemeFontSizeSm}"
-                                    Foreground="{DynamicResource ThemeDangerBrush}"/>
-                        </StackPanel>
-                    </StackPanel>
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- Left: Category navigation rail                        -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource ThemeSurfaceRecessedBrush}"
+                BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+                BorderThickness="0,0,1,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ListBox x:Name="CategoryList"
+                         Classes="settings-categories"
+                         SelectionChanged="OnCategoryListSelectionChanged">
 
-                    <!-- Display Name -->
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Display Name" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        <TextBox Text="{Binding UserDisplayName}"
-                                 Watermark="Enter your name"
-                                 Padding="12,8"/>
-                    </StackPanel>
-                </StackPanel>
-            </Expander>
-
-            <!-- Appearance Section -->
-            <Expander IsExpanded="False" Classes="settings-section">
-                <Expander.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Border Width="28" Height="28" CornerRadius="6"
-                                Background="{DynamicResource ThemePrimaryMutedBrush}">
-                            <controls:IconControl Icon="Settings" Size="14"
-                                                  Stroke="{DynamicResource ThemePrimaryBrush}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Appearance" FontWeight="SemiBold"
-                                   FontSize="{DynamicResource ThemeFontSizeMd}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Expander.Header>
-                <StackPanel Spacing="6" Margin="16,0,16,16">
-                    <TextBlock Text="Theme" FontSize="{DynamicResource ThemeFontSizeSm}"
-                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                    <Grid ColumnDefinitions="*,8,Auto">
-                        <ComboBox Grid.Column="0"
-                                  ItemsSource="{Binding AvailableThemes}"
-                                  SelectedItem="{Binding SelectedTheme}"
-                                  HorizontalAlignment="Stretch"
-                                  Padding="12,8">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:ThemeOption">
-                                    <TextBlock Text="{Binding DisplayName}"/>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                        <Button Grid.Column="2"
-                                Content="Customize"
-                                Command="{Binding OpenThemeEditorCommand}"
-                                Padding="12,8"
-                                VerticalAlignment="Stretch"/>
-                    </Grid>
-                </StackPanel>
-            </Expander>
-
-            <!-- Accessibility Section -->
-            <Expander IsExpanded="False" Classes="settings-section">
-                <Expander.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Border Width="28" Height="28" CornerRadius="6"
-                                Background="{DynamicResource ThemePrimaryMutedBrush}">
-                            <controls:IconControl Icon="AlertCircle" Size="14"
-                                                  Stroke="{DynamicResource ThemePrimaryBrush}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Accessibility" FontWeight="SemiBold"
-                                   FontSize="{DynamicResource ThemeFontSizeMd}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Expander.Header>
-                <StackPanel Spacing="8" Margin="16,0,16,16">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0"
-                                   Text="Font Size"
-                                   FontSize="{DynamicResource ThemeFontSizeSm}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="{Binding FontScaleDisplayText}"
-                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                       Foreground="{DynamicResource ThemePrimaryBrush}"/>
-                            <TextBlock Text="{Binding FontScalePercentText}"
-                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <Slider Minimum="0.8" Maximum="1.5"
-                            Value="{Binding FontScaleMultiplier}"
-                            TickFrequency="0.1"
-                            IsSnapToTickEnabled="True"
-                            TickPlacement="BottomRight"/>
-
-                    <!-- Preset buttons -->
-                    <StackPanel Orientation="Horizontal" Spacing="4">
-                        <Button Content="80%"
-                                Command="{Binding SetFontScaleCommand}"
-                                CommandParameter="0.8"
-                                Padding="8,4"
-                                FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                        <Button Content="100%"
-                                Command="{Binding SetFontScaleCommand}"
-                                CommandParameter="1.0"
-                                Padding="8,4"
-                                FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                        <Button Content="125%"
-                                Command="{Binding SetFontScaleCommand}"
-                                CommandParameter="1.25"
-                                Padding="8,4"
-                                FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                        <Button Content="150%"
-                                Command="{Binding SetFontScaleCommand}"
-                                CommandParameter="1.5"
-                                Padding="8,4"
-                                FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                    </StackPanel>
-
-                    <!-- Font Family -->
-                    <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
-                        <TextBlock Grid.Column="0"
-                                   Text="Font"
-                                   FontSize="{DynamicResource ThemeFontSizeSm}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                    </Grid>
-
-                    <ComboBox ItemsSource="{Binding AvailableFontFamilies}"
-                              SelectedItem="{Binding SelectedFontFamily}"
-                              HorizontalAlignment="Stretch">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Spacing="2" Margin="4,2">
-                                    <TextBlock Text="{Binding DisplayName}"
-                                               FontSize="{DynamicResource ThemeFontSizeSmMd}"/>
-                                    <TextBlock Text="{Binding Description}"
-                                               FontSize="{DynamicResource ThemeFontSizeXs}"
-                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-
-                    <!-- Live preview -->
-                    <Border Background="{DynamicResource ThemeSurfaceBrush}"
-                            CornerRadius="4" Padding="12" Margin="0,4,0,0">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="Preview"
-                                       FontSize="{DynamicResource ThemeFontSizeXs}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                            <TextBlock Text="The quick brown fox jumps over the lazy dog."
-                                       FontSize="{DynamicResource ThemeFontSizeMd}"
-                                       FontFamily="{DynamicResource ThemeFontSans}"
-                                       TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </Expander>
-
-            <!-- Notifications Section -->
-            <Expander IsExpanded="False" Classes="settings-section">
-                <Expander.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Border Width="28" Height="28" CornerRadius="6"
-                                Background="{DynamicResource ThemePrimaryMutedBrush}">
-                            <controls:IconControl Icon="Mail" Size="14"
-                                                  Stroke="{DynamicResource ThemePrimaryBrush}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Notifications" FontWeight="SemiBold"
-                                   FontSize="{DynamicResource ThemeFontSizeMd}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Expander.Header>
-                <StackPanel Spacing="16" Margin="16,0,16,16">
-                    <!-- Enable/Disable Toggle -->
-                    <Grid ColumnDefinitions="*,Auto">
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="Enable Notifications"
-                                       FontSize="{DynamicResource ThemeFontSizeSm}"/>
-                            <TextBlock Text="Show system notifications for task and calendar reminders"
-                                       FontSize="{DynamicResource ThemeFontSizeXs}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                       TextWrapping="Wrap"/>
-                        </StackPanel>
-                        <ToggleSwitch Grid.Column="1"
-                                      IsChecked="{Binding NotificationsEnabled}"
-                                      OnContent="" OffContent=""
-                                      VerticalAlignment="Center"/>
-                    </Grid>
-
-                    <!-- Sound Toggle -->
-                    <Grid ColumnDefinitions="*,Auto"
-                          IsVisible="{Binding NotificationsEnabled}">
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="Notification Sound"
-                                       FontSize="{DynamicResource ThemeFontSizeSm}"/>
-                            <TextBlock Text="Play sound with notifications"
-                                       FontSize="{DynamicResource ThemeFontSizeXs}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        </StackPanel>
-                        <ToggleSwitch Grid.Column="1"
-                                      IsChecked="{Binding NotificationSoundEnabled}"
-                                      OnContent="" OffContent=""
-                                      VerticalAlignment="Center"/>
-                    </Grid>
-
-                    <!-- Test Notification -->
-                    <StackPanel Spacing="6"
-                                IsVisible="{Binding NotificationsEnabled}">
-                        <Button Content="Test Notification"
-                                Command="{Binding TestNotificationCommand}"
-                                Padding="12,6"
-                                HorizontalAlignment="Left"/>
-                        <TextBlock Text="{Binding TestNotificationStatus}"
-                                   IsVisible="{Binding TestNotificationStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                   FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                    </StackPanel>
-
-                    <TextBlock Text="Notifications appear in your OS notification center even when PrivStack is minimized. Skipped during Focus Mode."
-                               Foreground="{DynamicResource ThemeTextMutedBrush}"
-                               FontSize="{DynamicResource ThemeFontSizeXs}"
-                               TextWrapping="Wrap"
-                               IsVisible="{Binding NotificationsEnabled}"/>
-                </StackPanel>
-            </Expander>
-
-            <!-- Speech-to-Text Section -->
-            <Expander IsExpanded="False" Classes="settings-section">
-                <Expander.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Border Width="28" Height="28" CornerRadius="6"
-                                Background="{DynamicResource ThemePrimaryMutedBrush}">
-                            <controls:IconControl Icon="MessageSquare" Size="14"
-                                                  Stroke="{DynamicResource ThemePrimaryBrush}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Speech-to-Text" FontWeight="SemiBold"
-                                   FontSize="{DynamicResource ThemeFontSizeMd}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Expander.Header>
-                <StackPanel Spacing="16" Margin="16,0,16,16">
-                    <!-- Enable/Disable Toggle -->
-                    <Grid ColumnDefinitions="*,Auto">
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="Enable Speech Input"
-                                       FontSize="{DynamicResource ThemeFontSizeSm}"/>
-                            <TextBlock Text="Use Cmd+M (Mac) or Ctrl+M to dictate text"
-                                       FontSize="{DynamicResource ThemeFontSizeXs}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        </StackPanel>
-                        <ToggleSwitch Grid.Column="1"
-                                      IsChecked="{Binding SpeechToTextEnabled}"
-                                      OnContent="" OffContent=""
-                                      VerticalAlignment="Center"/>
-                    </Grid>
-
-                    <!-- Model Selection -->
-                    <StackPanel Spacing="6" IsVisible="{Binding SpeechToTextEnabled}">
-                        <TextBlock Text="Whisper Model" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        <ComboBox ItemsSource="{Binding WhisperModels}"
-                                  SelectedItem="{Binding SelectedWhisperModel}"
-                                  HorizontalAlignment="Stretch"
-                                  Padding="12,8">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:WhisperModelOption">
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <TextBlock Grid.Column="0" Text="{Binding DisplayName}"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding SizeText}"
-                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                                   Margin="12,0,0,0"/>
-                                    </Grid>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </StackPanel>
-
-                    <!-- Microphone Selection -->
-                    <StackPanel Spacing="6" IsVisible="{Binding SpeechToTextEnabled}">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Grid.Column="0"
-                                       Text="Microphone" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                            <Button Grid.Column="1"
-                                    Content="Refresh"
-                                    Command="{Binding RefreshAudioDevicesCommand}"
-                                    Padding="8,4"
-                                    FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                        </Grid>
-                        <ComboBox ItemsSource="{Binding AudioInputDevices}"
-                                  SelectedItem="{Binding SelectedAudioInputDevice}"
-                                  HorizontalAlignment="Stretch"
-                                  Padding="12,8">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="svc:AudioInputDevice">
-                                    <TextBlock Text="{Binding Name}"/>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </StackPanel>
-
-                    <!-- Beam Search Toggle -->
-                    <Grid ColumnDefinitions="*,Auto"
-                          IsVisible="{Binding SpeechToTextEnabled}">
-                        <StackPanel Grid.Column="0" Spacing="2">
-                            <TextBlock Text="Beam Search" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                            <TextBlock Text="Slower but more accurate transcription"
-                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                       Opacity="0.7"/>
-                        </StackPanel>
-                        <ToggleSwitch Grid.Column="1"
-                                      IsChecked="{Binding WhisperBeamSearch}"
-                                      OnContent="" OffContent=""
-                                      VerticalAlignment="Center"/>
-                    </Grid>
-
-                    <!-- Warning Message -->
-                    <Border Background="{DynamicResource ThemeWarningMutedBrush}"
-                            CornerRadius="4" Padding="12"
-                            IsVisible="{Binding HasSpeechWarning}">
+                    <!-- Profile -->
+                    <ListBoxItem>
                         <Grid ColumnDefinitions="Auto,*">
-                            <PathIcon Grid.Column="0"
-                                     Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"
-                                     Width="14" Height="14"
-                                     VerticalAlignment="Top" Margin="0,2,8,0"
-                                     Foreground="{DynamicResource ThemeWarningBrush}"/>
-                            <TextBlock Grid.Column="1" Text="{Binding SpeechWarningMessage}"
-                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                       Foreground="{DynamicResource ThemeWarningBrush}"
-                                       TextWrapping="Wrap"/>
+                            <Border Classes="cat-icon-bubble" VerticalAlignment="Center">
+                                <controls:IconControl Icon="User" Size="12"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="Profile" Classes="cat-label"
+                                       Margin="10,0,0,0" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       VerticalAlignment="Center"/>
                         </Grid>
-                    </Border>
+                    </ListBoxItem>
 
-                    <!-- Model Status -->
-                    <Border Background="{DynamicResource ThemeSurfaceBrush}"
-                            CornerRadius="4" Padding="12"
-                            IsVisible="{Binding SpeechToTextEnabled}">
-                        <StackPanel Spacing="8">
-                            <!-- Model Downloaded Status -->
-                            <Grid ColumnDefinitions="*,Auto"
-                                  IsVisible="{Binding !IsDownloadingModel}">
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock FontSize="{DynamicResource ThemeFontSizeSm}">
-                                        <TextBlock.Text>
-                                            <MultiBinding StringFormat="{}Model: {0}">
-                                                <Binding Path="SelectedWhisperModel.DisplayName"/>
-                                            </MultiBinding>
-                                        </TextBlock.Text>
-                                    </TextBlock>
-                                    <TextBlock FontSize="{DynamicResource ThemeFontSizeXs}"
-                                               Foreground="{DynamicResource ThemeTextMutedBrush}">
-                                        <TextBlock.Text>
-                                            <MultiBinding StringFormat="{}Status: {0}">
-                                                <Binding Path="ModelStatusText"/>
-                                            </MultiBinding>
-                                        </TextBlock.Text>
-                                    </TextBlock>
+                    <!-- Appearance -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Classes="cat-icon-bubble" VerticalAlignment="Center">
+                                <controls:IconControl Icon="Settings" Size="12"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="Appearance" Classes="cat-label"
+                                       Margin="10,0,0,0" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- Accessibility -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Classes="cat-icon-bubble" VerticalAlignment="Center">
+                                <controls:IconControl Icon="AlertCircle" Size="12"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="Accessibility" Classes="cat-label"
+                                       Margin="10,0,0,0" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- Notifications -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Classes="cat-icon-bubble" VerticalAlignment="Center">
+                                <controls:IconControl Icon="Mail" Size="12"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="Notifications" Classes="cat-label"
+                                       Margin="10,0,0,0" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- Speech-to-Text -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Classes="cat-icon-bubble" VerticalAlignment="Center">
+                                <controls:IconControl Icon="MessageSquare" Size="12"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="Speech" Classes="cat-label"
+                                       Margin="10,0,0,0" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- Data & Backup -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Classes="cat-icon-bubble" VerticalAlignment="Center">
+                                <controls:IconControl Icon="Database" Size="12"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="Data &amp; Backup" Classes="cat-label"
+                                       Margin="10,0,0,0" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- Connections -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Classes="cat-icon-bubble" VerticalAlignment="Center">
+                                <controls:IconControl Icon="Network" Size="12"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="Connections" Classes="cat-label"
+                                       Margin="10,0,0,0" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- Cloud Sync -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Classes="cat-icon-bubble" VerticalAlignment="Center">
+                                <controls:IconControl Icon="Sync" Size="12"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="Cloud Sync" Classes="cat-label"
+                                       Margin="10,0,0,0" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- Security -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Classes="cat-icon-bubble" VerticalAlignment="Center">
+                                <controls:IconControl Icon="Lock" Size="12"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="Security" Classes="cat-label"
+                                       Margin="10,0,0,0" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- Enterprise -->
+                    <ListBoxItem IsVisible="{Binding IsPolicyActive}">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Classes="cat-icon-bubble" VerticalAlignment="Center">
+                                <controls:IconControl Icon="Users" Size="12"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="Enterprise" Classes="cat-label"
+                                       Margin="10,0,0,0" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- About -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Classes="cat-icon-bubble" VerticalAlignment="Center">
+                                <controls:IconControl Icon="Info" Size="12"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="About" Classes="cat-label"
+                                       Margin="10,0,0,0" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- Danger Zone -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Classes="cat-icon-bubble danger" VerticalAlignment="Center">
+                                <controls:IconControl Icon="AlertCircle" Size="12"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="Danger Zone" Classes="cat-label danger"
+                                       Margin="10,0,0,0" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </ListBoxItem>
+
+                </ListBox>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- Right: Content panel with CrossFade transition        -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <Carousel Grid.Column="1"
+                  x:Name="SettingsTabs">
+            <Carousel.PageTransition>
+                <CrossFade Duration="0:0:0.15"/>
+            </Carousel.PageTransition>
+
+            <!-- ── 0: Profile ─────────────────────────────────── -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Profile" Classes="settings-section-title"/>
+                            <TextBlock Text="Manage your personal information" Classes="settings-section-subtitle"/>
+                        </StackPanel>
+
+                        <!-- Profile image -->
+                        <Border Classes="card" Padding="20">
+                            <StackPanel Spacing="16">
+                                <TextBlock Text="Profile Picture" Classes="field-label"/>
+                                <StackPanel Orientation="Horizontal" Spacing="16">
+                                    <Border Width="56" Height="56" CornerRadius="28"
+                                            ClipToBounds="True"
+                                            Background="{DynamicResource ThemePrimaryBrush}">
+                                        <Panel>
+                                            <Image Source="{Binding ProfileImageBitmap}"
+                                                   IsVisible="{Binding HasProfileImage}"
+                                                   Width="56" Height="56"
+                                                   Stretch="UniformToFill"/>
+                                            <TextBlock Text="{Binding UserInitial}"
+                                                       IsVisible="{Binding !HasProfileImage}"
+                                                       FontSize="{DynamicResource ThemeFontSizeXl}" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                        </Panel>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center" Spacing="8">
+                                        <Button Content="Choose Image"
+                                                x:Name="ChooseProfileImageButton"
+                                                Click="OnChooseProfileImageClick"
+                                                Padding="14,7"
+                                                FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                        <Button Content="Remove"
+                                                Command="{Binding RemoveProfileImageCommand}"
+                                                IsVisible="{Binding HasProfileImage}"
+                                                Padding="14,7"
+                                                FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                Foreground="{DynamicResource ThemeDangerBrush}"/>
+                                    </StackPanel>
                                 </StackPanel>
-                                <Button Grid.Column="1"
-                                        Content="{Binding DownloadButtonText}"
-                                        Command="{Binding DownloadModelCommand}"
-                                        IsEnabled="{Binding CanDownloadModel}"
-                                        Padding="12,6"/>
-                            </Grid>
+                            </StackPanel>
+                        </Border>
 
-                            <!-- Download Progress -->
-                            <StackPanel IsVisible="{Binding IsDownloadingModel}" Spacing="6">
-                                <TextBlock Text="Downloading model..."
-                                           FontSize="{DynamicResource ThemeFontSizeSm}"/>
-                                <ProgressBar Value="{Binding DownloadProgress}"
-                                             Minimum="0" Maximum="100"
-                                             Height="6"
-                                             Foreground="{DynamicResource ThemePrimaryBrush}"/>
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding DownloadProgressText}"
+                        <!-- Display Name -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Display Name" Classes="field-label"/>
+                            <TextBox Text="{Binding UserDisplayName}"
+                                     Watermark="Enter your name"
+                                     Padding="12,10"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+            <!-- ── 1: Appearance ──────────────────────────────── -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Appearance" Classes="settings-section-title"/>
+                            <TextBlock Text="Customize how PrivStack looks" Classes="settings-section-subtitle"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Theme" Classes="field-label"/>
+                            <Grid ColumnDefinitions="*,8,Auto">
+                                <ComboBox Grid.Column="0"
+                                          ItemsSource="{Binding AvailableThemes}"
+                                          SelectedItem="{Binding SelectedTheme}"
+                                          HorizontalAlignment="Stretch"
+                                          Padding="12,8">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ThemeOption">
+                                            <TextBlock Text="{Binding DisplayName}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Button Grid.Column="2"
+                                        Content="Customize"
+                                        Command="{Binding OpenThemeEditorCommand}"
+                                        Padding="12,8"
+                                        VerticalAlignment="Stretch"/>
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+            <!-- ── 2: Accessibility ───────────────────────────── -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Accessibility" Classes="settings-section-title"/>
+                            <TextBlock Text="Font size, family, and display options" Classes="settings-section-subtitle"/>
+                        </StackPanel>
+
+                        <!-- Font size -->
+                        <StackPanel Spacing="8">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="Font Size" Classes="field-label"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="{Binding FontScaleDisplayText}"
+                                               FontSize="{DynamicResource ThemeFontSizeSm}"
+                                               Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                                    <TextBlock Text="{Binding FontScalePercentText}"
+                                               FontSize="{DynamicResource ThemeFontSizeSm}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                </StackPanel>
+                            </Grid>
+                            <Slider Minimum="0.8" Maximum="1.5"
+                                    Value="{Binding FontScaleMultiplier}"
+                                    TickFrequency="0.1"
+                                    IsSnapToTickEnabled="True"
+                                    TickPlacement="BottomRight"/>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <Button Content="80%" Command="{Binding SetFontScaleCommand}" CommandParameter="0.8"
+                                        Padding="8,4" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                                <Button Content="100%" Command="{Binding SetFontScaleCommand}" CommandParameter="1.0"
+                                        Padding="8,4" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                                <Button Content="125%" Command="{Binding SetFontScaleCommand}" CommandParameter="1.25"
+                                        Padding="8,4" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                                <Button Content="150%" Command="{Binding SetFontScaleCommand}" CommandParameter="1.5"
+                                        Padding="8,4" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Font family -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Font" Classes="field-label"/>
+                            <ComboBox ItemsSource="{Binding AvailableFontFamilies}"
+                                      SelectedItem="{Binding SelectedFontFamily}"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Spacing="2" Margin="4,2">
+                                            <TextBlock Text="{Binding DisplayName}"
+                                                       FontSize="{DynamicResource ThemeFontSizeSmMd}"/>
+                                            <TextBlock Text="{Binding Description}"
+                                                       FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <!-- Preview -->
+                            <Border Background="{DynamicResource ThemeSurfaceBrush}"
+                                    CornerRadius="6" Padding="14,10">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Preview"
                                                FontSize="{DynamicResource ThemeFontSizeXs}"
                                                Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                    <TextBlock Text="The quick brown fox jumps over the lazy dog."
+                                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                                               FontFamily="{DynamicResource ThemeFontSans}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+            <!-- ── 3: Notifications ───────────────────────────── -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Notifications" Classes="settings-section-title"/>
+                            <TextBlock Text="Control alerts and system notifications" Classes="settings-section-subtitle"/>
+                        </StackPanel>
+
+                        <Border Classes="card" Padding="16,14">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="Enable Notifications"
+                                               FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Medium"/>
+                                    <TextBlock Text="Show system notifications for task and calendar reminders"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding NotificationsEnabled}"
+                                              OnContent="" OffContent=""
+                                              VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <Border Classes="card" Padding="16,14"
+                                IsVisible="{Binding NotificationsEnabled}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="Notification Sound"
+                                               FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Medium"/>
+                                    <TextBlock Text="Play sound with notifications"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding NotificationSoundEnabled}"
+                                              OnContent="" OffContent=""
+                                              VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <StackPanel Spacing="8" IsVisible="{Binding NotificationsEnabled}">
+                            <Button Content="Test Notification"
+                                    Command="{Binding TestNotificationCommand}"
+                                    Padding="14,8"
+                                    HorizontalAlignment="Left"/>
+                            <TextBlock Text="{Binding TestNotificationStatus}"
+                                       IsVisible="{Binding TestNotificationStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                        </StackPanel>
+
+                        <TextBlock Text="Notifications appear in your OS notification center even when PrivStack is minimized. Skipped during Focus Mode."
+                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding NotificationsEnabled}"/>
+                    </StackPanel>
+                </ScrollViewer>
+
+            <!-- ── 4: Speech-to-Text ──────────────────────────── -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Speech-to-Text" Classes="settings-section-title"/>
+                            <TextBlock Text="Whisper-powered voice dictation" Classes="settings-section-subtitle"/>
+                        </StackPanel>
+
+                        <Border Classes="card" Padding="16,14">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="Enable Speech Input"
+                                               FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Medium"/>
+                                    <TextBlock Text="Use Cmd+M (Mac) or Ctrl+M to dictate text"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding SpeechToTextEnabled}"
+                                              OnContent="" OffContent=""
+                                              VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <StackPanel Spacing="20" IsVisible="{Binding SpeechToTextEnabled}">
+                            <!-- Model -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Whisper Model" Classes="field-label"/>
+                                <ComboBox ItemsSource="{Binding WhisperModels}"
+                                          SelectedItem="{Binding SelectedWhisperModel}"
+                                          HorizontalAlignment="Stretch"
+                                          Padding="12,8">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:WhisperModelOption">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Grid.Column="0" Text="{Binding DisplayName}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding SizeText}"
+                                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                           Margin="12,0,0,0"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- Microphone -->
+                            <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="Microphone" Classes="field-label"/>
                                     <Button Grid.Column="1"
-                                            Content="Cancel"
-                                            Command="{Binding CancelDownloadCommand}"
+                                            Content="Refresh"
+                                            Command="{Binding RefreshAudioDevicesCommand}"
                                             Padding="8,4"
                                             FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
                                 </Grid>
+                                <ComboBox ItemsSource="{Binding AudioInputDevices}"
+                                          SelectedItem="{Binding SelectedAudioInputDevice}"
+                                          HorizontalAlignment="Stretch"
+                                          Padding="12,8">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="svc:AudioInputDevice">
+                                            <TextBlock Text="{Binding Name}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
                             </StackPanel>
-                        </StackPanel>
-                    </Border>
 
-                    <!-- Keyboard Shortcut Info -->
-                    <Border Background="{DynamicResource ThemePrimaryMutedBrush}"
-                            CornerRadius="4" Padding="12"
-                            IsVisible="{Binding SpeechToTextEnabled}">
-                        <WrapPanel Orientation="Horizontal">
-                            <TextBlock Text="Shortcut:"
-                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                       Foreground="{DynamicResource ThemePrimaryBrush}"
-                                       Margin="0,0,8,4" VerticalAlignment="Center"/>
-                            <Border Background="{DynamicResource ThemeSurfaceBrush}"
-                                    CornerRadius="4" Padding="8,4" Margin="0,0,8,4">
-                                <TextBlock Text="{Binding SpeechShortcutText}"
-                                           FontFamily="{DynamicResource ThemeFontMono}"
-                                           FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                            <!-- Beam search -->
+                            <Border Classes="card" Padding="16,14">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Grid.Column="0" Spacing="2">
+                                        <TextBlock Text="Beam Search"
+                                                   FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Medium"/>
+                                        <TextBlock Text="Slower but more accurate transcription"
+                                                   FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   Opacity="0.7"/>
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1"
+                                                  IsChecked="{Binding WhisperBeamSearch}"
+                                                  OnContent="" OffContent=""
+                                                  VerticalAlignment="Center"/>
+                                </Grid>
                             </Border>
-                            <TextBlock Text="while in a text field"
-                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                       Margin="0,0,0,4" VerticalAlignment="Center"/>
-                        </WrapPanel>
-                    </Border>
-                </StackPanel>
-            </Expander>
 
-            <!-- Data & Backup Section -->
-            <Expander IsExpanded="False" Classes="settings-section">
-                <Expander.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Border Width="28" Height="28" CornerRadius="6"
-                                Background="{DynamicResource ThemePrimaryMutedBrush}">
-                            <controls:IconControl Icon="Database" Size="14"
-                                                  Stroke="{DynamicResource ThemePrimaryBrush}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Data &amp; Backup" FontWeight="SemiBold"
-                                   FontSize="{DynamicResource ThemeFontSizeMd}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Expander.Header>
-                <StackPanel Spacing="12" Margin="16,0,16,16">
-                    <TextBlock Text="Configure data storage location and automatic backups."
-                               Foreground="{DynamicResource ThemeTextMutedBrush}"
-                               FontSize="{DynamicResource ThemeFontSizeSm}"
-                               TextWrapping="Wrap"/>
-                    <!-- Storage Location -->
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Storage Location" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-
-                        <StackPanel Spacing="4">
-                            <!-- Default -->
-                            <Button Command="{Binding SelectStorageLocationCommand}"
-                                    CommandParameter="{x:Static models:DataDirectoryType.Default}"
-                                    HorizontalContentAlignment="Stretch"
-                                    Padding="8,6" CornerRadius="4">
-                                <Grid ColumnDefinitions="Auto,*,Auto">
+                            <!-- Warning -->
+                            <Border Background="{DynamicResource ThemeWarningMutedBrush}"
+                                    CornerRadius="8" Padding="12"
+                                    IsVisible="{Binding HasSpeechWarning}">
+                                <Grid ColumnDefinitions="Auto,*">
                                     <PathIcon Grid.Column="0"
-                                             Data="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
-                                             Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,8,0"
-                                             Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                                    <TextBlock Grid.Column="1" Text="Default (Local)" FontSize="{DynamicResource ThemeFontSizeXsSm}" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="&#x2713;" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                               Foreground="{DynamicResource ThemePrimaryBrush}"
-                                               IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DataDirectoryType.Default}}"/>
-                                </Grid>
-                            </Button>
-
-                            <!-- Google Drive -->
-                            <Button Command="{Binding SelectStorageLocationCommand}"
-                                    CommandParameter="{x:Static models:DataDirectoryType.GoogleDrive}"
-                                    IsEnabled="{Binding IsGoogleDriveAvailable}"
-                                    HorizontalContentAlignment="Stretch"
-                                    Padding="8,6" CornerRadius="4">
-                                <Grid ColumnDefinitions="Auto,*,Auto">
-                                    <TextBlock Grid.Column="0" Text="G" FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Bold" Foreground="#4285F4" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="Google Drive" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                                        <TextBlock Text="Not found" FontSize="{DynamicResource ThemeFontSize2Xs}" Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                                   IsVisible="{Binding !IsGoogleDriveAvailable}"/>
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="2" Text="&#x2713;" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                               Foreground="{DynamicResource ThemePrimaryBrush}"
-                                               IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DataDirectoryType.GoogleDrive}}"/>
-                                </Grid>
-                            </Button>
-
-                            <!-- iCloud -->
-                            <Button Command="{Binding SelectStorageLocationCommand}"
-                                    CommandParameter="{x:Static models:DataDirectoryType.ICloud}"
-                                    IsEnabled="{Binding IsICloudAvailable}"
-                                    HorizontalContentAlignment="Stretch"
-                                    Padding="8,6" CornerRadius="4">
-                                <Grid ColumnDefinitions="Auto,*,Auto">
-                                    <PathIcon Grid.Column="0"
-                                             Data="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"
-                                             Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,8,0"
-                                             Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="iCloud Drive" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                                        <TextBlock Text="Not found" FontSize="{DynamicResource ThemeFontSize2Xs}" Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                                   IsVisible="{Binding !IsICloudAvailable}"/>
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="2" Text="&#x2713;" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                               Foreground="{DynamicResource ThemePrimaryBrush}"
-                                               IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DataDirectoryType.ICloud}}"/>
-                                </Grid>
-                            </Button>
-
-                            <!-- Custom -->
-                            <Button Command="{Binding SelectStorageLocationCommand}"
-                                    CommandParameter="{x:Static models:DataDirectoryType.Custom}"
-                                    HorizontalContentAlignment="Stretch"
-                                    Padding="8,6" CornerRadius="4">
-                                <Grid ColumnDefinitions="Auto,*,Auto">
-                                    <PathIcon Grid.Column="0"
-                                             Data="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"
-                                             Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,8,0"
-                                             Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                                    <TextBlock Grid.Column="1" Text="Custom Location" FontSize="{DynamicResource ThemeFontSizeXsSm}" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="&#x2713;" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                               Foreground="{DynamicResource ThemePrimaryBrush}"
-                                               IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DataDirectoryType.Custom}}"/>
-                                </Grid>
-                            </Button>
-                        </StackPanel>
-
-                        <!-- Current Path Display -->
-                        <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
-                                CornerRadius="4" Padding="8,6" Margin="0,4,0,0">
-                            <TextBlock Text="{Binding DataDirectoryDisplay}"
-                                       FontSize="{DynamicResource ThemeFontSizeXs}"
-                                       TextTrimming="CharacterEllipsis"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                       ToolTip.Tip="{Binding DataDirectoryDisplay}"/>
-                        </Border>
-
-                        <!-- Browse button for custom -->
-                        <StackPanel Orientation="Horizontal" Spacing="4"
-                                    IsVisible="{Binding IsCustomDirectorySelected}">
-                            <Button Content="Browse..."
-                                    Command="{Binding ChangeDataDirectoryCommand}"
-                                    Padding="8,4"
-                                    FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                        </StackPanel>
-
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <Button Content="Open Folder"
-                                    Command="{Binding OpenDataDirectoryCommand}"
-                                    Padding="8,4"
-                                    FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <!-- Migration progress -->
-                    <Border IsVisible="{Binding IsMigratingStorage}"
-                            Background="{DynamicResource ThemeSurfaceElevatedBrush}"
-                            CornerRadius="6" Padding="12,10" Margin="0,4">
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="{Binding MigrationStatus}"
-                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                            <ProgressBar Value="{Binding MigrationProgress}"
-                                         Minimum="0" Maximum="100"
-                                         Height="4"
-                                         Foreground="{DynamicResource ThemePrimaryBrush}"/>
-                        </StackPanel>
-                    </Border>
-
-                    <Separator Background="{DynamicResource ThemeBorderBrush}" Margin="0,4"/>
-
-                    <!-- Backup Directory -->
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Backup Directory" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
-                                CornerRadius="4" Padding="8,6">
-                            <TextBlock Text="{Binding BackupDirectory}"
-                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                       TextTrimming="CharacterEllipsis"
-                                       ToolTip.Tip="{Binding BackupDirectory}"/>
-                        </Border>
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <Button Content="Change"
-                                    Command="{Binding ChangeBackupDirectoryCommand}"
-                                    Padding="8,4"
-                                    FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                            <Button Content="Open"
-                                    Command="{Binding OpenBackupDirectoryCommand}"
-                                    Padding="8,4"
-                                    FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <Separator Background="{DynamicResource ThemeBorderBrush}" Margin="0,4"/>
-
-                    <!-- Backup Frequency -->
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Backup Frequency" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        <ComboBox ItemsSource="{Binding BackupFrequencies}"
-                                  SelectedItem="{Binding SelectedBackupFrequency}"
-                                  HorizontalAlignment="Stretch"
-                                  Padding="8,6"/>
-                    </StackPanel>
-
-                    <!-- Backup Type -->
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Backup Type" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        <StackPanel Orientation="Horizontal" Spacing="16">
-                            <RadioButton Content="Single"
-                                         IsChecked="{Binding IsOneTimeBackup}"/>
-                            <RadioButton Content="Rolling"
-                                         IsChecked="{Binding IsRollingBackup}"/>
-                        </StackPanel>
-                        <TextBlock Text="Keeps only one backup, replacing it each time"
-                                   FontSize="{DynamicResource ThemeFontSizeXs}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                   TextWrapping="Wrap"
-                                   IsVisible="{Binding IsOneTimeBackup}"/>
-                        <TextBlock Text="Keeps the most recent backups up to max count"
-                                   FontSize="{DynamicResource ThemeFontSizeXs}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                   TextWrapping="Wrap"
-                                   IsVisible="{Binding IsRollingBackup}"/>
-                    </StackPanel>
-
-                    <!-- Max Backups (only shown for Rolling) -->
-                    <StackPanel Spacing="6"
-                                IsVisible="{Binding IsRollingBackup}">
-                        <TextBlock Text="Max Backups" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        <NumericUpDown Value="{Binding MaxBackups}"
-                                       Minimum="1"
-                                       Maximum="100"
-                                       Increment="1"
-                                       FormatString="0"
-                                       Padding="8,6"/>
-                    </StackPanel>
-
-                    <Separator Background="{DynamicResource ThemeBorderBrush}" Margin="0,4"/>
-
-                    <!-- Backup Now -->
-                    <StackPanel Spacing="8">
-                        <Button Command="{Binding BackupNowCommand}"
-                                IsEnabled="{Binding !IsBackingUp}"
-                                HorizontalAlignment="Left"
-                                Padding="12,8">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="Backup Now" IsVisible="{Binding !IsBackingUp}"/>
-                                <TextBlock Text="Creating backup..." IsVisible="{Binding IsBackingUp}"/>
-                            </StackPanel>
-                        </Button>
-                        <TextBlock Text="{Binding BackupStatus}"
-                                   IsVisible="{Binding BackupStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                   FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                   TextWrapping="Wrap"/>
-                    </StackPanel>
-                </StackPanel>
-            </Expander>
-
-            <!-- Connections Section -->
-            <Expander IsExpanded="False" Classes="settings-section"
-                      x:DataType="vm:SettingsViewModel">
-                <Expander.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Border Width="28" Height="28" CornerRadius="6"
-                                Background="{DynamicResource ThemePrimaryMutedBrush}">
-                            <controls:IconControl Icon="Network" Size="14"
-                                                  Stroke="{DynamicResource ThemePrimaryBrush}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Connections" FontWeight="SemiBold"
-                                   FontSize="{DynamicResource ThemeFontSizeMd}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Expander.Header>
-                <StackPanel Spacing="12" Margin="16,0,16,16"
-                            DataContext="{Binding Connections}"
-                            x:DataType="vm:ConnectionsViewModel">
-                    <TextBlock Text="Connect external services to sync data with PrivStack."
-                               Foreground="{DynamicResource ThemeTextMutedBrush}"
-                               FontSize="{DynamicResource ThemeFontSizeSm}"
-                               TextWrapping="Wrap"/>
-
-                    <!-- GitHub: Not Connected -->
-                    <Border Background="{DynamicResource ThemeSurfaceBrush}"
-                            CornerRadius="6" Padding="12"
-                            IsVisible="{Binding !IsGitHubConnected}">
-                        <StackPanel Spacing="8">
-                            <Grid ColumnDefinitions="Auto,*,Auto">
-                                <TextBlock Grid.Column="0" Text="GitHub"
-                                           FontSize="{DynamicResource ThemeFontSizeSmMd}"
-                                           FontWeight="SemiBold"
-                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Grid.Column="1" Text="Not connected"
-                                           FontSize="{DynamicResource ThemeFontSizeSm}"
-                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                           VerticalAlignment="Center"/>
-                                <Button Grid.Column="2"
-                                        Content="Connect"
-                                        Command="{Binding ConnectGitHubCommand}"
-                                        IsEnabled="{Binding !IsConnecting}"
-                                        Padding="12,6"
-                                        Background="{DynamicResource ThemePrimaryBrush}"
-                                        Foreground="{DynamicResource ThemeTextOnAccentBrush}"
-                                        CornerRadius="4"/>
-                            </Grid>
-
-                            <!-- Device Flow: user code + link -->
-                            <Border IsVisible="{Binding IsConnecting}"
-                                    Background="{DynamicResource ThemePrimaryMutedBrush}"
-                                    CornerRadius="4" Padding="12">
-                                <StackPanel Spacing="8">
-                                    <TextBlock Text="Enter this code on GitHub:"
+                                             Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"
+                                             Width="14" Height="14"
+                                             VerticalAlignment="Top" Margin="0,2,8,0"
+                                             Foreground="{DynamicResource ThemeWarningBrush}"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding SpeechWarningMessage}"
                                                FontSize="{DynamicResource ThemeFontSizeSm}"
-                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                                    <TextBlock Text="{Binding DeviceUserCode}"
-                                               FontSize="{DynamicResource ThemeFontSizeLg}"
-                                               FontWeight="Bold"
-                                               FontFamily="{DynamicResource ThemeFontMono}"
-                                               HorizontalAlignment="Center"/>
-                                    <StackPanel Orientation="Horizontal" Spacing="8"
-                                                HorizontalAlignment="Center">
-                                        <Button Content="Open GitHub"
-                                                Command="{Binding OpenVerificationUriCommand}"
+                                               Foreground="{DynamicResource ThemeWarningBrush}"
+                                               TextWrapping="Wrap"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Model status -->
+                            <Border Background="{DynamicResource ThemeSurfaceBrush}"
+                                    CornerRadius="8" Padding="14,12">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnDefinitions="*,Auto"
+                                          IsVisible="{Binding !IsDownloadingModel}">
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock FontSize="{DynamicResource ThemeFontSizeSm}">
+                                                <TextBlock.Text>
+                                                    <MultiBinding StringFormat="{}Model: {0}">
+                                                        <Binding Path="SelectedWhisperModel.DisplayName"/>
+                                                    </MultiBinding>
+                                                </TextBlock.Text>
+                                            </TextBlock>
+                                            <TextBlock FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}">
+                                                <TextBlock.Text>
+                                                    <MultiBinding StringFormat="{}Status: {0}">
+                                                        <Binding Path="ModelStatusText"/>
+                                                    </MultiBinding>
+                                                </TextBlock.Text>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <Button Grid.Column="1"
+                                                Content="{Binding DownloadButtonText}"
+                                                Command="{Binding DownloadModelCommand}"
+                                                IsEnabled="{Binding CanDownloadModel}"
+                                                Padding="12,6"/>
+                                    </Grid>
+                                    <StackPanel IsVisible="{Binding IsDownloadingModel}" Spacing="6">
+                                        <TextBlock Text="Downloading model..."
+                                                   FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                        <ProgressBar Value="{Binding DownloadProgress}"
+                                                     Minimum="0" Maximum="100" Height="6"
+                                                     Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{Binding DownloadProgressText}"
+                                                       FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                            <Button Grid.Column="1"
+                                                    Content="Cancel"
+                                                    Command="{Binding CancelDownloadCommand}"
+                                                    Padding="8,4"
+                                                    FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Shortcut info -->
+                            <Border Background="{DynamicResource ThemePrimaryMutedBrush}"
+                                    CornerRadius="8" Padding="14,10">
+                                <WrapPanel Orientation="Horizontal">
+                                    <TextBlock Text="Shortcut:"
+                                               FontSize="{DynamicResource ThemeFontSizeSm}"
+                                               Foreground="{DynamicResource ThemePrimaryBrush}"
+                                               Margin="0,0,8,4" VerticalAlignment="Center"/>
+                                    <Border Background="{DynamicResource ThemeSurfaceBrush}"
+                                            CornerRadius="4" Padding="8,4" Margin="0,0,8,4">
+                                        <TextBlock Text="{Binding SpeechShortcutText}"
+                                                   FontFamily="{DynamicResource ThemeFontMono}"
+                                                   FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                    </Border>
+                                    <TextBlock Text="while in a text field"
+                                               FontSize="{DynamicResource ThemeFontSizeSm}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               Margin="0,0,0,4" VerticalAlignment="Center"/>
+                                </WrapPanel>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+            <!-- ── 5: Data & Backup ───────────────────────────── -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Data &amp; Backup" Classes="settings-section-title"/>
+                            <TextBlock Text="Configure data storage location and backups" Classes="settings-section-subtitle"/>
+                        </StackPanel>
+
+                        <!-- Storage location -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Storage Location" Classes="field-label"/>
+                            <StackPanel Spacing="4">
+                                <Button Command="{Binding SelectStorageLocationCommand}"
+                                        CommandParameter="{x:Static models:DataDirectoryType.Default}"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="12,8" CornerRadius="8">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <PathIcon Grid.Column="0"
+                                                 Data="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
+                                                 Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                 Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                        <TextBlock Grid.Column="1" Text="Default (Local)" FontSize="{DynamicResource ThemeFontSizeXsSm}" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="&#x2713;" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                   Foreground="{DynamicResource ThemePrimaryBrush}"
+                                                   IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DataDirectoryType.Default}}"/>
+                                    </Grid>
+                                </Button>
+                                <Button Command="{Binding SelectStorageLocationCommand}"
+                                        CommandParameter="{x:Static models:DataDirectoryType.GoogleDrive}"
+                                        IsEnabled="{Binding IsGoogleDriveAvailable}"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="12,8" CornerRadius="8">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <TextBlock Grid.Column="0" Text="G" FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Bold" Foreground="#4285F4" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="Google Drive" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                                            <TextBlock Text="Not found" FontSize="{DynamicResource ThemeFontSize2Xs}" Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                       IsVisible="{Binding !IsGoogleDriveAvailable}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="&#x2713;" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                   Foreground="{DynamicResource ThemePrimaryBrush}"
+                                                   IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DataDirectoryType.GoogleDrive}}"/>
+                                    </Grid>
+                                </Button>
+                                <Button Command="{Binding SelectStorageLocationCommand}"
+                                        CommandParameter="{x:Static models:DataDirectoryType.ICloud}"
+                                        IsEnabled="{Binding IsICloudAvailable}"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="12,8" CornerRadius="8">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <PathIcon Grid.Column="0"
+                                                 Data="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"
+                                                 Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                 Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="iCloud Drive" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                                            <TextBlock Text="Not found" FontSize="{DynamicResource ThemeFontSize2Xs}" Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                       IsVisible="{Binding !IsICloudAvailable}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="&#x2713;" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                   Foreground="{DynamicResource ThemePrimaryBrush}"
+                                                   IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DataDirectoryType.ICloud}}"/>
+                                    </Grid>
+                                </Button>
+                                <Button Command="{Binding SelectStorageLocationCommand}"
+                                        CommandParameter="{x:Static models:DataDirectoryType.Custom}"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="12,8" CornerRadius="8">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <PathIcon Grid.Column="0"
+                                                 Data="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"
+                                                 Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                 Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                        <TextBlock Grid.Column="1" Text="Custom Location" FontSize="{DynamicResource ThemeFontSizeXsSm}" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="&#x2713;" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                   Foreground="{DynamicResource ThemePrimaryBrush}"
+                                                   IsVisible="{Binding SelectedDirectoryType, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:DataDirectoryType.Custom}}"/>
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
+                            <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                    CornerRadius="6" Padding="10,7" Margin="0,2,0,0">
+                                <TextBlock Text="{Binding DataDirectoryDisplay}"
+                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           TextTrimming="CharacterEllipsis"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           ToolTip.Tip="{Binding DataDirectoryDisplay}"/>
+                            </Border>
+                            <StackPanel Orientation="Horizontal" Spacing="4"
+                                        IsVisible="{Binding IsCustomDirectorySelected}">
+                                <Button Content="Browse..."
+                                        Command="{Binding ChangeDataDirectoryCommand}"
+                                        Padding="8,4"
+                                        FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <Button Content="Open Folder"
+                                        Command="{Binding OpenDataDirectoryCommand}"
+                                        Padding="8,4"
+                                        FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Migration progress -->
+                        <Border IsVisible="{Binding IsMigratingStorage}"
+                                Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                CornerRadius="8" Padding="14,12">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="{Binding MigrationStatus}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                <ProgressBar Value="{Binding MigrationProgress}"
+                                             Minimum="0" Maximum="100" Height="4"
+                                             Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}"/>
+
+                        <!-- Backup directory -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Backup Directory" Classes="field-label"/>
+                            <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                    CornerRadius="6" Padding="10,7">
+                                <TextBlock Text="{Binding BackupDirectory}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding BackupDirectory}"/>
+                            </Border>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <Button Content="Change" Command="{Binding ChangeBackupDirectoryCommand}"
+                                        Padding="8,4" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                                <Button Content="Open" Command="{Binding OpenBackupDirectoryCommand}"
+                                        Padding="8,4" FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Backup frequency -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Backup Frequency" Classes="field-label"/>
+                            <ComboBox ItemsSource="{Binding BackupFrequencies}"
+                                      SelectedItem="{Binding SelectedBackupFrequency}"
+                                      HorizontalAlignment="Stretch"
+                                      Padding="10,7"/>
+                        </StackPanel>
+
+                        <!-- Backup type -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Backup Type" Classes="field-label"/>
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <RadioButton Content="Single" IsChecked="{Binding IsOneTimeBackup}"/>
+                                <RadioButton Content="Rolling" IsChecked="{Binding IsRollingBackup}"/>
+                            </StackPanel>
+                            <TextBlock Text="Keeps only one backup, replacing it each time"
+                                       FontSize="{DynamicResource ThemeFontSizeXs}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                       TextWrapping="Wrap"
+                                       IsVisible="{Binding IsOneTimeBackup}"/>
+                            <TextBlock Text="Keeps the most recent backups up to max count"
+                                       FontSize="{DynamicResource ThemeFontSizeXs}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                       TextWrapping="Wrap"
+                                       IsVisible="{Binding IsRollingBackup}"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="8" IsVisible="{Binding IsRollingBackup}">
+                            <TextBlock Text="Max Backups" Classes="field-label"/>
+                            <NumericUpDown Value="{Binding MaxBackups}"
+                                           Minimum="1" Maximum="100" Increment="1"
+                                           FormatString="0" Padding="8,6"/>
+                        </StackPanel>
+
+                        <!-- Backup now -->
+                        <StackPanel Spacing="8">
+                            <Button Command="{Binding BackupNowCommand}"
+                                    IsEnabled="{Binding !IsBackingUp}"
+                                    HorizontalAlignment="Left"
+                                    Padding="14,8">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="Backup Now" IsVisible="{Binding !IsBackingUp}"/>
+                                    <TextBlock Text="Creating backup..." IsVisible="{Binding IsBackingUp}"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="{Binding BackupStatus}"
+                                       IsVisible="{Binding BackupStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+            <!-- ── 6: Connections ─────────────────────────────── -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Connections" Classes="settings-section-title"/>
+                            <TextBlock Text="Connect external services to sync data with PrivStack" Classes="settings-section-subtitle"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="12"
+                                    DataContext="{Binding Connections}"
+                                    x:DataType="vm:ConnectionsViewModel">
+                            <!-- GitHub: not connected -->
+                            <Border Background="{DynamicResource ThemeSurfaceBrush}"
+                                    CornerRadius="10" Padding="14"
+                                    IsVisible="{Binding !IsGitHubConnected}">
+                                <StackPanel Spacing="10">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <TextBlock Grid.Column="0" Text="GitHub"
+                                                   FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Grid.Column="1" Text="Not connected"
+                                                   FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   VerticalAlignment="Center"/>
+                                        <Button Grid.Column="2"
+                                                Content="Connect"
+                                                Command="{Binding ConnectGitHubCommand}"
+                                                IsEnabled="{Binding !IsConnecting}"
                                                 Padding="12,6"
                                                 Background="{DynamicResource ThemePrimaryBrush}"
                                                 Foreground="{DynamicResource ThemeTextOnAccentBrush}"
-                                                CornerRadius="4"/>
-                                        <Button Content="Cancel"
-                                                Command="{Binding CancelConnectCommand}"
-                                                Padding="12,6"
-                                                CornerRadius="4"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Spacing="8"
-                                                HorizontalAlignment="Center">
-                                        <ProgressBar IsIndeterminate="True" Width="80" Height="4"/>
-                                        <TextBlock Text="Waiting for authorization..."
-                                                   FontSize="{DynamicResource ThemeFontSizeXs}"
-                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                                   VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- GitHub: Connected -->
-                    <Border Background="{DynamicResource ThemeSurfaceBrush}"
-                            CornerRadius="6" Padding="12"
-                            IsVisible="{Binding IsGitHubConnected}">
-                        <StackPanel Spacing="6">
-                            <Grid ColumnDefinitions="Auto,*,Auto">
-                                <TextBlock Grid.Column="0" Text="GitHub"
-                                           FontSize="{DynamicResource ThemeFontSizeSmMd}"
-                                           FontWeight="SemiBold"
-                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock FontSize="{DynamicResource ThemeFontSizeSm}">
-                                        <TextBlock.Text>
-                                            <MultiBinding StringFormat="{}Connected as @{0}">
-                                                <Binding Path="GitHubUsername"/>
-                                            </MultiBinding>
-                                        </TextBlock.Text>
-                                    </TextBlock>
-                                    <TextBlock FontSize="{DynamicResource ThemeFontSizeXs}"
-                                               Foreground="{DynamicResource ThemeTextMutedBrush}">
-                                        <TextBlock.Text>
-                                            <MultiBinding StringFormat="{}Scopes: {0}">
-                                                <Binding Path="GitHubScopes"/>
-                                            </MultiBinding>
-                                        </TextBlock.Text>
-                                    </TextBlock>
-                                </StackPanel>
-                                <Button Grid.Column="2"
-                                        Content="Disconnect"
-                                        Command="{Binding DisconnectGitHubCommand}"
-                                        Padding="12,6"
-                                        Foreground="{DynamicResource ThemeDangerBrush}"
-                                        CornerRadius="4"/>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Error display -->
-                    <TextBlock Text="{Binding ConnectionError}"
-                               IsVisible="{Binding ConnectionError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                               Foreground="{DynamicResource ThemeDangerBrush}"
-                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                               TextWrapping="Wrap"/>
-                </StackPanel>
-            </Expander>
-
-            <!-- Cloud Sync Section -->
-            <Expander IsExpanded="False" Classes="settings-section"
-                      x:DataType="vm:SettingsViewModel">
-                <Expander.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Border Width="28" Height="28" CornerRadius="6"
-                                Background="{DynamicResource ThemePrimaryMutedBrush}">
-                            <controls:IconControl Icon="Sync" Size="14"
-                                                  Stroke="{DynamicResource ThemePrimaryBrush}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Cloud Sync" FontWeight="SemiBold"
-                                   FontSize="{DynamicResource ThemeFontSizeMd}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Expander.Header>
-                <views:CloudSyncSettingsSection DataContext="{Binding CloudSync}"
-                                                Margin="16,0,16,16"/>
-            </Expander>
-
-            <!-- Security Section -->
-            <Expander IsExpanded="False" Classes="settings-section">
-                <Expander.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Border Width="28" Height="28" CornerRadius="6"
-                                Background="{DynamicResource ThemePrimaryMutedBrush}">
-                            <controls:IconControl Icon="Lock" Size="14"
-                                                  Stroke="{DynamicResource ThemePrimaryBrush}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Security" FontWeight="SemiBold"
-                                   FontSize="{DynamicResource ThemeFontSizeMd}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Expander.Header>
-                <StackPanel Spacing="16" Margin="16,0,16,16">
-                    <!-- Sensitive Data Lockout -->
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Sensitive Data Lockout" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        <ComboBox ItemsSource="{Binding LockoutOptions}"
-                                  SelectedItem="{Binding SelectedLockoutOption}"
-                                  HorizontalAlignment="Stretch"
-                                  Padding="12,8">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:LockoutOption">
-                                    <TextBlock Text="{Binding Display}"/>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                        <TextBlock Text="Require re-entering password to view Passwords and Vault after inactivity."
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                   FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                   TextWrapping="Wrap"/>
-                    </StackPanel>
-
-                    <Separator Background="{DynamicResource ThemeBorderBrush}" Margin="0,4"/>
-
-                    <!-- Change Password -->
-                    <StackPanel Spacing="8">
-                        <Button Command="{Binding ToggleChangePasswordCommand}"
-                                Background="Transparent"
-                                Padding="0"
-                                Cursor="Hand"
-                                HorizontalAlignment="Left">
-                            <TextBlock Text="Change Master Password"
-                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                       Foreground="{DynamicResource ThemePrimaryBrush}"/>
-                        </Button>
-
-                        <StackPanel Spacing="10" IsVisible="{Binding IsChangePasswordVisible}">
-                            <TextBlock Text="All encrypted data will be re-encrypted with the new password. This may take a moment."
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                       TextWrapping="Wrap"/>
-                            <TextBox Watermark="Current password"
-                                     PasswordChar="&#x2022;"
-                                     Text="{Binding CurrentPassword, Mode=TwoWay}"
-                                     IsEnabled="{Binding !IsChangingPassword}"
-                                     Padding="12,8"/>
-                            <TextBox Watermark="New password (min 8 characters)"
-                                     PasswordChar="&#x2022;"
-                                     Text="{Binding NewPassword, Mode=TwoWay}"
-                                     IsEnabled="{Binding !IsChangingPassword}"
-                                     Padding="12,8"/>
-                            <TextBox Watermark="Confirm new password"
-                                     PasswordChar="&#x2022;"
-                                     Text="{Binding ConfirmNewPassword, Mode=TwoWay}"
-                                     IsEnabled="{Binding !IsChangingPassword}"
-                                     Padding="12,8"/>
-
-                            <Button Command="{Binding ChangePasswordCommand}"
-                                    IsEnabled="{Binding !IsChangingPassword}"
-                                    Background="{DynamicResource ThemePrimaryBrush}"
-                                    Foreground="{DynamicResource ThemeTextOnAccentBrush}"
-                                    Padding="12,8"
-                                    CornerRadius="6"
-                                    HorizontalAlignment="Left">
-                                <TextBlock Text="Change Password"
-                                           IsVisible="{Binding !IsChangingPassword}"/>
-                            </Button>
-
-                            <!-- Progress overlay during re-encryption -->
-                            <Border IsVisible="{Binding IsChangingPassword}"
-                                    Background="{DynamicResource ThemeWarningMutedBrush}"
-                                    CornerRadius="6"
-                                    Padding="12,8">
-                                <StackPanel Spacing="6">
-                                    <TextBlock Text="Re-encrypting all data — do not close the app..."
-                                               FontSize="{DynamicResource ThemeFontSizeSm}"
-                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                                    <ProgressBar IsIndeterminate="True" Height="4" CornerRadius="2"
-                                                 Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                                                CornerRadius="6"/>
+                                    </Grid>
+                                    <Border IsVisible="{Binding IsConnecting}"
+                                            Background="{DynamicResource ThemePrimaryMutedBrush}"
+                                            CornerRadius="8" Padding="14">
+                                        <StackPanel Spacing="10">
+                                            <TextBlock Text="Enter this code on GitHub:"
+                                                       FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                            <TextBlock Text="{Binding DeviceUserCode}"
+                                                       FontSize="{DynamicResource ThemeFontSizeLg}"
+                                                       FontWeight="Bold"
+                                                       FontFamily="{DynamicResource ThemeFontMono}"
+                                                       HorizontalAlignment="Center"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="8"
+                                                        HorizontalAlignment="Center">
+                                                <Button Content="Open GitHub"
+                                                        Command="{Binding OpenVerificationUriCommand}"
+                                                        Padding="12,6"
+                                                        Background="{DynamicResource ThemePrimaryBrush}"
+                                                        Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                                        CornerRadius="6"/>
+                                                <Button Content="Cancel"
+                                                        Command="{Binding CancelConnectCommand}"
+                                                        Padding="12,6"
+                                                        CornerRadius="6"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                                <ProgressBar IsIndeterminate="True" Width="80" Height="4"/>
+                                                <TextBlock Text="Waiting for authorization..."
+                                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                           VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </Border>
 
-                            <!-- Status: error -->
-                            <TextBlock Text="{Binding ChangePasswordStatus}"
-                                       IsVisible="{Binding !ChangePasswordSuccess}"
+                            <!-- GitHub: connected -->
+                            <Border Background="{DynamicResource ThemeSurfaceBrush}"
+                                    CornerRadius="10" Padding="14"
+                                    IsVisible="{Binding IsGitHubConnected}">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <TextBlock Grid.Column="0" Text="GitHub"
+                                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock FontSize="{DynamicResource ThemeFontSizeSm}">
+                                            <TextBlock.Text>
+                                                <MultiBinding StringFormat="{}Connected as @{0}">
+                                                    <Binding Path="GitHubUsername"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                        <TextBlock FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}">
+                                            <TextBlock.Text>
+                                                <MultiBinding StringFormat="{}Scopes: {0}">
+                                                    <Binding Path="GitHubScopes"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <Button Grid.Column="2"
+                                            Content="Disconnect"
+                                            Command="{Binding DisconnectGitHubCommand}"
+                                            Padding="12,6"
+                                            Foreground="{DynamicResource ThemeDangerBrush}"
+                                            CornerRadius="6"/>
+                                </Grid>
+                            </Border>
+
+                            <TextBlock Text="{Binding ConnectionError}"
+                                       IsVisible="{Binding ConnectionError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                        Foreground="{DynamicResource ThemeDangerBrush}"
                                        FontSize="{DynamicResource ThemeFontSizeXsSm}"
                                        TextWrapping="Wrap"/>
-                            <!-- Status: success -->
-                            <TextBlock Text="{Binding ChangePasswordStatus}"
-                                       IsVisible="{Binding ChangePasswordSuccess}"
-                                       Foreground="{DynamicResource ThemeSuccessBrush}"
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+            <!-- ── 7: Cloud Sync ──────────────────────────────── -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Cloud Sync" Classes="settings-section-title"/>
+                            <TextBlock Text="Sync your data across devices" Classes="settings-section-subtitle"/>
+                        </StackPanel>
+                        <views:CloudSyncSettingsSection DataContext="{Binding CloudSync}"
+                                                        Margin="0"/>
+                    </StackPanel>
+                </ScrollViewer>
+
+            <!-- ── 8: Security ────────────────────────────────── -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Security" Classes="settings-section-title"/>
+                            <TextBlock Text="Password, encryption, and session settings" Classes="settings-section-subtitle"/>
+                        </StackPanel>
+
+                        <!-- Lockout -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Sensitive Data Lockout" Classes="field-label"/>
+                            <ComboBox ItemsSource="{Binding LockoutOptions}"
+                                      SelectedItem="{Binding SelectedLockoutOption}"
+                                      HorizontalAlignment="Stretch"
+                                      Padding="12,8">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:LockoutOption">
+                                        <TextBlock Text="{Binding Display}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Text="Require re-entering password to view Passwords and Vault after inactivity."
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <Border Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}"/>
+
+                        <!-- Change password -->
+                        <StackPanel Spacing="10">
+                            <Button Command="{Binding ToggleChangePasswordCommand}"
+                                    Background="Transparent"
+                                    Padding="0"
+                                    Cursor="Hand"
+                                    HorizontalAlignment="Left">
+                                <TextBlock Text="Change Master Password"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                           Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                            </Button>
+                            <StackPanel Spacing="10" IsVisible="{Binding IsChangePasswordVisible}">
+                                <TextBlock Text="All encrypted data will be re-encrypted with the new password. This may take a moment."
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           TextWrapping="Wrap"/>
+                                <TextBox Watermark="Current password"
+                                         PasswordChar="&#x2022;"
+                                         Text="{Binding CurrentPassword, Mode=TwoWay}"
+                                         IsEnabled="{Binding !IsChangingPassword}"
+                                         Padding="12,8"/>
+                                <TextBox Watermark="New password (min 8 characters)"
+                                         PasswordChar="&#x2022;"
+                                         Text="{Binding NewPassword, Mode=TwoWay}"
+                                         IsEnabled="{Binding !IsChangingPassword}"
+                                         Padding="12,8"/>
+                                <TextBox Watermark="Confirm new password"
+                                         PasswordChar="&#x2022;"
+                                         Text="{Binding ConfirmNewPassword, Mode=TwoWay}"
+                                         IsEnabled="{Binding !IsChangingPassword}"
+                                         Padding="12,8"/>
+                                <Button Command="{Binding ChangePasswordCommand}"
+                                        IsEnabled="{Binding !IsChangingPassword}"
+                                        Background="{DynamicResource ThemePrimaryBrush}"
+                                        Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                        Padding="14,8" CornerRadius="8"
+                                        HorizontalAlignment="Left">
+                                    <TextBlock Text="Change Password" IsVisible="{Binding !IsChangingPassword}"/>
+                                </Button>
+                                <Border IsVisible="{Binding IsChangingPassword}"
+                                        Background="{DynamicResource ThemeWarningMutedBrush}"
+                                        CornerRadius="8" Padding="14,10">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Re-encrypting all data — do not close the app..."
+                                                   FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                        <ProgressBar IsIndeterminate="True" Height="4" CornerRadius="2"
+                                                     Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Text="{Binding ChangePasswordStatus}"
+                                           IsVisible="{Binding !ChangePasswordSuccess}"
+                                           Foreground="{DynamicResource ThemeDangerBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding ChangePasswordStatus}"
+                                           IsVisible="{Binding ChangePasswordSuccess}"
+                                           Foreground="{DynamicResource ThemeSuccessBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <Border Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}"/>
+
+                        <!-- Emergency Kit -->
+                        <StackPanel Spacing="12">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Emergency Kit" FontWeight="SemiBold"
+                                           FontSize="{DynamicResource ThemeFontSizeMd}"/>
+                                <TextBlock Text="Your Emergency Kit lets you recover your account if you forget your master password."
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border Width="8" Height="8" CornerRadius="4"
+                                        VerticalAlignment="Center"
+                                        Background="{DynamicResource ThemeSuccessBrush}"
+                                        IsVisible="{Binding HasEmergencyKit}"/>
+                                <Border Width="8" Height="8" CornerRadius="4"
+                                        VerticalAlignment="Center"
+                                        Background="{DynamicResource ThemeWarningBrush}"
+                                        IsVisible="{Binding !HasEmergencyKit}"/>
+                                <TextBlock Text="Configured"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                           IsVisible="{Binding HasEmergencyKit}"/>
+                                <TextBlock Text="Not configured"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                           IsVisible="{Binding !HasEmergencyKit}"/>
+                            </StackPanel>
+                            <Button Command="{Binding RegenerateEmergencyKitCommand}"
+                                    IsEnabled="{Binding !IsRegeneratingKit}"
+                                    Padding="14,8" CornerRadius="8"
+                                    HorizontalAlignment="Left"
+                                    IsVisible="{Binding HasEmergencyKit}">
+                                <TextBlock Text="Regenerate Emergency Kit" FontWeight="Medium"/>
+                            </Button>
+                            <Button Command="{Binding RegenerateEmergencyKitCommand}"
+                                    IsEnabled="{Binding !IsRegeneratingKit}"
+                                    Padding="14,8" CornerRadius="8"
+                                    HorizontalAlignment="Left"
+                                    IsVisible="{Binding !HasEmergencyKit}">
+                                <TextBlock Text="Generate Emergency Kit" FontWeight="Medium"/>
+                            </Button>
+                            <StackPanel Spacing="8" IsVisible="{Binding ShowRegeneratedWords}">
+                                <Border Background="{DynamicResource ThemeWarningMutedBrush}"
+                                        CornerRadius="8" Padding="14,10">
+                                    <TextBlock Text="Write these words down or download the PDF. You will not be able to see them again."
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                               TextWrapping="Wrap" FontWeight="Medium"/>
+                                </Border>
+                                <ItemsControl ItemsSource="{Binding RegeneratedWords}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                                    CornerRadius="4" Padding="8,4" Margin="0,0,6,6">
+                                                <TextBlock Text="{Binding}"
+                                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                           FontFamily="Consolas, Menlo, monospace"
+                                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Command="{Binding DownloadRegeneratedKitCommand}"
+                                            Background="{DynamicResource ThemePrimaryBrush}"
+                                            Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                            Padding="14,8" CornerRadius="8"
+                                            HorizontalAlignment="Left">
+                                        <TextBlock Text="Download PDF" FontWeight="Medium"/>
+                                    </Button>
+                                    <TextBlock Text="Downloaded"
+                                               IsVisible="{Binding HasDownloadedRegeneratedKit}"
+                                               Foreground="{DynamicResource ThemeSuccessBrush}"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <TextBlock Text="{Binding EmergencyKitError}"
+                                       IsVisible="{Binding EmergencyKitError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       Foreground="{DynamicResource ThemeDangerBrush}"
+                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <Border Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}"/>
+
+                        <!-- Lock app -->
+                        <StackPanel Spacing="8">
+                            <Button Command="{Binding LogoutCommand}"
+                                    Background="{DynamicResource ThemeDangerMutedBrush}"
+                                    Foreground="{DynamicResource ThemeDangerBrush}"
+                                    Padding="14,8" CornerRadius="8"
+                                    HorizontalAlignment="Left">
+                                <TextBlock Text="Lock App" FontWeight="Medium"/>
+                            </Button>
+                            <TextBlock Text="Clears encryption keys from memory and returns to the unlock screen."
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
                                        FontSize="{DynamicResource ThemeFontSizeXsSm}"
                                        TextWrapping="Wrap"/>
                         </StackPanel>
                     </StackPanel>
+                </ScrollViewer>
 
-                    <Separator Background="{DynamicResource ThemeBorderBrush}" Margin="0,4"/>
-
-                    <!-- Emergency Kit -->
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="Emergency Kit" FontWeight="Medium"
-                                   FontSize="{DynamicResource ThemeFontSizeMd}"
-                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                        <TextBlock Text="Your Emergency Kit lets you recover your account if you forget your master password."
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                   FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                   TextWrapping="Wrap"/>
-
-                        <!-- Status -->
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Border Width="8" Height="8" CornerRadius="4"
-                                    VerticalAlignment="Center"
-                                    Background="{DynamicResource ThemeSuccessBrush}"
-                                    IsVisible="{Binding HasEmergencyKit}"/>
-                            <Border Width="8" Height="8" CornerRadius="4"
-                                    VerticalAlignment="Center"
-                                    Background="{DynamicResource ThemeWarningBrush}"
-                                    IsVisible="{Binding !HasEmergencyKit}"/>
-                            <TextBlock Text="Configured"
-                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                                       IsVisible="{Binding HasEmergencyKit}"/>
-                            <TextBlock Text="Not configured"
-                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                                       IsVisible="{Binding !HasEmergencyKit}"/>
+            <!-- ── 9: Enterprise ──────────────────────────────── -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Enterprise" Classes="settings-section-title"/>
+                            <TextBlock Text="Policy and administrative controls" Classes="settings-section-subtitle"/>
                         </StackPanel>
-
-                        <!-- Regenerate button -->
-                        <Button Command="{Binding RegenerateEmergencyKitCommand}"
-                                IsEnabled="{Binding !IsRegeneratingKit}"
-                                Background="{DynamicResource ThemeSurfaceElevatedBrush}"
-                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                Padding="12,8"
-                                CornerRadius="6"
-                                HorizontalAlignment="Left"
-                                IsVisible="{Binding HasEmergencyKit}">
-                            <TextBlock Text="Regenerate Emergency Kit" FontWeight="Medium"/>
-                        </Button>
-                        <Button Command="{Binding RegenerateEmergencyKitCommand}"
-                                IsEnabled="{Binding !IsRegeneratingKit}"
-                                Background="{DynamicResource ThemeSurfaceElevatedBrush}"
-                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                Padding="12,8"
-                                CornerRadius="6"
-                                HorizontalAlignment="Left"
-                                IsVisible="{Binding !HasEmergencyKit}">
-                            <TextBlock Text="Generate Emergency Kit" FontWeight="Medium"/>
-                        </Button>
-
-                        <!-- Regenerated words display -->
-                        <StackPanel Spacing="8" IsVisible="{Binding ShowRegeneratedWords}">
-                            <Border Background="{DynamicResource ThemeWarningMutedBrush}"
-                                    CornerRadius="6" Padding="12,8">
-                                <TextBlock Text="Write these words down or download the PDF. You will not be able to see them again."
-                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                           TextWrapping="Wrap" FontWeight="Medium"/>
-                            </Border>
-
-                            <ItemsControl ItemsSource="{Binding RegeneratedWords}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel Orientation="Horizontal"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
-                                                CornerRadius="4" Padding="8,4" Margin="0,0,6,6">
-                                            <TextBlock Text="{Binding}"
-                                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                                       FontFamily="Consolas, Menlo, monospace"
-                                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-
-                            <!-- Download PDF button -->
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Command="{Binding DownloadRegeneratedKitCommand}"
-                                        Background="{DynamicResource ThemePrimaryBrush}"
-                                        Foreground="{DynamicResource ThemeTextOnAccentBrush}"
-                                        Padding="12,8"
-                                        CornerRadius="6"
-                                        HorizontalAlignment="Left">
-                                    <TextBlock Text="Download PDF" FontWeight="Medium"/>
-                                </Button>
-                                <TextBlock Text="Downloaded"
-                                           IsVisible="{Binding HasDownloadedRegeneratedKit}"
-                                           Foreground="{DynamicResource ThemeSuccessBrush}"
-                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                           VerticalAlignment="Center"/>
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Policy"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                <Border Width="8" Height="8" CornerRadius="4"
+                                        VerticalAlignment="Center"
+                                        Background="{DynamicResource ThemeTextMutedBrush}"/>
+                                <TextBlock Text="{Binding PolicyStatusText}"/>
                             </StackPanel>
-                        </StackPanel>
-
-                        <!-- Error display -->
-                        <TextBlock Text="{Binding EmergencyKitError}"
-                                   IsVisible="{Binding EmergencyKitError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                   Foreground="{DynamicResource ThemeDangerBrush}"
-                                   FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                   TextWrapping="Wrap"/>
-                    </StackPanel>
-
-                    <Separator Background="{DynamicResource ThemeBorderBrush}" Margin="0,4"/>
-
-                    <!-- Logout / Lock App -->
-                    <StackPanel Spacing="6">
-                        <Button Command="{Binding LogoutCommand}"
-                                Background="{DynamicResource ThemeDangerMutedBrush}"
-                                Foreground="{DynamicResource ThemeDangerBrush}"
-                                Padding="12,8"
-                                CornerRadius="6"
-                                HorizontalAlignment="Left">
-                            <TextBlock Text="Lock App" FontWeight="Medium"/>
-                        </Button>
-                        <TextBlock Text="Clears encryption keys from memory and returns to the unlock screen."
+                        </Grid>
+                        <TextBlock Text="Enterprise policies are configured via ~/.privstack/policy.toml and control plugin allowlists, permission overrides, and audit logging."
                                    Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                   FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                   FontSize="{DynamicResource ThemeFontSizeSm}"
                                    TextWrapping="Wrap"/>
                     </StackPanel>
-                </StackPanel>
-            </Expander>
+                </ScrollViewer>
 
-            <!-- Enterprise Admin (P5.8) -->
-            <Expander IsExpanded="False" Classes="settings-section"
-                      IsVisible="{Binding IsPolicyActive}">
-                <Expander.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Border Width="28" Height="28" CornerRadius="6"
-                                Background="{DynamicResource ThemePrimaryMutedBrush}">
-                            <controls:IconControl Icon="Users" Size="14"
-                                                  Stroke="{DynamicResource ThemePrimaryBrush}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Enterprise" FontWeight="SemiBold"
-                                   FontSize="{DynamicResource ThemeFontSizeMd}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Expander.Header>
-                <StackPanel Spacing="12" Margin="16,0,16,16">
-                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Policy"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                            <Border Width="8" Height="8" CornerRadius="4"
-                                    VerticalAlignment="Center"
-                                    Background="{DynamicResource ThemeTextMutedBrush}"/>
-                            <TextBlock Text="{Binding PolicyStatusText}"/>
+            <!-- ── 10: About ──────────────────────────────────── -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="About" Classes="settings-section-title"/>
+                            <TextBlock Text="Local-first, privacy-focused productivity suite" Classes="settings-section-subtitle"/>
                         </StackPanel>
-                    </Grid>
 
-                    <TextBlock Text="Enterprise policies are configured via ~/.privstack/policy.toml and control plugin allowlists, permission overrides, and audit logging."
-                               Foreground="{DynamicResource ThemeTextMutedBrush}"
-                               FontSize="{DynamicResource ThemeFontSizeSm}"
-                               TextWrapping="Wrap"/>
-                </StackPanel>
-            </Expander>
-
-            <!-- About Section -->
-            <Expander IsExpanded="False" Classes="settings-section">
-                <Expander.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Border Width="28" Height="28" CornerRadius="6"
-                                Background="{DynamicResource ThemePrimaryMutedBrush}">
-                            <controls:IconControl Icon="Info" Size="14"
-                                                  Stroke="{DynamicResource ThemePrimaryBrush}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"/>
+                        <Border Classes="card" Padding="20">
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Shell"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}" Margin="0,0,32,0"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ShellVersion}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Core" Margin="0,10,32,0"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CoreVersion}" Margin="0,10,0,0"/>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Platform" Margin="0,10,32,0"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding PlatformInfo}" Margin="0,10,0,0"
+                                           TextWrapping="Wrap"/>
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="License" Margin="0,10,32,0"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="Polyform Strict" Margin="0,10,0,0"/>
+                            </Grid>
                         </Border>
-                        <TextBlock Text="About" FontWeight="SemiBold"
-                                   FontSize="{DynamicResource ThemeFontSizeMd}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Expander.Header>
-                <StackPanel Spacing="12" Margin="16,0,16,16">
-                    <TextBlock Text="Local-first, privacy-focused productivity suite."
-                               Foreground="{DynamicResource ThemeTextMutedBrush}"
-                               FontSize="{DynamicResource ThemeFontSizeSm}"
-                               TextWrapping="Wrap"/>
 
-                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,4,0,0">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Shell"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}" Margin="0,0,24,0"/>
-                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ShellVersion}"/>
-
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Core" Margin="0,8,24,0"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CoreVersion}" Margin="0,8,0,0"/>
-
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Platform" Margin="0,8,24,0"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding PlatformInfo}" Margin="0,8,0,0"
-                                   TextWrapping="Wrap"/>
-
-                        <TextBlock Grid.Row="3" Grid.Column="0" Text="License" Margin="0,8,24,0"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                        <TextBlock Grid.Row="3" Grid.Column="1" Text="Polyform Strict" Margin="0,8,0,0"/>
-                    </Grid>
-
-                    <!-- Links -->
-                    <StackPanel Spacing="6" Margin="0,4,0,0">
-                        <Button Command="{Binding OpenUrlCommand}"
-                                CommandParameter="https://privstack.io"
-                                Background="Transparent" Padding="0" Cursor="Hand"
-                                HorizontalAlignment="Left">
-                            <TextBlock Text="privstack.io"
-                                       Foreground="{DynamicResource ThemePrimaryBrush}"
-                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                       TextDecorations="Underline"/>
-                        </Button>
-                        <Button Command="{Binding OpenUrlCommand}"
-                                CommandParameter="https://github.com/PrivStackApp/PrivStack-IO"
-                                Background="Transparent" Padding="0" Cursor="Hand"
-                                HorizontalAlignment="Left">
-                            <TextBlock Text="GitHub"
-                                       Foreground="{DynamicResource ThemePrimaryBrush}"
-                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                       TextDecorations="Underline"/>
-                        </Button>
-                    </StackPanel>
-                </StackPanel>
-            </Expander>
-
-            <!-- Danger Zone -->
-            <Expander IsExpanded="False" Classes="settings-section"
-                      BorderBrush="{DynamicResource ThemeDangerBrush}"
-                      BorderThickness="1">
-                <Expander.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Border Width="28" Height="28" CornerRadius="6"
-                                Background="{DynamicResource ThemeDangerMutedBrush}">
-                            <controls:IconControl Icon="AlertCircle" Size="14"
-                                                  Stroke="{DynamicResource ThemeDangerBrush}"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="Danger Zone" FontWeight="SemiBold"
-                                   FontSize="{DynamicResource ThemeFontSizeMd}"
-                                   Foreground="{DynamicResource ThemeDangerBrush}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Expander.Header>
-                <StackPanel Spacing="12" Margin="16,0,16,16">
-                    <TextBlock Text="Reset all settings to their default values."
-                               Foreground="{DynamicResource ThemeTextMutedBrush}"
-                               FontSize="{DynamicResource ThemeFontSizeSm}"/>
-
-                    <Button Content="Reset Settings"
-                            Command="{Binding ResetSettingsCommand}"
-                            Background="{DynamicResource ThemeDangerBrush}"
-                            Foreground="{DynamicResource ThemeTextOnAccentBrush}"
-                            Padding="16,8"
-                            HorizontalAlignment="Left"/>
-
-                    <!-- Separator -->
-                    <Border Height="1" Background="{DynamicResource ThemeBorderBrush}" Margin="0,4"/>
-
-                    <TextBlock Text="Manage sample data. Reseed repopulates with fresh dummy data. Wipe removes all data entirely. Both require password confirmation."
-                               Foreground="{DynamicResource ThemeTextMutedBrush}"
-                               FontSize="{DynamicResource ThemeFontSizeSm}"
-                               TextWrapping="Wrap"/>
-
-                    <WrapPanel Orientation="Horizontal">
-                        <Button Content="Reseed Sample Data"
-                                Command="{Binding ReseedSampleDataCommand}"
-                                IsEnabled="{Binding !IsReseeding}"
-                                Background="{DynamicResource ThemeDangerBrush}"
-                                Foreground="{DynamicResource ThemeTextOnAccentBrush}"
-                                Padding="16,8"
-                                Margin="0,0,12,8"/>
-
-                        <Button Content="Wipe All Data"
-                                Command="{Binding WipeSeedDataCommand}"
-                                IsEnabled="{Binding !IsReseeding}"
-                                Background="{DynamicResource ThemeDangerBrush}"
-                                Foreground="{DynamicResource ThemeTextOnAccentBrush}"
-                                Padding="16,8"
-                                Margin="0,0,12,8"/>
-
-                        <StackPanel Orientation="Horizontal" Spacing="8"
-                                    IsVisible="{Binding IsReseeding}" VerticalAlignment="Center">
-                            <ProgressBar IsIndeterminate="True" Width="80" Height="4"/>
+                        <StackPanel Spacing="8">
+                            <Button Command="{Binding OpenUrlCommand}"
+                                    CommandParameter="https://privstack.io"
+                                    Background="Transparent" Padding="0" Cursor="Hand"
+                                    HorizontalAlignment="Left">
+                                <TextBlock Text="privstack.io"
+                                           Foreground="{DynamicResource ThemePrimaryBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                           TextDecorations="Underline"/>
+                            </Button>
+                            <Button Command="{Binding OpenUrlCommand}"
+                                    CommandParameter="https://github.com/PrivStackApp/PrivStack-IO"
+                                    Background="Transparent" Padding="0" Cursor="Hand"
+                                    HorizontalAlignment="Left">
+                                <TextBlock Text="GitHub"
+                                           Foreground="{DynamicResource ThemePrimaryBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                           TextDecorations="Underline"/>
+                            </Button>
                         </StackPanel>
-                    </WrapPanel>
+                    </StackPanel>
+                </ScrollViewer>
 
-                    <TextBlock Text="{Binding ReseedStatus}"
-                               IsVisible="{Binding ReseedStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                               Foreground="{DynamicResource ThemeTextMutedBrush}"
-                               FontSize="{DynamicResource ThemeFontSizeSm}"/>
-                </StackPanel>
-            </Expander>
-        </StackPanel>
-    </ScrollViewer>
+            <!-- ── 11: Danger Zone ────────────────────────────── -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Danger Zone" Classes="settings-section-title"
+                                       Foreground="{DynamicResource ThemeDangerBrush}"/>
+                            <TextBlock Text="Irreversible actions — proceed with care" Classes="settings-section-subtitle"/>
+                        </StackPanel>
+
+                        <Border BorderBrush="{DynamicResource ThemeDangerBrush}"
+                                BorderThickness="1"
+                                CornerRadius="{DynamicResource ThemeRadiusLg}"
+                                Padding="20">
+                            <StackPanel Spacing="16">
+                                <TextBlock Text="Reset all settings to their default values."
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                <Button Content="Reset Settings"
+                                        Command="{Binding ResetSettingsCommand}"
+                                        Background="{DynamicResource ThemeDangerBrush}"
+                                        Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                        Padding="14,8"
+                                        CornerRadius="8"
+                                        HorizontalAlignment="Left"/>
+
+                                <Border Height="1" Background="{DynamicResource ThemeBorderBrush}"/>
+
+                                <TextBlock Text="Manage sample data. Reseed repopulates with fresh dummy data. Wipe removes all data entirely. Both require password confirmation."
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                           TextWrapping="Wrap"/>
+
+                                <WrapPanel Orientation="Horizontal">
+                                    <Button Content="Reseed Sample Data"
+                                            Command="{Binding ReseedSampleDataCommand}"
+                                            IsEnabled="{Binding !IsReseeding}"
+                                            Background="{DynamicResource ThemeDangerBrush}"
+                                            Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                            Padding="14,8" CornerRadius="8"
+                                            Margin="0,0,10,8"/>
+                                    <Button Content="Wipe All Data"
+                                            Command="{Binding WipeSeedDataCommand}"
+                                            IsEnabled="{Binding !IsReseeding}"
+                                            Background="{DynamicResource ThemeDangerBrush}"
+                                            Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                            Padding="14,8" CornerRadius="8"
+                                            Margin="0,0,10,8"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8"
+                                                IsVisible="{Binding IsReseeding}" VerticalAlignment="Center">
+                                        <ProgressBar IsIndeterminate="True" Width="80" Height="4"/>
+                                    </StackPanel>
+                                </WrapPanel>
+
+                                <TextBlock Text="{Binding ReseedStatus}"
+                                           IsVisible="{Binding ReseedStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+        </Carousel>
+    </Grid>
 </UserControl>

@@ -1,17 +1,12 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.LogicalTree;
 using Avalonia.Platform.Storage;
 using PrivStack.Desktop.ViewModels;
-using System.Linq;
 
 namespace PrivStack.Desktop.Views;
 
 public partial class SettingsPanel : UserControl
 {
-    private Expander[]? _sectionExpanders;
-
     public SettingsPanel()
     {
         InitializeComponent();
@@ -21,25 +16,28 @@ public partial class SettingsPanel : UserControl
     {
         base.OnLoaded(e);
 
-        _sectionExpanders = this.GetLogicalDescendants()
-            .OfType<Expander>()
-            .Where(exp => exp.Classes.Contains("settings-section"))
-            .ToArray();
-
-        foreach (var expander in _sectionExpanders)
-            expander.PropertyChanged += OnExpanderPropertyChanged;
+        var categoryList = this.FindControl<ListBox>("CategoryList");
+        if (categoryList != null)
+        {
+            categoryList.SelectedIndex = 0;
+            categoryList.SelectionChanged += OnCategoryListSelectionChanged;
+        }
     }
 
-    private void OnExpanderPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    protected override void OnUnloaded(RoutedEventArgs e)
     {
-        if (e.Property != Expander.IsExpandedProperty || e.NewValue is not true || _sectionExpanders is null)
-            return;
+        var categoryList = this.FindControl<ListBox>("CategoryList");
+        if (categoryList != null)
+            categoryList.SelectionChanged -= OnCategoryListSelectionChanged;
 
-        foreach (var other in _sectionExpanders)
-        {
-            if (other != sender)
-                other.IsExpanded = false;
-        }
+        base.OnUnloaded(e);
+    }
+
+    private void OnCategoryListSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        var tabs = this.FindControl<Carousel>("SettingsTabs");
+        if (sender is ListBox list && tabs != null && list.SelectedIndex >= 0)
+            tabs.SelectedIndex = list.SelectedIndex;
     }
 
     private async void OnChooseProfileImageClick(object? sender, RoutedEventArgs e)
@@ -62,16 +60,5 @@ public partial class SettingsPanel : UserControl
             var path = files[0].Path.LocalPath;
             vm.SetProfileImage(path);
         }
-    }
-
-    protected override void OnUnloaded(RoutedEventArgs e)
-    {
-        if (_sectionExpanders is not null)
-        {
-            foreach (var expander in _sectionExpanders)
-                expander.PropertyChanged -= OnExpanderPropertyChanged;
-            _sectionExpanders = null;
-        }
-        base.OnUnloaded(e);
     }
 }
