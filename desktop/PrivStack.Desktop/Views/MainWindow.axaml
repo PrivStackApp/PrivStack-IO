@@ -117,8 +117,29 @@
                         <ContentControl Content="{Binding CurrentViewModel}" ClipToBounds="True"/>
 
                         <!-- Info Panel: Collapsed side tab (visible when panel is closed and not on Graph/Nexus) -->
-                        <Button IsVisible="{Binding ShowInfoPanelTab}"
-                                Command="{Binding ToggleInfoPanelCommand}"
+                        <!-- Hover region: wider hit-test area that fades in the tab button -->
+                        <Border Classes="info-tab-hover-zone"
+                                Width="36"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Stretch"
+                                Background="Transparent"
+                                IsVisible="{Binding ShowInfoPanelTab}"
+                                ZIndex="10"
+                                IsHitTestVisible="True">
+                            <Border.Styles>
+                                <Style Selector="Border.info-tab-hover-zone Button">
+                                    <Setter Property="Opacity" Value="0"/>
+                                    <Setter Property="Transitions">
+                                        <Transitions>
+                                            <DoubleTransition Property="Opacity" Duration="0:0:0.2"/>
+                                        </Transitions>
+                                    </Setter>
+                                </Style>
+                                <Style Selector="Border.info-tab-hover-zone:pointerover Button">
+                                    <Setter Property="Opacity" Value="1"/>
+                                </Style>
+                            </Border.Styles>
+                        <Button Command="{Binding ToggleInfoPanelCommand}"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center"
                                 Background="{DynamicResource ThemeSurfaceBrush}"
@@ -126,8 +147,7 @@
                                 BorderThickness="1,1,0,1"
                                 CornerRadius="6,0,0,6"
                                 Padding="5,16"
-                                Cursor="Hand"
-                                ZIndex="10">
+                                Cursor="Hand">
                             <Button.Styles>
                                 <Style Selector="Button:pointerover /template/ ContentPresenter">
                                     <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
@@ -159,6 +179,7 @@
                                 </LayoutTransformControl>
                             </StackPanel>
                         </Button>
+                        </Border>
 
                         <!-- Info Panel: Slide Drawer (hidden on Graph/Nexus, animates in/out otherwise) -->
                         <StackPanel x:Name="InfoPanelDrawer"
