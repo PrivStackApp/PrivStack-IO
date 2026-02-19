@@ -36,6 +36,7 @@ public partial class DashboardViewModel : ViewModelBase
     private readonly EntityMetadataService _entityMetadataService;
     private readonly LinkProviderCacheService _linkProviderCache;
     private readonly IWorkspaceService _workspaceService;
+    private readonly Native.IPrivStackRuntime _runtime;
     private List<OfficialPluginInfo> _serverPlugins = [];
 
     internal DashboardViewModel(
@@ -45,7 +46,8 @@ public partial class DashboardViewModel : ViewModelBase
         IPrivStackSdk sdk,
         EntityMetadataService entityMetadataService,
         LinkProviderCacheService linkProviderCache,
-        IWorkspaceService workspaceService)
+        IWorkspaceService workspaceService,
+        Native.IPrivStackRuntime runtime)
     {
         _installService = installService;
         _pluginRegistry = pluginRegistry;
@@ -54,6 +56,7 @@ public partial class DashboardViewModel : ViewModelBase
         _entityMetadataService = entityMetadataService;
         _linkProviderCache = linkProviderCache;
         _workspaceService = workspaceService;
+        _runtime = runtime;
     }
 
     // --- Tab State ---
@@ -549,8 +552,30 @@ public partial class DashboardViewModel : ViewModelBase
         {
             IsRunningMaintenance = true;
             StatusMessage = null;
+
+            // 1. Run normal VACUUM via Rust FFI
             await _sdk.RunDatabaseMaintenance();
+
+            // 2. Check if entity DB is still bloated with 0 entities
+            var metrics = await _metricsService.GetDataMetricsAsync(_pluginRegistry, _workspaceService);
+            var totalEntities = metrics.PluginDataItems.Sum(m => m.EntityCount);
+            var dbDir = Path.GetDirectoryName(_workspaceService.GetActiveDataPath());
+
+            if (totalEntities == 0 && dbDir != null)
+            {
+                var entityDb = Path.Combine(dbDir, "data.entities.duckdb");
+                var entityDbSize = File.Exists(entityDb) ? new FileInfo(entityDb).Length : 0;
+
+                // If 0 entities but DB > 1 MB, VACUUM didn't reclaim — force recreate
+                if (entityDbSize > 1_048_576)
+                {
+                    _log.Information("Force-compacting empty entity DB ({Size} bytes)", entityDbSize);
+                    await ForceRecreateDatabase(dbDir);
+                }
+            }
+
             await LoadDataMetricsAsync();
+            StatusMessage = "Database maintenance completed.";
         }
         catch (Exception ex)
         {
@@ -560,6 +585,36 @@ public partial class DashboardViewModel : ViewModelBase
         {
             IsRunningMaintenance = false;
         }
+    }
+
+    private async Task ForceRecreateDatabase(string dbDir)
+    {
+        var dbPath = _workspaceService.GetActiveDataPath();
+        var dbFiles = new[]
+        {
+            "data.entities.duckdb",
+            "data.entities.duckdb.wal",
+            "data.datasets.duckdb",
+            "data.datasets.duckdb.wal",
+        };
+
+        // Shutdown the Rust core (closes all DuckDB connections)
+        await Task.Run(() => _runtime.Shutdown());
+
+        // Delete the empty database files
+        foreach (var file in dbFiles)
+        {
+            var path = Path.Combine(dbDir, file);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+                _log.Information("Deleted empty DB file: {File}", file);
+            }
+        }
+
+        // Re-initialize (Rust will recreate schemas on fresh files)
+        await Task.Run(() => _runtime.Initialize(dbPath));
+        _log.Information("Database re-initialized after force compact");
     }
 
     [RelayCommand]
