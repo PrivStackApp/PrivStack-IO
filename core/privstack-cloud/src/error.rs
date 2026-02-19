@@ -47,6 +47,9 @@ pub enum CloudError {
     #[error("not found: {0}")]
     NotFound(String),
 
+    #[error("rate limited: retry after {retry_after_secs}s")]
+    RateLimited { retry_after_secs: u64 },
+
     #[error("invalid configuration: {0}")]
     Config(String),
 }
@@ -55,9 +58,20 @@ impl CloudError {
     /// Returns true if this error represents a 429 rate-limit response.
     pub fn is_rate_limited(&self) -> bool {
         match self {
+            CloudError::RateLimited { .. } => true,
             CloudError::Api(msg) => msg.contains("429"),
             CloudError::Http(e) => e.status().is_some_and(|s| s.as_u16() == 429),
             _ => false,
+        }
+    }
+
+    /// Returns the retry-after duration if this is a rate-limit error.
+    pub fn retry_after(&self) -> Option<std::time::Duration> {
+        match self {
+            CloudError::RateLimited { retry_after_secs } => {
+                Some(std::time::Duration::from_secs(*retry_after_secs))
+            }
+            _ => None,
         }
     }
 }
