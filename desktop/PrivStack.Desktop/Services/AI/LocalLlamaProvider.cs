@@ -170,7 +170,7 @@ internal sealed class LocalLlamaProvider : IAiProvider
             var prompt = $"<|start_header_id|>system<|end_header_id|>\n\n{systemPrompt}<|eot_id|>" +
                          $"<|start_header_id|>user<|end_header_id|>\n\n{userPrompt}<|eot_id|>" +
                          "<|start_header_id|>assistant<|end_header_id|>\n\n";
-            return (prompt, ["<|eot_id|>", "<|end_of_text|>"]);
+            return (prompt, ["<|eot_id|>", "<|end_of_text|>", "<|start_header_id|>"]);
         }
 
         if (modelName.StartsWith("mistral", StringComparison.OrdinalIgnoreCase))
@@ -183,7 +183,7 @@ internal sealed class LocalLlamaProvider : IAiProvider
         // Phi-3 chat template (default)
         {
             var prompt = $"<|system|>\n{systemPrompt}<|end|>\n<|user|>\n{userPrompt}<|end|>\n<|assistant|>\n";
-            return (prompt, ["<|end|>", "<|user|>"]);
+            return (prompt, ["<|end|>", "<|user|>", "<|assistant|>", "<|endoftext|>"]);
         }
     }
 
