@@ -964,12 +964,13 @@ impl EntityStore {
         let _ = std::fs::remove_file(&compact_path);
 
         let fresh_conn = Connection::open(db_path)?;
+        let db_name = get_default_db_name(&fresh_conn);
         let compact_str = compact_path.to_string_lossy();
         let copy_result = fresh_conn.execute_batch(&format!(
             "ATTACH '{}' AS compact_db;
-             COPY FROM DATABASE main TO compact_db;
+             COPY FROM DATABASE \"{}\" TO compact_db;
              DETACH compact_db;",
-            compact_str,
+            compact_str, db_name,
         ));
         drop(fresh_conn);
 
@@ -1023,6 +1024,15 @@ impl EntityStore {
 
         Ok((size_before, size_after))
     }
+}
+
+/// Returns the name of the primary (non-temp, non-system) database on this connection.
+/// In newer DuckDB the default database is named after the file stem (e.g. "data"),
+/// not necessarily "main".
+fn get_default_db_name(conn: &Connection) -> String {
+    conn.prepare("SELECT database_name FROM pragma_database_list() WHERE NOT internal ORDER BY database_oid LIMIT 1")
+        .and_then(|mut s| s.query_row([], |r| r.get::<_, String>(0)))
+        .unwrap_or_else(|_| "main".to_string())
 }
 
 fn format_bytes_log(bytes: u64) -> String {
@@ -1183,11 +1193,12 @@ pub fn compact_duckdb_file(path: &std::path::Path) -> Option<(u64, u64)> {
     let _ = std::fs::remove_file(&compact_path);
 
     let fresh_conn = duckdb::Connection::open(path).ok()?;
+    let db_name = get_default_db_name(&fresh_conn);
     let compact_str = compact_path.to_string_lossy();
     let copy_ok = fresh_conn
         .execute_batch(&format!(
-            "ATTACH '{}' AS compact_db; COPY FROM DATABASE main TO compact_db; DETACH compact_db;",
-            compact_str
+            "ATTACH '{}' AS compact_db; COPY FROM DATABASE \"{}\" TO compact_db; DETACH compact_db;",
+            compact_str, db_name
         ))
         .is_ok();
     drop(fresh_conn);
