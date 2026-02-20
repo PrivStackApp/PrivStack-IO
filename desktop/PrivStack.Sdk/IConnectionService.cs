@@ -63,6 +63,17 @@ public interface IConnectionService
     Task<IReadOnlyList<ConnectionInfo>> GetConnectionsWithScopesAsync(
         string provider, IReadOnlyList<string> requiredScopes, CancellationToken ct = default);
 
+    // ── Migration ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Imports an existing refresh token as a new shell-level connection.
+    /// Used during migration from plugin-level OAuth to shell-level connections.
+    /// Returns the new connection ID.
+    /// </summary>
+    Task<string> ImportConnectionAsync(
+        string provider, string refreshToken, string email,
+        IReadOnlyList<string> scopes, CancellationToken ct = default);
+
     // ── Events ──────────────────────────────────────────────────────
 
     /// <summary>
