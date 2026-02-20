@@ -264,6 +264,10 @@
     <Color x:Key="ThemeICloudBrand">#3693F3</Color>
     <SolidColorBrush x:Key="ThemeGoogleBrandBrush" Color="{StaticResource ThemeGoogleBrand}"/>
     <SolidColorBrush x:Key="ThemeICloudBrandBrush" Color="{StaticResource ThemeICloudBrand}"/>
+    <Color x:Key="ThemeGitHubBrand">#24292f</Color>
+    <Color x:Key="ThemeMicrosoftBrand">#00A4EF</Color>
+    <SolidColorBrush x:Key="ThemeGitHubBrandBrush" Color="{StaticResource ThemeGitHubBrand}"/>
+    <SolidColorBrush x:Key="ThemeMicrosoftBrandBrush" Color="{StaticResource ThemeMicrosoftBrand}"/>
 
     <!-- Note highlight colors -->
     <Color x:Key="ThemeHighlightYellow">#FFF293</Color>
