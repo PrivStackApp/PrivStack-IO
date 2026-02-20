@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PrivStack.Desktop.Services.Connections;
+using PrivStack.Desktop.Services.Plugin;
+using PrivStack.Sdk.Capabilities;
 using Serilog;
 
 namespace PrivStack.Desktop.ViewModels;
@@ -30,16 +32,20 @@ public partial class ConnectionsViewModel : ViewModelBase
 
     private readonly ConnectionService _connectionService;
     private readonly GitHubDeviceFlowService _deviceFlowService;
+    private readonly IPluginRegistry _pluginRegistry;
     private CancellationTokenSource? _pollCts;
 
     public ConnectionsViewModel(
         ConnectionService connectionService,
-        GitHubDeviceFlowService deviceFlowService)
+        GitHubDeviceFlowService deviceFlowService,
+        IPluginRegistry pluginRegistry)
     {
         _connectionService = connectionService;
         _deviceFlowService = deviceFlowService;
+        _pluginRegistry = pluginRegistry;
         _connectionService.ConnectionChanged += OnConnectionChanged;
 
+        RefreshRequiredProviders();
         LoadGitHubState();
         LoadGoogleConnections();
         LoadMicrosoftConnections();
@@ -99,6 +105,32 @@ public partial class ConnectionsViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isMicrosoftConnecting;
+
+    // ========================================
+    // Plugin-Driven Provider Visibility
+    // ========================================
+
+    [ObservableProperty]
+    private bool _isGoogleRequired;
+
+    [ObservableProperty]
+    private bool _isMicrosoftRequired;
+
+    [ObservableProperty]
+    private bool _hasAnyOAuthProvider;
+
+    private void RefreshRequiredProviders()
+    {
+        var consumers = _pluginRegistry.GetCapabilityProviders<IConnectionConsumer>();
+        var providers = consumers
+            .SelectMany(c => c.RequiredConnections)
+            .Select(r => r.Provider)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        IsGoogleRequired = providers.Contains("google");
+        IsMicrosoftRequired = providers.Contains("microsoft");
+        HasAnyOAuthProvider = providers.Count > 0;
+    }
 
     // ========================================
     // GitHub Commands
