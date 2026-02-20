@@ -156,16 +156,7 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isLoadingDiagnostics;
 
-    [ObservableProperty]
-    private string? _diagnosticsJson;
-
-    public ObservableCollection<DbTableDiagnostic> DiagnosticsTables { get; } = [];
-
-    [ObservableProperty]
-    private string _diagnosticsDatabaseSize = "—";
-
-    [ObservableProperty]
-    private string _diagnosticsWalSize = "—";
+    public ObservableCollection<DbFileDiagnostic> DiagnosticsFiles { get; } = [];
 
     public ObservableCollection<PluginDataInfo> PluginDataItems { get; } = [];
 
@@ -721,33 +712,64 @@ public partial class DashboardViewModel : ViewModelBase
         try
         {
             IsLoadingDiagnostics = true;
-            DiagnosticsTables.Clear();
+            DiagnosticsFiles.Clear();
 
             var json = await Task.Run(() => _sdk.GetDatabaseDiagnostics());
-            DiagnosticsJson = json;
+            _log.Information("Raw diagnostics JSON: {Json}", json);
 
             var doc = System.Text.Json.JsonDocument.Parse(json);
+            var dbDir = Path.GetDirectoryName(_workspaceService.GetActiveDataPath());
 
-            if (doc.RootElement.TryGetProperty("database", out var db))
+            foreach (var dbEntry in doc.RootElement.EnumerateObject())
             {
-                DiagnosticsDatabaseSize = db.TryGetProperty("database_size", out var ds)
-                    ? ds.GetString() ?? "—" : "—";
-                DiagnosticsWalSize = db.TryGetProperty("wal_size", out var ws)
-                    ? ws.GetString() ?? "—" : "—";
-            }
+                var dbLabel = dbEntry.Name;
+                var dbVal = dbEntry.Value;
 
-            if (doc.RootElement.TryGetProperty("tables", out var tables))
-            {
-                foreach (var table in tables.EnumerateArray())
+                // Get actual file size from disk
+                long fileSize = 0;
+                var fileName = $"data.{dbLabel}.duckdb";
+                if (dbVal.TryGetProperty("file_size", out var fs))
+                    fileSize = fs.GetInt64();
+                else if (dbDir != null)
                 {
-                    var name = table.GetProperty("table").GetString() ?? "unknown";
-                    var rowCount = table.GetProperty("row_count").GetInt64();
-                    var estimatedSize = table.GetProperty("estimated_size").GetInt64();
-                    var columnCount = table.GetProperty("column_count").GetInt64();
-
-                    DiagnosticsTables.Add(new DbTableDiagnostic(
-                        name, rowCount, estimatedSize, columnCount));
+                    var diskPath = Path.Combine(dbDir, fileName);
+                    if (File.Exists(diskPath))
+                        fileSize = new FileInfo(diskPath).Length;
                 }
+
+                // Parse tables
+                long totalRows = 0;
+                var tableItems = new List<DbTableDiagnostic>();
+                if (dbVal.TryGetProperty("tables", out var tables))
+                {
+                    foreach (var table in tables.EnumerateArray())
+                    {
+                        var name = table.GetProperty("table").GetString() ?? "unknown";
+                        var rowCount = table.GetProperty("row_count").GetInt64();
+                        var estimatedSize = table.GetProperty("estimated_size").GetInt64();
+                        var columnCount = table.GetProperty("column_count").GetInt64();
+
+                        tableItems.Add(new DbTableDiagnostic(
+                            dbLabel, name, rowCount, estimatedSize, columnCount));
+                        totalRows += rowCount;
+                    }
+                }
+
+                var fileDiag = new DbFileDiagnostic(dbLabel, fileName, fileSize, totalRows);
+
+                // Parse block info from databases array (entity store)
+                if (dbVal.TryGetProperty("databases", out var dbs) && dbs.GetArrayLength() > 0)
+                {
+                    var first = dbs[0];
+                    fileDiag.TotalBlocks = first.TryGetProperty("total_blocks", out var tb) ? tb.GetInt64() : 0;
+                    fileDiag.UsedBlocks = first.TryGetProperty("used_blocks", out var ub) ? ub.GetInt64() : 0;
+                    fileDiag.FreeBlocks = first.TryGetProperty("free_blocks", out var fb) ? fb.GetInt64() : 0;
+                }
+
+                foreach (var t in tableItems)
+                    fileDiag.Tables.Add(t);
+
+                DiagnosticsFiles.Add(fileDiag);
             }
         }
         catch (Exception ex)
@@ -759,6 +781,12 @@ public partial class DashboardViewModel : ViewModelBase
         {
             IsLoadingDiagnostics = false;
         }
+    }
+
+    [RelayCommand]
+    private void ToggleDiagnosticsExpanded(DbFileDiagnostic item)
+    {
+        item.IsExpanded = !item.IsExpanded;
     }
 
     // =========================================================================

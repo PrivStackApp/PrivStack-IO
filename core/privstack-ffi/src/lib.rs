@@ -5541,15 +5541,47 @@ pub extern "C" fn privstack_db_maintenance() -> PrivStackError {
     }
 }
 
-/// Returns per-table diagnostics as JSON string. Caller must free with `privstack_free_string`.
+/// Returns diagnostics for ALL DuckDB files as JSON. Caller must free with `privstack_free_string`.
 #[unsafe(no_mangle)]
 pub extern "C" fn privstack_db_diagnostics() -> *mut c_char {
+    use privstack_storage::entity_store::scan_duckdb_file;
+
     let handle = HANDLE.lock().unwrap();
     match handle.as_ref() {
-        Some(h) => match h.entity_store.db_diagnostics() {
-            Ok(json) => to_c_string(&json),
-            Err(_) => to_c_string("{}"),
-        },
+        Some(h) => {
+            let mut all_dbs = serde_json::Map::new();
+
+            // 1. Entity store (uses existing open connection)
+            if let Ok(diag) = h.entity_store.db_diagnostics() {
+                // Add file_size from disk
+                let entity_path = Path::new(&h.db_path).with_extension("entities.duckdb");
+                let file_size = std::fs::metadata(&entity_path)
+                    .map(|m| m.len() as i64)
+                    .unwrap_or(0);
+                let mut val = diag;
+                if let Some(obj) = val.as_object_mut() {
+                    obj.insert("file_size".to_string(), serde_json::json!(file_size));
+                }
+                all_dbs.insert("entities".to_string(), val);
+            }
+
+            // 2. Scan sibling DuckDB files (opens read-only connections)
+            let base = Path::new(&h.db_path);
+            let siblings = [
+                ("datasets", base.with_extension("datasets.duckdb")),
+                ("blobs", base.with_extension("blobs.duckdb")),
+                ("events", base.with_extension("events.duckdb")),
+                ("vault", base.with_extension("vault.duckdb")),
+            ];
+
+            for (label, path) in &siblings {
+                if let Some(diag) = scan_duckdb_file(&path) {
+                    all_dbs.insert(label.to_string(), diag);
+                }
+            }
+
+            to_c_string(&serde_json::Value::Object(all_dbs).to_string())
+        }
         None => to_c_string("{}"),
     }
 }
