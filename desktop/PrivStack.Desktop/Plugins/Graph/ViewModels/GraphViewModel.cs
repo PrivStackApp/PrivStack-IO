@@ -179,7 +179,7 @@ public partial class GraphViewModel : PrivStack.Sdk.ViewModelBase
         if (_fullGraphData == null) { GraphData = null; NodeCount = 0; EdgeCount = 0; return; }
 
         var includeNodeTypes = new HashSet<string>();
-        if (ShowNotes) { includeNodeTypes.Add("note"); includeNodeTypes.Add("wiki_source"); }
+        if (ShowNotes) { includeNodeTypes.Add("note"); includeNodeTypes.Add("wiki_source"); includeNodeTypes.Add("sticky_note"); }
         if (ShowTasks) { includeNodeTypes.Add("task"); includeNodeTypes.Add("project"); }
         if (ShowContacts) { includeNodeTypes.Add("contact"); includeNodeTypes.Add("company"); includeNodeTypes.Add("contact_group"); }
         if (ShowEvents) includeNodeTypes.Add("event");
