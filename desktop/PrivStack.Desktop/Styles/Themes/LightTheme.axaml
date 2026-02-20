@@ -245,8 +245,8 @@
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
     <!-- Stage badges -->
-    <Color x:Key="ThemeAlphaBadge">#E53935</Color>
-    <Color x:Key="ThemeBetaBadge">#FB8C00</Color>
+    <Color x:Key="ThemeAlphaBadge">#DC2626</Color>
+    <Color x:Key="ThemeBetaBadge">#B45309</Color>
     <SolidColorBrush x:Key="ThemeAlphaBadgeBrush" Color="{StaticResource ThemeAlphaBadge}"/>
     <SolidColorBrush x:Key="ThemeBetaBadgeBrush" Color="{StaticResource ThemeBetaBadge}"/>
 
