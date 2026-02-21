@@ -79,7 +79,7 @@ public class FontScaleService : IFontScaleService
         ["ThemeSpacingLg"] = 16,
         ["ThemeSpacingXl"] = 24,
         ["ThemeSpacing2Xl"] = 32,
-        ["ThemePageMaxWidth"] = 1000,
+        ["ThemePageMaxWidth"] = 1060,
         ["ThemeContentMaxWidth"] = 800,
         ["ThemeContentWideMinWidth"] = 600,
         ["ThemeContentWideMaxWidth"] = 960,
