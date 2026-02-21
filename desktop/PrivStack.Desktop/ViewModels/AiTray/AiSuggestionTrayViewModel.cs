@@ -23,7 +23,8 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
     IRecipient<ContentSuggestionPushedMessage>,
     IRecipient<ContentSuggestionUpdatedMessage>,
     IRecipient<ContentSuggestionRemovedMessage>,
-    IRecipient<ContentSuggestionDismissedMessage>
+    IRecipient<ContentSuggestionDismissedMessage>,
+    IRecipient<ContentSuggestionActionRequestedMessage>
 {
     private static readonly ILogger _log = Serilog.Log.ForContext<AiSuggestionTrayViewModel>();
 
@@ -80,6 +81,7 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         WeakReferenceMessenger.Default.Register<ContentSuggestionUpdatedMessage>(this);
         WeakReferenceMessenger.Default.Register<ContentSuggestionRemovedMessage>(this);
         WeakReferenceMessenger.Default.Register<ContentSuggestionDismissedMessage>(this);
+        WeakReferenceMessenger.Default.Register<ContentSuggestionActionRequestedMessage>(this);
 
         // Subscribe to active item changes for context injection
         _infoPanelService.ActiveItemChanged += OnActiveItemChanged;

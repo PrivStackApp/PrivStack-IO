@@ -1,6 +1,7 @@
 using PrivStack.Sdk.Capabilities;
 using PrivStack.Sdk.Messaging;
 using PrivStack.Sdk.Services;
+using Serilog;
 
 namespace PrivStack.Desktop.ViewModels.AiTray;
 
@@ -9,6 +10,8 @@ namespace PrivStack.Desktop.ViewModels.AiTray;
 /// </summary>
 public partial class AiSuggestionTrayViewModel
 {
+    private const string IntentPrefix = "intent:";
+
     /// <summary>Maps SuggestionId → Assistant MessageId for update routing.</summary>
     private readonly Dictionary<string, string> _suggestionToAssistantId = new();
 
@@ -42,7 +45,7 @@ public partial class AiSuggestionTrayViewModel
         _dispatcher.Post(() =>
         {
             var intentMsgs = IntentMessages
-                .Where(m => m.SuggestionId?.StartsWith("intent:") == true).ToList();
+                .Where(m => m.SuggestionId?.StartsWith(IntentPrefix) == true).ToList();
             foreach (var msg in intentMsgs)
                 IntentMessages.Remove(msg);
             UpdateCounts();
@@ -53,7 +56,7 @@ public partial class AiSuggestionTrayViewModel
     {
         var assistantMsg = new AiChatMessageViewModel(ChatMessageRole.Assistant)
         {
-            SuggestionId = $"intent:{suggestion.SuggestionId}",
+            SuggestionId = $"{IntentPrefix}{suggestion.SuggestionId}",
             Content = suggestion.Summary,
             State = ChatMessageState.Ready,
             SourcePluginId = suggestion.MatchedIntent.PluginId,
@@ -63,8 +66,72 @@ public partial class AiSuggestionTrayViewModel
             NavigateToSourceFunc = NavigateToLinkedItemFunc
         };
 
+        // Add the primary action button (e.g. "Create Calendar Event", "Create Task")
+        assistantMsg.Actions.Add(new SuggestionAction
+        {
+            ActionId = "execute_intent",
+            DisplayName = suggestion.MatchedIntent.DisplayName,
+            IsPrimary = true
+        });
+
         IntentMessages.Add(assistantMsg);
         RequestScrollToBottom();
+    }
+
+    // ── Intent Action Execution ───────────────────────────────────────
+
+    public void Receive(ContentSuggestionActionRequestedMessage message)
+    {
+        // Only handle intent suggestions here; plugin content suggestions are handled by the plugins themselves
+        if (!message.SuggestionId.StartsWith(IntentPrefix)) return;
+
+        var rawId = message.SuggestionId[IntentPrefix.Length..];
+
+        if (message.ActionId == "execute_intent")
+            _dispatcher.Post(() => _ = ExecuteIntentActionAsync(message.SuggestionId, rawId));
+    }
+
+    private async Task ExecuteIntentActionAsync(string prefixedId, string rawSuggestionId)
+    {
+        var msg = IntentMessages.FirstOrDefault(m => m.SuggestionId == prefixedId);
+        if (msg != null)
+        {
+            msg.State = ChatMessageState.Loading;
+            msg.Actions.Clear();
+        }
+
+        try
+        {
+            var result = await _intentEngine.ExecuteAsync(rawSuggestionId);
+
+            if (result.Success)
+            {
+                if (msg != null)
+                {
+                    msg.State = ChatMessageState.Applied;
+                    msg.Content = result.Summary ?? "Done!";
+                }
+            }
+            else
+            {
+                if (msg != null)
+                {
+                    msg.State = ChatMessageState.Error;
+                    msg.ErrorMessage = result.ErrorMessage ?? "Action failed.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to execute intent {SuggestionId}", rawSuggestionId);
+            if (msg != null)
+            {
+                msg.State = ChatMessageState.Error;
+                msg.ErrorMessage = ex.Message;
+            }
+        }
+
+        UpdateCounts();
     }
 
     // ── Content Suggestion Messenger Handlers ────────────────────────
@@ -144,6 +211,10 @@ public partial class AiSuggestionTrayViewModel
     {
         _dispatcher.Post(() =>
         {
+            // Dismiss from IntentEngine if this is an intent suggestion
+            if (message.SuggestionId.StartsWith(IntentPrefix))
+                _intentEngine.Dismiss(message.SuggestionId[IntentPrefix.Length..]);
+
             RemoveMessageBySuggestionId(message.SuggestionId);
             UpdateCounts();
         });
@@ -151,6 +222,7 @@ public partial class AiSuggestionTrayViewModel
 
     private void RemoveMessageBySuggestionId(string suggestionId)
     {
+        // Content suggestion cleanup (keyed by raw SuggestionId)
         if (_suggestionToUserMsgId.TryGetValue(suggestionId, out var userMsgId))
         {
             var userMsg = IntentMessages.FirstOrDefault(m => m.MessageId == userMsgId);
@@ -165,8 +237,10 @@ public partial class AiSuggestionTrayViewModel
             _suggestionToAssistantId.Remove(suggestionId);
         }
 
-        var intentKey = $"intent:{suggestionId}";
-        var intentMsg = IntentMessages.FirstOrDefault(m => m.SuggestionId == intentKey);
+        // Intent suggestion cleanup — match by SuggestionId directly (handles both
+        // prefixed "intent:{id}" from dismiss and raw "{id}" from IntentEngine events)
+        var intentMsg = IntentMessages.FirstOrDefault(m => m.SuggestionId == suggestionId)
+                     ?? IntentMessages.FirstOrDefault(m => m.SuggestionId == $"{IntentPrefix}{suggestionId}");
         if (intentMsg != null) IntentMessages.Remove(intentMsg);
     }
 }
