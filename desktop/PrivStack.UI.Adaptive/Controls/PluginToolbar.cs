@@ -319,11 +319,13 @@ public sealed class PluginToolbar : Border
         {
             Text = shortcutHint,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(4, 0, 6, 0),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 0, 8, 0),
             Opacity = 0.5,
+            FontWeight = FontWeight.Bold,
         };
         shortcutBadge.Bind(TextBlock.FontSizeProperty,
-            shortcutBadge.GetResourceObservable("ThemeFontSizeXs"));
+            shortcutBadge.GetResourceObservable("ThemeFontSizeSm"));
         shortcutBadge.Bind(TextBlock.ForegroundProperty,
             shortcutBadge.GetResourceObservable("ThemeTextMutedBrush"));
 
@@ -331,12 +333,21 @@ public sealed class PluginToolbar : Border
         inner.GotFocus += (_, _) => shortcutBadge.IsVisible = false;
         inner.LostFocus += (_, _) => shortcutBadge.IsVisible = true;
 
-        var panel = new StackPanel
+        var leftGroup = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center,
-            Children = { searchIcon, inner, shortcutBadge }
+            Children = { searchIcon, inner }
         };
+
+        var panel = new Grid
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            Children = { leftGroup, shortcutBadge }
+        };
+        Grid.SetColumn(leftGroup, 0);
+        Grid.SetColumn(shortcutBadge, 1);
 
         var pill = new Border
         {
