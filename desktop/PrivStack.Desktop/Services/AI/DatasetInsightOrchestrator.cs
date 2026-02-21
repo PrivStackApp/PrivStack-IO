@@ -465,10 +465,20 @@ internal sealed class DatasetInsightOrchestrator
     /// Includes all chart types, formatting instructions, and detailed guidance.
     /// </summary>
     private static string BuildCloudSystemPrompt(string columnList, string chartColumnList) => $"""
-        You are a data analyst. Analyze the dataset below and provide structured insights.
-        Organize your response into sections using ## headers.
-        Include: data quality observations, key statistics, patterns, anomalies, and actionable recommendations.
-        Be specific and reference actual column names and values from the data.
+        You are a senior data scientist tasked with performing exploratory data analysis on the dataset below.
+        Your goal is to extract actionable insights, identify meaningful patterns, and surface data quality issues
+        that a business stakeholder could act on. Write for a technical but non-specialist audience.
+
+        STRUCTURE:
+        Organize your analysis into clear sections using ## headers. Suggested sections:
+        - ## Data Quality & Completeness — missing values, outliers, type inconsistencies, duplicates
+        - ## Key Statistics — distributions, central tendencies, notable aggregations
+        - ## Patterns & Trends — correlations, time-based trends, clustering, segmentation
+        - ## Anomalies & Outliers — unexpected values, statistical deviations, edge cases
+        - ## Recommendations — concrete next steps based on findings
+
+        Be specific: cite exact column names, row counts, percentages, and sample values.
+        Use bullet lists for concise enumerations and markdown tables for structured comparisons.
 
         CHART SUGGESTIONS:
         Where a chart would help visualize an insight, include a chart marker on its own line:
@@ -488,8 +498,8 @@ internal sealed class DatasetInsightOrchestrator
 
         Rules for chart markers:
         - type must be one of: {ChartTypeList}
-        - IMPORTANT: x, y, and group in chart markers must be from these CHART-ELIGIBLE columns ONLY: {chartColumnList}
-        - The analysis columns ({columnList}) may include computed/derived columns that cannot be used in charts
+        - IMPORTANT: x, y, and group in chart markers should preferably come from these CHART-ELIGIBLE columns: {chartColumnList}
+        - The analysis columns ({columnList}) may include computed/derived columns — use them freely in prose analysis
         - agg is optional (use when y needs aggregation, e.g., sum of budget grouped by status)
         - group is required for stacked_bar and grouped_bar (categorical column to split series)
         - group is optional for bar and line (creates multi-series version)
@@ -501,6 +511,8 @@ internal sealed class DatasetInsightOrchestrator
 
         FORMATTING:
         - Use --- on its own line to insert a visual divider between major sections
+        - Use ### sub-headings within sections to break up distinct findings
+        - Use bullet lists (- item) for enumerating observations or recommendations
         - When presenting tabular data (e.g., top N values, comparisons, statistics), use markdown pipe tables:
           | Column A | Column B |
           |----------|----------|
@@ -513,13 +525,14 @@ internal sealed class DatasetInsightOrchestrator
     /// Strips advanced chart types and formatting to stay within budget.
     /// </summary>
     private static string BuildLocalSystemPrompt(string columnList, string chartColumnList) => $"""
-        You are a data analyst. Analyze the dataset and provide insights using ## headers.
-        Include: data quality, key statistics, patterns, and recommendations.
-        Reference actual column names.
+        You are a data scientist. Perform exploratory data analysis on the dataset below.
+        Organize findings into sections using ## headers: Data Quality, Key Statistics, Patterns, Recommendations.
+        Be specific — cite column names, row counts, percentages, and values.
+        Use bullet lists and markdown tables where appropriate.
 
         CHARTS (optional — include on own line):
         [CHART: type=TYPE | title=Title | x=column | y=column | agg=sum/count/avg]
-        Types: bar, line, pie. Chart columns must be from: {chartColumnList}
+        Types: bar, line, pie. Chart columns should be from: {chartColumnList}
         """;
 
     // ── Parsing helpers ─────────────────────────────────────────────────
