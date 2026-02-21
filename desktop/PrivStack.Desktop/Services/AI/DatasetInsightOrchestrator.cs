@@ -244,8 +244,8 @@ internal sealed class DatasetInsightOrchestrator
         {
             var line = lines[i];
 
-            // Chart marker — validate against chart-eligible columns (underlying dataset)
-            var chart = TryParseChartMarker(line, result.EffectiveChartColumns);
+            // Chart marker — validate against analysis columns (prompt guides AI toward chart-eligible ones)
+            var chart = TryParseChartMarker(line, result.Columns);
             if (chart != null)
             {
                 FlushParagraph(paragraph, blocks);
@@ -274,6 +274,34 @@ internal sealed class DatasetInsightOrchestrator
                 continue;
             }
 
+            // Markdown heading (### or deeper — ## are already parsed as section titles)
+            var headingMatch = HeadingRegex.Match(line);
+            if (headingMatch.Success)
+            {
+                FlushParagraph(paragraph, blocks);
+                var level = headingMatch.Groups[1].Value.Length;
+                var text = headingMatch.Groups[2].Value.Trim();
+                blocks.Add(InsightPageBuilder.BuildHeadingBlock(level, text));
+                i++;
+                continue;
+            }
+
+            // Bullet list (-, *, +)
+            if (BulletListRegex.IsMatch(line))
+            {
+                FlushParagraph(paragraph, blocks);
+                i = ConsumeListItems(lines, i, BulletListRegex, isBullet: true, blocks);
+                continue;
+            }
+
+            // Numbered list (1., 2., etc.)
+            if (NumberedListRegex.IsMatch(line))
+            {
+                FlushParagraph(paragraph, blocks);
+                i = ConsumeListItems(lines, i, NumberedListRegex, isBullet: false, blocks);
+                continue;
+            }
+
             paragraph.AppendLine(line);
             i++;
         }
@@ -283,6 +311,42 @@ internal sealed class DatasetInsightOrchestrator
 
     private static readonly Regex DividerRegex = new(
         @"^\s*[-*_]{3,}\s*$", RegexOptions.Compiled);
+
+    private static readonly Regex HeadingRegex = new(
+        @"^(#{1,6})\s+(.+)$", RegexOptions.Compiled);
+
+    private static readonly Regex BulletListRegex = new(
+        @"^\s*[-*+]\s+(.+)$", RegexOptions.Compiled);
+
+    private static readonly Regex NumberedListRegex = new(
+        @"^\s*\d+\.\s+(.+)$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Consumes consecutive list items matching the given regex and builds a single list block.
+    /// </summary>
+    private static int ConsumeListItems(
+        string[] lines, int startIndex, Regex itemRegex, bool isBullet, List<JsonObject> blocks)
+    {
+        var items = new List<string>();
+        var i = startIndex;
+
+        while (i < lines.Length)
+        {
+            var match = itemRegex.Match(lines[i]);
+            if (!match.Success) break;
+            items.Add(match.Groups[1].Value.Trim());
+            i++;
+        }
+
+        if (items.Count > 0)
+        {
+            blocks.Add(isBullet
+                ? InsightPageBuilder.BuildBulletListBlock(items)
+                : InsightPageBuilder.BuildNumberedListBlock(items));
+        }
+
+        return i;
+    }
 
     private static bool IsTableRow(string line)
     {

@@ -132,6 +132,49 @@ internal static class InsightPageBuilder
         };
     }
 
+    /// <summary>Builds a bullet_list block with the given items.</summary>
+    public static JsonObject BuildBulletListBlock(List<string> items)
+    {
+        var jsonItems = new JsonArray();
+        foreach (var item in items)
+        {
+            jsonItems.Add(new JsonObject
+            {
+                ["id"] = Guid.NewGuid().ToString(),
+                ["text"] = item,
+            });
+        }
+
+        return new JsonObject
+        {
+            ["id"] = Guid.NewGuid().ToString(),
+            ["type"] = "bullet_list",
+            ["items"] = jsonItems,
+        };
+    }
+
+    /// <summary>Builds a numbered_list block with the given items.</summary>
+    public static JsonObject BuildNumberedListBlock(List<string> items, int start = 1)
+    {
+        var jsonItems = new JsonArray();
+        foreach (var item in items)
+        {
+            jsonItems.Add(new JsonObject
+            {
+                ["id"] = Guid.NewGuid().ToString(),
+                ["text"] = item,
+            });
+        }
+
+        return new JsonObject
+        {
+            ["id"] = Guid.NewGuid().ToString(),
+            ["type"] = "numbered_list",
+            ["start"] = start,
+            ["items"] = jsonItems,
+        };
+    }
+
     /// <summary>
     /// Builds a dataset-backed chart block. Derives orientation, inner_radius_ratio,
     /// and show_legend from the chart type.
