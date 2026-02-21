@@ -10,11 +10,13 @@ using CommunityToolkit.Mvvm.Input;
 using PrivStack.Desktop.Plugins.Graph.Services;
 using PrivStack.Sdk;
 using PrivStack.UI.Adaptive.Models;
+using Serilog;
 
 namespace PrivStack.Desktop.Plugins.Graph.ViewModels;
 
 internal partial class EmbeddingSpaceViewModel : ViewModelBase
 {
+    private static readonly ILogger _log = Log.ForContext<EmbeddingSpaceViewModel>();
     private readonly EmbeddingDataService _dataService;
     private readonly IPluginSettings? _settings;
     private bool _isInitializing = true;
@@ -71,14 +73,24 @@ internal partial class EmbeddingSpaceViewModel : ViewModelBase
     [RelayCommand]
     public async Task LoadAsync()
     {
+        _log.Information("EmbeddingSpace: LoadAsync started, MaxPoints={Max}, Threshold={Threshold}",
+            MaxPoints, SimilarityThreshold);
         IsLoading = true;
         try
         {
             var entityTypes = BuildEntityTypeFilter();
+            _log.Information("EmbeddingSpace: entity type filter = {Types}",
+                entityTypes != null ? string.Join(", ", entityTypes) : "(all)");
             EmbeddingData = await _dataService.LoadAsync(
                 MaxPoints, SimilarityThreshold, MaxNeighbors, entityTypes);
             PointCount = EmbeddingData?.Points.Count ?? 0;
             EdgeCount = EmbeddingData?.Edges.Count ?? 0;
+            _log.Information("EmbeddingSpace: Loaded {Points} points, {Edges} edges",
+                PointCount, EdgeCount);
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "EmbeddingSpace: LoadAsync failed");
         }
         finally
         {
