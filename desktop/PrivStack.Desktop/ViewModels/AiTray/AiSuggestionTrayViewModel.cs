@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -6,6 +7,7 @@ using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.AI;
 using PrivStack.Desktop.Services.Plugin;
+using PrivStack.Sdk;
 using PrivStack.Sdk.Messaging;
 using PrivStack.Sdk.Services;
 using Serilog;
@@ -33,6 +35,7 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
     private readonly AiConversationStore _conversationStore;
     private readonly InfoPanelService _infoPanelService;
     private readonly IPluginRegistry _pluginRegistry;
+    private readonly IPrivStackSdk _sdk;
 
     /// <summary>
     /// Set by MainWindowViewModel to enable source entity navigation without coupling.
@@ -48,7 +51,8 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         AiMemoryExtractor memoryExtractor,
         AiConversationStore conversationStore,
         InfoPanelService infoPanelService,
-        IPluginRegistry pluginRegistry)
+        IPluginRegistry pluginRegistry,
+        IPrivStackSdk sdk)
     {
         _intentEngine = intentEngine;
         _dispatcher = dispatcher;
@@ -59,6 +63,7 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         _conversationStore = conversationStore;
         _infoPanelService = infoPanelService;
         _pluginRegistry = pluginRegistry;
+        _sdk = sdk;
 
         // Subscribe to IntentEngine events
         _intentEngine.SuggestionAdded += OnIntentSuggestionAdded;
@@ -116,30 +121,64 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
 
     // ── Active Item Context ──────────────────────────────────────────
 
-    private string? _activeItemContextBlock;
+    private string? _activeItemContextShort;
+    private string? _activeItemContextFull;
 
     private void OnActiveItemChanged()
-    {
-        _activeItemContextBlock = BuildActiveItemContext();
-    }
-
-    private string? BuildActiveItemContext()
     {
         var linkType = _infoPanelService.ActiveLinkType;
         var itemId = _infoPanelService.ActiveItemId;
         var title = _infoPanelService.ActiveItemTitle;
 
         if (string.IsNullOrEmpty(linkType) || string.IsNullOrEmpty(itemId) || string.IsNullOrEmpty(title))
-            return null;
-
-        var details = _infoPanelService.ActiveItemDetails;
-        if (details is { Count: > 0 })
         {
-            var fields = string.Join(", ", details.Select(d => $"{d.Label}: {d.Value}"));
-            return $"The user is currently viewing: {title} ({linkType}). Details: {fields}";
+            _activeItemContextShort = null;
+            _activeItemContextFull = null;
+            return;
         }
 
-        return $"The user is currently viewing: {title} ({linkType})";
+        _activeItemContextShort = $"Currently viewing: {title} ({linkType})";
+        _activeItemContextFull = _activeItemContextShort; // default until entity loads
+
+        _ = FetchActiveItemEntityAsync(linkType, itemId, title);
+    }
+
+    private async Task FetchActiveItemEntityAsync(string linkType, string itemId, string title)
+    {
+        try
+        {
+            var entityType = EntityTypeMap.GetEntityType(linkType);
+            if (entityType == null) return;
+
+            var response = await _sdk.SendAsync<JsonElement>(new SdkMessage
+            {
+                PluginId = "privstack.graph",
+                Action = SdkAction.Read,
+                EntityType = entityType,
+                EntityId = itemId,
+            });
+
+            if (!response.Success || response.Data.ValueKind == JsonValueKind.Undefined) return;
+
+            // Verify we're still looking at the same item
+            if (_infoPanelService.ActiveItemId != itemId) return;
+
+            var json = JsonSerializer.Serialize(response.Data, new JsonSerializerOptions { WriteIndented = true });
+
+            // Cap at ~8K chars to avoid blowing up the prompt on huge entities
+            const int maxContextChars = 8000;
+            if (json.Length > maxContextChars)
+                json = json[..maxContextChars] + "\n... (truncated)";
+
+            var displayName = EntityTypeMap.GetDisplayName(linkType) ?? linkType;
+            _activeItemContextFull =
+                $"The user is currently viewing a {displayName} item: \"{title}\"\n" +
+                $"Full entity data (JSON):\n```json\n{json}\n```";
+        }
+        catch (Exception ex)
+        {
+            _log.Debug(ex, "Failed to fetch active item entity for context: {LinkType}:{ItemId}", linkType, itemId);
+        }
     }
 
     // ── Commands ─────────────────────────────────────────────────────
