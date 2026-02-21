@@ -45,10 +45,12 @@ public partial class AiSuggestionTrayViewModel
 
         try
         {
+            var userName = _appSettings.Settings.UserDisplayName
+                ?? Environment.UserName ?? "there";
             var tier = AiPersona.Classify(text);
             var request = new AiRequest
             {
-                SystemPrompt = AiPersona.GetSystemPrompt(tier),
+                SystemPrompt = AiPersona.GetSystemPrompt(tier, userName),
                 UserPrompt = text,
                 MaxTokens = AiPersona.MaxTokensFor(tier),
                 Temperature = 0.4,
@@ -59,7 +61,7 @@ public partial class AiSuggestionTrayViewModel
 
             if (response.Success && !string.IsNullOrEmpty(response.Content))
             {
-                assistantMsg.Content = response.Content;
+                assistantMsg.Content = AiPersona.Sanitize(response.Content);
                 assistantMsg.State = ChatMessageState.Ready;
             }
             else

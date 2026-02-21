@@ -1,10 +1,12 @@
+using System.Text.RegularExpressions;
+
 namespace PrivStack.Desktop;
 
 /// <summary>
 /// Single source of truth for the AI assistant's persona and behavior.
 /// Change <see cref="Name"/> to rebrand the AI everywhere in the app.
 /// </summary>
-public static class AiPersona
+public static partial class AiPersona
 {
     public const string Name = "Duncan";
 
@@ -81,45 +83,68 @@ public static class AiPersona
     {
         var lower = userMessage.ToLowerInvariant();
 
-        // Check Long first (most specific phrases)
         foreach (var kw in LongKeywords)
             if (lower.Contains(kw)) return ResponseTier.Long;
 
-        // Short signals (greetings, one-word messages, can't-do topics)
         if (userMessage.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length <= 3)
         {
             foreach (var kw in ShortKeywords)
                 if (lower.Contains(kw)) return ResponseTier.Short;
         }
 
-        // Medium signals
         foreach (var kw in MediumKeywords)
             if (lower.Contains(kw)) return ResponseTier.Medium;
 
-        // Very short messages default to Short
         if (userMessage.Length < 20)
             return ResponseTier.Short;
 
-        // Default
         return ResponseTier.Medium;
     }
 
     /// <summary>
     /// Builds the full system prompt with tier-appropriate length guidance.
+    /// The user's display name is injected so the assistant knows who it's talking to.
     /// </summary>
-    public static string GetSystemPrompt(ResponseTier tier) => $"""
-        You are {Name}, the built-in assistant for PrivStack (a local-first productivity app).
-
-        RULES — follow these strictly:
-        1. {LengthRule(tier)}
-        2. Plain text only. No markdown, no bullet lists, no headers, no formatting.
-        3. Never start with "I'm an AI" or describe what you are. Just answer.
-        4. Never repeat yourself across messages. If you already said something, don't restate it.
-        5. No filler phrases ("Great question!", "Sure!", "Of course!", "Absolutely!"). Get to the point.
-        6. If you can't do something (web access, real-time data, external lookups), say so in one line and offer what you CAN help with locally.
-        7. You run locally inside PrivStack. No internet access. Cannot browse, fetch URLs, check weather, or access any live data.
-        8. You CAN help with: writing, summarizing, brainstorming, formatting, answering knowledge questions, and working with the user's local PrivStack data.
-        9. Match the user's energy — casual gets casual, serious gets focused.
-        10. When unsure, ask a short clarifying question instead of guessing.
+    /// <remarks>
+    /// IMPORTANT: Do NOT put example conversations in this prompt. Local LLMs will
+    /// parrot them verbatim instead of treating them as behavioral guidance.
+    /// </remarks>
+    public static string GetSystemPrompt(ResponseTier tier, string userName) => $"""
+        You are {Name}. The user's name is {userName}.
+        You are a concise assistant inside PrivStack, a local productivity app.
+        You run offline with no internet access.
+        {LengthRule(tier)}
+        Never describe yourself or say what you are.
+        Never use filler phrases.
+        Never repeat prior answers.
+        Plain text only, no formatting.
+        If asked about weather, live data, or anything requiring internet, say you can't access the web in one short sentence.
         """;
+
+    // ── Response sanitization ────────────────────────────────────────
+
+    [GeneratedRegex(@"<\|?(system|user|assistant|end|im_start|im_end)\|?>", RegexOptions.IgnoreCase)]
+    private static partial Regex ChatTokenPattern();
+
+    [GeneratedRegex(@"^\s*-\s*(User|Assistant|Duncan|System)\s*:", RegexOptions.IgnoreCase | RegexOptions.Multiline)]
+    private static partial Regex RolePrefixPattern();
+
+    /// <summary>
+    /// Strips raw chat template tokens and role prefixes that local models sometimes leak.
+    /// </summary>
+    public static string Sanitize(string response)
+    {
+        if (string.IsNullOrEmpty(response)) return response;
+
+        // Strip raw chat tokens like <|assistant|>, <|end|>, <|im_start|>, etc.
+        var cleaned = ChatTokenPattern().Replace(response, "");
+
+        // Strip lines that start with role prefixes like "- User:", "Assistant:", "Duncan:"
+        cleaned = RolePrefixPattern().Replace(cleaned, "");
+
+        // Collapse excessive whitespace from removed tokens
+        cleaned = cleaned.Trim();
+
+        return cleaned;
+    }
 }
