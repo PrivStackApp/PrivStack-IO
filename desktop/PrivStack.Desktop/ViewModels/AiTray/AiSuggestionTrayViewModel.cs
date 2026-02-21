@@ -37,6 +37,7 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
     private readonly InfoPanelService _infoPanelService;
     private readonly IPluginRegistry _pluginRegistry;
     private readonly IPrivStackSdk _sdk;
+    private readonly RagSearchService _ragSearchService;
 
     /// <summary>
     /// Set by MainWindowViewModel to enable source entity navigation without coupling.
@@ -53,7 +54,8 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         AiConversationStore conversationStore,
         InfoPanelService infoPanelService,
         IPluginRegistry pluginRegistry,
-        IPrivStackSdk sdk)
+        IPrivStackSdk sdk,
+        RagSearchService ragSearchService)
     {
         _intentEngine = intentEngine;
         _dispatcher = dispatcher;
@@ -65,6 +67,7 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         _infoPanelService = infoPanelService;
         _pluginRegistry = pluginRegistry;
         _sdk = sdk;
+        _ragSearchService = ragSearchService;
 
         // Subscribe to IntentEngine events
         _intentEngine.SuggestionAdded += OnIntentSuggestionAdded;
