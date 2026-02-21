@@ -13,7 +13,7 @@ using PrivStack.UI.Adaptive.Models;
 
 namespace PrivStack.Desktop.Plugins.Graph.ViewModels;
 
-public partial class EmbeddingSpaceViewModel : ViewModelBase
+internal partial class EmbeddingSpaceViewModel : ViewModelBase
 {
     private readonly EmbeddingDataService _dataService;
     private readonly IPluginSettings? _settings;
