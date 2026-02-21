@@ -1,8 +1,8 @@
 // ============================================================================
 // File: EmbeddingDataService.cs
 // Description: Fetches RAG vector embeddings via FFI, projects 768-dim to 3D
-//              via random projection, and computes pairwise cosine similarity
-//              edges above a threshold.
+//              via random projection, and computes K-nearest-neighbor edges
+//              using cosine similarity with a minimum threshold cutoff.
 // ============================================================================
 
 using System.Runtime.InteropServices;
@@ -141,7 +141,7 @@ internal sealed class EmbeddingDataService
         List<double[]> embeddings, double threshold, int maxNeighbors)
     {
         var n = embeddings.Count;
-        var edges = new List<EmbeddingSimilarityEdge>();
+        if (n == 0) return [];
 
         // Pre-compute norms
         var norms = new double[n];
@@ -152,25 +152,53 @@ internal sealed class EmbeddingDataService
             norms[i] = Math.Sqrt(sum);
         }
 
-        // Track top-K neighbors per node
-        var neighborCounts = new int[n];
+        // KNN: For each point, find its top-K nearest neighbors by cosine similarity.
+        // This guarantees every point has connections regardless of threshold.
+        // The threshold acts as a minimum display cutoff for the weakest edges.
+        var topK = new (int Index, double Sim)[maxNeighbors];
+        var edgeSet = new HashSet<(int, int)>();
+        var edges = new List<EmbeddingSimilarityEdge>();
 
         for (int i = 0; i < n; i++)
         {
-            if (neighborCounts[i] >= maxNeighbors) continue;
+            // Find top-K neighbors for point i
+            int filled = 0;
+            double minSim = double.MaxValue;
+            int minIdx = 0;
 
-            for (int j = i + 1; j < n; j++)
+            for (int j = 0; j < n; j++)
             {
-                if (neighborCounts[i] >= maxNeighbors && neighborCounts[j] >= maxNeighbors)
-                    continue;
-
+                if (i == j) continue;
                 var sim = CosineSimilarity(embeddings[i], embeddings[j], norms[i], norms[j]);
-                if (sim >= threshold)
+
+                if (filled < maxNeighbors)
                 {
-                    edges.Add(new EmbeddingSimilarityEdge(i, j, sim));
-                    neighborCounts[i]++;
-                    neighborCounts[j]++;
+                    topK[filled] = (j, sim);
+                    if (sim < minSim) { minSim = sim; minIdx = filled; }
+                    filled++;
                 }
+                else if (sim > minSim)
+                {
+                    topK[minIdx] = (j, sim);
+                    // Recompute min
+                    minSim = double.MaxValue;
+                    for (int k = 0; k < maxNeighbors; k++)
+                    {
+                        if (topK[k].Sim < minSim) { minSim = topK[k].Sim; minIdx = k; }
+                    }
+                }
+            }
+
+            // Add edges (deduplicated)
+            for (int k = 0; k < filled; k++)
+            {
+                var j = topK[k].Index;
+                var sim = topK[k].Sim;
+                if (sim < threshold) continue; // threshold still filters the weakest
+
+                var key = i < j ? (i, j) : (j, i);
+                if (edgeSet.Add(key))
+                    edges.Add(new EmbeddingSimilarityEdge(key.Item1, key.Item2, sim));
             }
         }
 

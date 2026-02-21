@@ -25,7 +25,7 @@ internal partial class EmbeddingSpaceViewModel : ViewModelBase
     [ObservableProperty] private bool _isLoading;
 
     // Parameters
-    [ObservableProperty] private double _similarityThreshold = 0.85;
+    [ObservableProperty] private double _similarityThreshold = 0.55;
     [ObservableProperty] private int _maxPoints = 1000;
     [ObservableProperty] private int _maxNeighbors = 5;
     [ObservableProperty] private bool _autoRotate = true;
@@ -64,7 +64,7 @@ internal partial class EmbeddingSpaceViewModel : ViewModelBase
 
         if (_settings != null)
         {
-            _similarityThreshold = _settings.Get("emb_sim_threshold", 0.85);
+            _similarityThreshold = _settings.Get("emb_sim_threshold", 0.55);
             _maxPoints = _settings.Get("emb_max_points", 1000);
             _maxNeighbors = _settings.Get("emb_max_neighbors", 5);
             _autoRotate = _settings.Get("emb_auto_rotate", true);
