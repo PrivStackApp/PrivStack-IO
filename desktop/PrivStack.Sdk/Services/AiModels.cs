@@ -80,4 +80,5 @@ public sealed record AiModelInfo
     public required string DisplayName { get; init; }
     public long SizeBytes { get; init; }
     public bool IsDownloaded { get; init; }
+    public int ContextWindowTokens { get; init; }
 }
