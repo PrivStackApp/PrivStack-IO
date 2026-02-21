@@ -32,6 +32,30 @@ public record AiLocalModelOption(string Id, string DisplayName, string SizeText,
 public record SavedApiKeyEntry(string ProviderId, string ProviderDisplayName, string KeyHint);
 
 /// <summary>
+/// Represents an AI memory entry for display and inline editing in the settings audit list.
+/// </summary>
+public sealed partial class AiMemoryDisplayItem : ObservableObject
+{
+    public string Id { get; }
+    public string CategoryLabel { get; }
+    public string DateLabel { get; }
+
+    [ObservableProperty]
+    private string _content;
+
+    [ObservableProperty]
+    private bool _isEditing;
+
+    public AiMemoryDisplayItem(string id, string content, string categoryLabel, string dateLabel)
+    {
+        Id = id;
+        _content = content;
+        CategoryLabel = categoryLabel;
+        DateLabel = dateLabel;
+    }
+}
+
+/// <summary>
 /// AI settings section of the Settings panel.
 /// </summary>
 public partial class SettingsViewModel
@@ -97,6 +121,17 @@ public partial class SettingsViewModel
 
     [ObservableProperty]
     private bool _aiIntentAutoAnalyze = true;
+
+    [ObservableProperty]
+    private int _personalMemoryCount;
+
+    [ObservableProperty]
+    private int _dataMemoryCount;
+
+    [ObservableProperty]
+    private bool _isMemoryListVisible;
+
+    public ObservableCollection<AiMemoryDisplayItem> AiMemories { get; } = [];
 
     public ObservableCollection<AiProviderOption> AiProviderOptions { get; } = [];
     public ObservableCollection<AiModelInfo> AiCloudModels { get; } = [];
@@ -182,6 +217,7 @@ public partial class SettingsViewModel
         AiIntentEnabled = settings.AiIntentEnabled;
         AiIntentAutoAnalyze = settings.AiIntentAutoAnalyze;
 
+        RefreshMemoryCounts();
         LoadSavedApiKeys();
     }
 
@@ -515,5 +551,118 @@ public partial class SettingsViewModel
             EmbeddingModelDownloadProgress = modelManager.DownloadProgress;
             EmbeddingModelDownloadStatus = $"Downloading... {modelManager.DownloadProgress:F0}%";
         }
+    }
+
+    // ── AI Memory Management ──────────────────────────────────────────
+
+    private void RefreshMemoryCounts()
+    {
+        try
+        {
+            var memoryService = App.Services.GetRequiredService<AiMemoryService>();
+            PersonalMemoryCount = memoryService.PersonalMemoryCount;
+            DataMemoryCount = memoryService.DataMemoryCount;
+        }
+        catch { /* service may not be ready */ }
+    }
+
+    private void RefreshMemoryList()
+    {
+        AiMemories.Clear();
+        try
+        {
+            var memoryService = App.Services.GetRequiredService<AiMemoryService>();
+            foreach (var m in memoryService.Memories)
+            {
+                var categoryLabel = AiMemoryService.IsPersonalCategory(m.Category) ? "Personal" : "Data";
+                var dateLabel = m.CreatedAt.ToString("MMM d, yyyy");
+                AiMemories.Add(new AiMemoryDisplayItem(m.Id, m.Content, categoryLabel, dateLabel));
+            }
+        }
+        catch { /* service may not be ready */ }
+    }
+
+    [RelayCommand]
+    private void ToggleMemoryList()
+    {
+        IsMemoryListVisible = !IsMemoryListVisible;
+        if (IsMemoryListVisible)
+            RefreshMemoryList();
+    }
+
+    [RelayCommand]
+    private void DeleteMemory(AiMemoryDisplayItem? item)
+    {
+        if (item == null) return;
+
+        var memoryService = App.Services.GetRequiredService<AiMemoryService>();
+        memoryService.Remove(item.Id);
+        AiMemories.Remove(item);
+        RefreshMemoryCounts();
+    }
+
+    [RelayCommand]
+    private void EditMemory(AiMemoryDisplayItem? item)
+    {
+        if (item == null) return;
+        item.IsEditing = true;
+    }
+
+    [RelayCommand]
+    private void SaveMemory(AiMemoryDisplayItem? item)
+    {
+        if (item == null) return;
+        item.IsEditing = false;
+
+        var memoryService = App.Services.GetRequiredService<AiMemoryService>();
+        memoryService.Update(item.Id, item.Content);
+    }
+
+    [RelayCommand]
+    private async Task ClearPersonalMemoriesAsync()
+    {
+        var confirmed = await _dialogService.ShowConfirmationAsync(
+            "Clear Personal Memories",
+            "This will delete all personal memories (preferences, personal facts) the AI has learned about you. This cannot be undone.",
+            "Clear");
+
+        if (!confirmed) return;
+
+        var memoryService = App.Services.GetRequiredService<AiMemoryService>();
+        memoryService.ClearPersonalMemories();
+        RefreshMemoryCounts();
+        if (IsMemoryListVisible) RefreshMemoryList();
+    }
+
+    [RelayCommand]
+    private async Task ClearDataMemoriesAsync()
+    {
+        var confirmed = await _dialogService.ShowConfirmationAsync(
+            "Clear Data Memories",
+            "This will delete all data-derived memories (content from notes, tasks, and other plugins). This cannot be undone.",
+            "Clear");
+
+        if (!confirmed) return;
+
+        var memoryService = App.Services.GetRequiredService<AiMemoryService>();
+        memoryService.ClearDataMemories();
+        RefreshMemoryCounts();
+        if (IsMemoryListVisible) RefreshMemoryList();
+    }
+
+    [RelayCommand]
+    private async Task ClearAllMemoriesAsync()
+    {
+        var confirmed = await _dialogService.ShowConfirmationAsync(
+            "Clear All Memories",
+            "This will delete all AI memories — both personal and data-derived. This cannot be undone.",
+            "Clear All");
+
+        if (!confirmed) return;
+
+        var memoryService = App.Services.GetRequiredService<AiMemoryService>();
+        memoryService.ClearAll();
+        RefreshMemoryCounts();
+        if (IsMemoryListVisible) RefreshMemoryList();
     }
 }

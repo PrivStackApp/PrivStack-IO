@@ -81,6 +81,27 @@ internal sealed class AiMemoryService
         _log.Information("All AI memories cleared");
     }
 
+    public void ClearPersonalMemories()
+    {
+        var removed = _memories.RemoveAll(m => IsPersonalCategory(m.Category));
+        Save();
+        _log.Information("Cleared {Count} personal AI memories", removed);
+    }
+
+    public void ClearDataMemories()
+    {
+        var removed = _memories.RemoveAll(m => !IsPersonalCategory(m.Category));
+        Save();
+        _log.Information("Cleared {Count} data AI memories", removed);
+    }
+
+    public int PersonalMemoryCount => _memories.Count(m => IsPersonalCategory(m.Category));
+
+    public int DataMemoryCount => _memories.Count(m => !IsPersonalCategory(m.Category));
+
+    internal static bool IsPersonalCategory(string? category)
+        => category is "preference" or "personal";
+
     /// <summary>
     /// Formats all memories as a text block for injection into the system prompt.
     /// </summary>
