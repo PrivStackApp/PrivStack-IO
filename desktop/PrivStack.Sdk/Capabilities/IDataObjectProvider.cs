@@ -18,6 +18,9 @@ public interface IDataObjectProvider
     /// <summary>Execute an aggregate query for visualizations.</summary>
     Task<AggregateQueryResult> AggregateAsync(AggregateQuery query, CancellationToken ct = default);
 
+    /// <summary>Execute a grouped aggregate query for multi-series chart data.</summary>
+    Task<GroupedAggregateResult> AggregateGroupedAsync(GroupedAggregateQuery query, CancellationToken ct = default);
+
     /// <summary>Get all saved query views (queries with IsView=true).</summary>
     Task<IReadOnlyList<SavedQueryInfo>> GetSavedQueryViewsAsync(CancellationToken ct = default);
 }
