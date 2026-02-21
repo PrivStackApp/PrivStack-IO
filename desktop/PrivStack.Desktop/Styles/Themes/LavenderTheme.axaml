@@ -16,6 +16,9 @@
     <Color x:Key="ThemeSurface">#F8F6FC</Color>
     <Color x:Key="ThemeSurfaceElevated">#FFFFFF</Color>
     <Color x:Key="ThemeSurfaceGlass">#D9F7F4FB</Color>
+    <!-- Input background — TextBox, ComboBox, search fields -->
+    <Color x:Key="ThemeInputBackground">#FFFFFF</Color>
+
     <Color x:Key="ThemeSurfaceRecessed">#E6E0F0</Color>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -101,6 +104,7 @@
     <SolidColorBrush x:Key="ThemeSurfaceElevatedBrush" Color="{StaticResource ThemeSurfaceElevated}"/>
     <SolidColorBrush x:Key="ThemeSurfaceGlassBrush" Color="{StaticResource ThemeSurfaceGlass}"/>
     <SolidColorBrush x:Key="ThemeSurfaceRecessedBrush" Color="{StaticResource ThemeSurfaceRecessed}"/>
+    <SolidColorBrush x:Key="ThemeInputBackgroundBrush" Color="{StaticResource ThemeInputBackground}"/>
 
     <SolidColorBrush x:Key="ThemeBorderBrush" Color="{StaticResource ThemeBorder}"/>
     <SolidColorBrush x:Key="ThemeBorderSubtleBrush" Color="{StaticResource ThemeBorderSubtle}"/>

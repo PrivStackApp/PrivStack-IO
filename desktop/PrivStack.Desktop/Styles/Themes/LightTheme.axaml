@@ -24,6 +24,9 @@
     <!-- Glass surface - semi-transparent overlay panels -->
     <Color x:Key="ThemeSurfaceGlass">#CCFAFAFD</Color>
 
+    <!-- Input background — TextBox, ComboBox, search fields -->
+    <Color x:Key="ThemeInputBackground">#FFFFFF</Color>
+
     <!-- Recessed surface — inset areas, code blocks, sidebar backgrounds -->
     <Color x:Key="ThemeSurfaceRecessed">#E6E6F2</Color>
 
@@ -149,6 +152,7 @@
     <SolidColorBrush x:Key="ThemeSurfaceElevatedBrush" Color="{StaticResource ThemeSurfaceElevated}"/>
     <SolidColorBrush x:Key="ThemeSurfaceGlassBrush" Color="{StaticResource ThemeSurfaceGlass}"/>
     <SolidColorBrush x:Key="ThemeSurfaceRecessedBrush" Color="{StaticResource ThemeSurfaceRecessed}"/>
+    <SolidColorBrush x:Key="ThemeInputBackgroundBrush" Color="{StaticResource ThemeInputBackground}"/>
 
     <!-- Border Brushes -->
     <SolidColorBrush x:Key="ThemeBorderBrush" Color="{StaticResource ThemeBorder}"/>
