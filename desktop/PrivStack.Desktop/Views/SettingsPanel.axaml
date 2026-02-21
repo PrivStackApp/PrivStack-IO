@@ -819,6 +819,11 @@
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
+                            <TextBlock Text="{Binding AiModelSaveStatus}"
+                                       IsVisible="{Binding AiModelSaveStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       Foreground="#4CAF50"
+                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Margin="0,-4,0,0"/>
                         </StackPanel>
 
                         <!-- Local model (download + selection) -->
