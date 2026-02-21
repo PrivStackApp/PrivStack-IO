@@ -71,6 +71,34 @@ internal static partial class NativeLibrary
     public static partial nint Search(string queryJson);
 
     // =========================================================================
+    // RAG Vector Index
+    // =========================================================================
+
+    /// <summary>
+    /// Upsert a RAG vector entry. Returns JSON response (free with FreeString).
+    /// </summary>
+    [LibraryImport(LibraryName, EntryPoint = "privstack_rag_upsert", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial nint RagUpsert(string json);
+
+    /// <summary>
+    /// Search RAG vectors by cosine similarity. Returns JSON response (free with FreeString).
+    /// </summary>
+    [LibraryImport(LibraryName, EntryPoint = "privstack_rag_search", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial nint RagSearch(string json);
+
+    /// <summary>
+    /// Delete all RAG vectors for an entity. Returns JSON response (free with FreeString).
+    /// </summary>
+    [LibraryImport(LibraryName, EntryPoint = "privstack_rag_delete", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial nint RagDelete(string json);
+
+    /// <summary>
+    /// Get content hashes for RAG vectors (incremental indexing). Returns JSON response (free with FreeString).
+    /// </summary>
+    [LibraryImport(LibraryName, EntryPoint = "privstack_rag_get_hashes", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial nint RagGetHashes(string json);
+
+    // =========================================================================
     // App-Level Authentication
     // =========================================================================
 

@@ -10,6 +10,7 @@
 
 mod cloud;
 mod datasets;
+mod rag;
 #[cfg(target_os = "android")]
 mod android_jni;
 
@@ -5715,7 +5716,7 @@ pub extern "C" fn privstack_compact_databases() -> *mut c_char {
 }
 
 /// Helper: allocate a C string from a Rust &str. Caller must free with `privstack_free_string`.
-fn to_c_string(s: &str) -> *mut c_char {
+pub(crate) fn to_c_string(s: &str) -> *mut c_char {
     CString::new(s).unwrap_or_default().into_raw()
 }
 

@@ -101,6 +101,12 @@ public static class ServiceRegistration
         services.AddSingleton<INavigationService, Sdk.NavigationServiceAdapter>();
         services.AddSingleton<AI.DatasetInsightOrchestrator>();
 
+        // RAG pipeline (embedding + indexing + search)
+        services.AddSingleton<EmbeddingModelManager>();
+        services.AddSingleton<EmbeddingService>();
+        services.AddSingleton<RagIndexService>();
+        services.AddSingleton<RagSearchService>();
+
         // IPC server for browser extension bridge
         services.AddSingleton<IpcMessageRouter>();
         services.AddSingleton<IpcServer>();
