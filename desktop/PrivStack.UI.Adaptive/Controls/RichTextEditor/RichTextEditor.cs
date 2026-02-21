@@ -176,6 +176,10 @@ public sealed class RichTextEditor : Control
     /// <summary>Fired when mouse leaves a privstack:// internal link. Args: (linkType, itemId). Used to cancel prefetch.</summary>
     public event Action<string, string>? InternalLinkUnhovered;
 
+    /// <summary>Fired when a drag selection escapes the bounds of this editor.
+    /// Args: (blockId, direction) where direction is +1 (below) or -1 (above).</summary>
+    public event Action<string, int>? DragSelectionEscaped;
+
     // Track the currently hovered internal link for hover/unhover events
     private (string LinkType, string ItemId)? _hoveredInternalLink;
 
@@ -272,6 +276,36 @@ public sealed class RichTextEditor : Control
         _caret.SelectionAnchor = start;
         _caret.Position = end;
         InvalidateVisual();
+    }
+
+    /// <summary>Selects from anchor (or 0) to end of document.</summary>
+    public void SelectToEnd()
+    {
+        var anchor = _caret.SelectionAnchor ?? 0;
+        SetSelection(anchor, _doc.Length);
+    }
+
+    /// <summary>Selects from anchor (or end) to start of document.</summary>
+    public void SelectToStart()
+    {
+        var anchor = _caret.SelectionAnchor ?? _doc.Length;
+        SetSelection(0, anchor);
+    }
+
+    /// <summary>Releases drag state and pointer capture (for external cross-block takeover).</summary>
+    public void ReleaseDragCapture()
+    {
+        _isDragging = false;
+    }
+
+    /// <summary>Returns the current selection anchor position (char index), or null if none.</summary>
+    public int? SelectionAnchor => _caret.SelectionAnchor;
+
+    /// <summary>Hit-test a local point to get the character index.</summary>
+    public int HitTestPoint(Point localPoint)
+    {
+        var adjusted = new Point(localPoint.X, localPoint.Y - _renderYOffset);
+        return _layout.HitTest(adjusted);
     }
 
     /// <summary>
@@ -803,6 +837,27 @@ public sealed class RichTextEditor : Control
         }
 
         if (!_isDragging) return;
+
+        // Detect drag escaping editor bounds — hand off to parent for cross-block selection
+        if (DragSelectionEscaped != null && rawPos.Y < 0)
+        {
+            // Dragging above: select from anchor to start, fire escape
+            SelectToStart();
+            _isDragging = false;
+            e.Pointer.Capture(null);
+            DragSelectionEscaped.Invoke(_blockId, -1);
+            return;
+        }
+
+        if (DragSelectionEscaped != null && rawPos.Y > Bounds.Height)
+        {
+            // Dragging below: select from anchor to end, fire escape
+            SelectToEnd();
+            _isDragging = false;
+            e.Pointer.Capture(null);
+            DragSelectionEscaped.Invoke(_blockId, 1);
+            return;
+        }
 
         _caret.Position = charIndex;
         _caret.ResetBlink();
