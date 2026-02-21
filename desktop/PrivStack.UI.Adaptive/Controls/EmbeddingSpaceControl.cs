@@ -68,6 +68,37 @@ public sealed partial class EmbeddingSpaceControl : Control
         InvalidateVisual();
     }
 
+    public void UpdateNeighborHighlights(int selectedIndex)
+    {
+        if (_data == null) return;
+
+        // Clear all neighbor state
+        foreach (var p in _data.Points)
+        {
+            p.IsNeighborOfSelected = false;
+            p.NeighborSimilarity = 0;
+        }
+
+        if (selectedIndex < 0 || _data.Edges == null) return;
+
+        // Mark neighbors connected by edges
+        foreach (var edge in _data.Edges)
+        {
+            if (edge.SourceIndex == selectedIndex && edge.TargetIndex < _data.Points.Count)
+            {
+                _data.Points[edge.TargetIndex].IsNeighborOfSelected = true;
+                _data.Points[edge.TargetIndex].NeighborSimilarity = edge.Similarity;
+            }
+            else if (edge.TargetIndex == selectedIndex && edge.SourceIndex < _data.Points.Count)
+            {
+                _data.Points[edge.SourceIndex].IsNeighborOfSelected = true;
+                _data.Points[edge.SourceIndex].NeighborSimilarity = edge.Similarity;
+            }
+        }
+
+        InvalidateVisual();
+    }
+
     private void StartTimer()
     {
         if (_timer != null) return;
@@ -150,13 +181,18 @@ public sealed partial class EmbeddingSpaceControl : Control
         DrawEdges(context, points);
 
         // Draw points (far to near)
+        var hasSelection = points.Any(p => p.IsSelected);
         foreach (var idx in _depthOrder)
         {
             var p = points[idx];
             if (p.ScreenRadius <= 0) continue;
 
             var brush = GetEntityBrush(p.EntityType);
-            var opacity = p.IsSelected ? 1.0 : p.IsHovered ? 0.9 : 0.7;
+            var opacity = p.IsSelected ? 1.0
+                : p.IsHovered ? 0.9
+                : hasSelection && !p.IsNeighborOfSelected ? 0.15
+                : p.IsNeighborOfSelected ? 0.95
+                : 0.7;
 
             if (brush is ISolidColorBrush scb)
             {
@@ -193,8 +229,9 @@ public sealed partial class EmbeddingSpaceControl : Control
     {
         if (_data?.Edges == null) return;
 
-        var edgeBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
-        var edgePen = new Pen(edgeBrush, 0.5);
+        var hasSelection = points.Any(p => p.IsSelected);
+        var defaultPen = new Pen(new SolidColorBrush(Color.FromArgb(hasSelection ? (byte)30 : (byte)100, 255, 255, 255)), 1.0);
+        var highlightPen = new Pen(new SolidColorBrush(Color.FromArgb(220, 100, 200, 255)), 1.5);
 
         foreach (var edge in _data.Edges)
         {
@@ -202,7 +239,18 @@ public sealed partial class EmbeddingSpaceControl : Control
             var s = points[edge.SourceIndex];
             var t = points[edge.TargetIndex];
             if (s.ScreenRadius <= 0 || t.ScreenRadius <= 0) continue;
-            context.DrawLine(edgePen, new Point(s.ScreenX, s.ScreenY), new Point(t.ScreenX, t.ScreenY));
+
+            var isHighlighted = s.IsSelected || t.IsSelected;
+            var pen = isHighlighted ? highlightPen : defaultPen;
+            context.DrawLine(pen, new Point(s.ScreenX, s.ScreenY), new Point(t.ScreenX, t.ScreenY));
+
+            // Draw similarity label on highlighted edges
+            if (isHighlighted)
+            {
+                var midX = (s.ScreenX + t.ScreenX) / 2;
+                var midY = (s.ScreenY + t.ScreenY) / 2;
+                DrawLabel(context, $"{edge.Similarity:F2}", midX, midY);
+            }
         }
     }
 

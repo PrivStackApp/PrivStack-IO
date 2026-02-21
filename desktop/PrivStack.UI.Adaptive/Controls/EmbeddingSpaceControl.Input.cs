@@ -132,13 +132,14 @@ public sealed partial class EmbeddingSpaceControl
 
         DeselectAll();
         _data.Points[index].IsSelected = true;
+        UpdateNeighborHighlights(index);
         PointClicked?.Invoke(index);
-        InvalidateVisual();
     }
 
     private void DeselectAll()
     {
         if (_data == null) return;
         foreach (var p in _data.Points) p.IsSelected = false;
+        UpdateNeighborHighlights(-1);
     }
 }

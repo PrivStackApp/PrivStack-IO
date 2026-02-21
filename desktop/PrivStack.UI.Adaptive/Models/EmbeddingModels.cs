@@ -27,6 +27,8 @@ public record EmbeddingPoint
     // Interaction state
     public bool IsSelected { get; set; }
     public bool IsHovered { get; set; }
+    public bool IsNeighborOfSelected { get; set; }
+    public double NeighborSimilarity { get; set; }
 }
 
 public readonly record struct EmbeddingSimilarityEdge(
