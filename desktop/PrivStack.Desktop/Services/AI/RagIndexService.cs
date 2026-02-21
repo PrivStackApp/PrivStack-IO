@@ -46,6 +46,27 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
 
         WeakReferenceMessenger.Default.Register<EntitySyncedMessage>(this);
         _consumerTask = Task.Run(() => ConsumeAsync(_disposeCts.Token));
+
+        // Auto-initialize if model is already downloaded (deferred to allow plugins to activate first)
+        _ = Task.Run(async () =>
+        {
+            // Wait for plugins to activate before attempting full index
+            await Task.Delay(TimeSpan.FromSeconds(5), _disposeCts.Token);
+            try
+            {
+                await _embeddingService.InitializeAsync(_disposeCts.Token);
+                if (_embeddingService.IsReady)
+                {
+                    _log.Information("Embedding model available on startup — starting full index");
+                    await StartFullIndexAsync(_disposeCts.Token);
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                _log.Debug(ex, "Auto-initialization of RAG index deferred (model not yet downloaded)");
+            }
+        });
     }
 
     // ── IRecipient<EntitySyncedMessage> ──

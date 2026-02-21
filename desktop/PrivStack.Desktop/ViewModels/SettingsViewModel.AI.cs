@@ -81,6 +81,18 @@ public partial class SettingsViewModel
     private string? _aiLocalModelDownloadStatus;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanDownloadEmbeddingModel))]
+    [NotifyPropertyChangedFor(nameof(EmbeddingModelDownloadLabel))]
+    [NotifyPropertyChangedFor(nameof(IsEmbeddingModelDownloaded))]
+    private bool _isEmbeddingModelDownloading;
+
+    [ObservableProperty]
+    private double _embeddingModelDownloadProgress;
+
+    [ObservableProperty]
+    private string? _embeddingModelDownloadStatus;
+
+    [ObservableProperty]
     private bool _aiIntentEnabled;
 
     [ObservableProperty]
@@ -107,6 +119,28 @@ public partial class SettingsViewModel
 
     public string AiLocalModelDownloadLabel =>
         SelectedAiLocalModel?.IsDownloaded == true ? "Downloaded" : "Download Model";
+
+    public bool IsEmbeddingModelDownloaded
+    {
+        get
+        {
+            try { return App.Services.GetRequiredService<EmbeddingModelManager>().IsModelDownloaded; }
+            catch { return false; }
+        }
+    }
+
+    public bool CanDownloadEmbeddingModel => !IsEmbeddingModelDownloaded && !IsEmbeddingModelDownloading;
+
+    public string EmbeddingModelDownloadLabel => IsEmbeddingModelDownloaded ? "Downloaded" : "Download Model";
+
+    public string EmbeddingModelSizeDisplay
+    {
+        get
+        {
+            try { return App.Services.GetRequiredService<EmbeddingModelManager>().ModelSizeDisplay; }
+            catch { return "~260 MB"; }
+        }
+    }
 
     // ── Initialization ─────────────────────────────────────────────────
 
@@ -399,6 +433,70 @@ public partial class SettingsViewModel
         }
     }
 
+    [RelayCommand]
+    private async Task DownloadEmbeddingModelAsync()
+    {
+        if (IsEmbeddingModelDownloaded) return;
+
+        try
+        {
+            IsEmbeddingModelDownloading = true;
+            EmbeddingModelDownloadStatus = "Downloading embedding model...";
+
+            var modelManager = App.Services.GetRequiredService<EmbeddingModelManager>();
+            modelManager.PropertyChanged += OnEmbeddingModelManagerPropertyChanged;
+
+            await modelManager.DownloadModelAsync();
+
+            EmbeddingModelDownloadStatus = "Download complete — initializing...";
+
+            // Initialize the embedding service now that the model is available
+            var embeddingService = App.Services.GetRequiredService<EmbeddingService>();
+            await embeddingService.InitializeAsync();
+
+            // Kick off full RAG index in the background
+            var ragIndexService = App.Services.GetRequiredService<RagIndexService>();
+            _ = Task.Run(() => ragIndexService.StartFullIndexAsync());
+
+            EmbeddingModelDownloadStatus = "Ready — indexing started";
+            OnPropertyChanged(nameof(IsEmbeddingModelDownloaded));
+            OnPropertyChanged(nameof(CanDownloadEmbeddingModel));
+            OnPropertyChanged(nameof(EmbeddingModelDownloadLabel));
+        }
+        catch (OperationCanceledException)
+        {
+            EmbeddingModelDownloadStatus = "Download cancelled";
+        }
+        catch (Exception ex)
+        {
+            EmbeddingModelDownloadStatus = $"Download failed: {ex.Message}";
+        }
+        finally
+        {
+            IsEmbeddingModelDownloading = false;
+            var modelManager = App.Services.GetRequiredService<EmbeddingModelManager>();
+            modelManager.PropertyChanged -= OnEmbeddingModelManagerPropertyChanged;
+        }
+    }
+
+    [RelayCommand]
+    private void DeleteEmbeddingModel()
+    {
+        try
+        {
+            var modelManager = App.Services.GetRequiredService<EmbeddingModelManager>();
+            modelManager.DeleteModel();
+            EmbeddingModelDownloadStatus = null;
+            OnPropertyChanged(nameof(IsEmbeddingModelDownloaded));
+            OnPropertyChanged(nameof(CanDownloadEmbeddingModel));
+            OnPropertyChanged(nameof(EmbeddingModelDownloadLabel));
+        }
+        catch (Exception ex)
+        {
+            EmbeddingModelDownloadStatus = $"Delete failed: {ex.Message}";
+        }
+    }
+
     private void OnAiModelManagerPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(AiModelManager.DownloadProgress))
@@ -406,6 +504,16 @@ public partial class SettingsViewModel
             var modelManager = App.Services.GetRequiredService<AiModelManager>();
             AiLocalModelDownloadProgress = modelManager.DownloadProgress;
             AiLocalModelDownloadStatus = $"Downloading... {modelManager.DownloadProgress:F0}%";
+        }
+    }
+
+    private void OnEmbeddingModelManagerPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(EmbeddingModelManager.DownloadProgress))
+        {
+            var modelManager = App.Services.GetRequiredService<EmbeddingModelManager>();
+            EmbeddingModelDownloadProgress = modelManager.DownloadProgress;
+            EmbeddingModelDownloadStatus = $"Downloading... {modelManager.DownloadProgress:F0}%";
         }
     }
 }

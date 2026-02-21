@@ -863,6 +863,57 @@
                             </StackPanel>
                         </StackPanel>
 
+                        <!-- Embedding Model (Semantic Search) -->
+                        <Border Classes="card" Padding="16,14" IsVisible="{Binding AiEnabled}">
+                            <StackPanel Spacing="10">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="Semantic Search"
+                                               FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Medium"/>
+                                    <Border CornerRadius="4" Padding="4,1" Background="{DynamicResource ThemeAlphaBadgeBrush}" VerticalAlignment="Center">
+                                        <TextBlock Text="Beta" FontSize="9" Foreground="{DynamicResource ThemeTextOnAccentBrush}" FontWeight="Bold"/>
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="Downloads a local embedding model to enable natural-language search across all your notes, tasks, contacts, and other content. Vectors are stored locally and never leave your device."
+                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           TextWrapping="Wrap"/>
+
+                                <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !IsEmbeddingModelDownloading}">
+                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock FontSize="{DynamicResource ThemeFontSizeXs}">
+                                            <Run Text="nomic-embed-text-v1.5 "/>
+                                            <Run Text="{Binding EmbeddingModelSizeDisplay}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                        <Button Content="{Binding EmbeddingModelDownloadLabel}"
+                                                Command="{Binding DownloadEmbeddingModelCommand}"
+                                                IsEnabled="{Binding CanDownloadEmbeddingModel}"
+                                                Padding="12,6"/>
+                                        <Button Content="Delete"
+                                                Command="{Binding DeleteEmbeddingModelCommand}"
+                                                IsVisible="{Binding IsEmbeddingModelDownloaded}"
+                                                Classes="danger"
+                                                Padding="12,6"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel Spacing="4" IsVisible="{Binding IsEmbeddingModelDownloading}">
+                                    <ProgressBar Minimum="0" Maximum="100"
+                                                 Value="{Binding EmbeddingModelDownloadProgress}"
+                                                 Height="6"/>
+                                    <TextBlock Text="{Binding EmbeddingModelDownloadStatus}"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                </StackPanel>
+
+                                <TextBlock Text="{Binding EmbeddingModelDownloadStatus}"
+                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeSuccessBrush}"
+                                           IsVisible="{Binding EmbeddingModelDownloadStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Temperature -->
                         <StackPanel Spacing="8" IsVisible="{Binding AiEnabled}">
                             <Grid ColumnDefinitions="*,Auto">
