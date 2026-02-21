@@ -243,14 +243,6 @@ public sealed partial class EmbeddingSpaceControl : Control
             var isHighlighted = s.IsSelected || t.IsSelected;
             var pen = isHighlighted ? highlightPen : defaultPen;
             context.DrawLine(pen, new Point(s.ScreenX, s.ScreenY), new Point(t.ScreenX, t.ScreenY));
-
-            // Draw similarity label on highlighted edges
-            if (isHighlighted)
-            {
-                var midX = (s.ScreenX + t.ScreenX) / 2;
-                var midY = (s.ScreenY + t.ScreenY) / 2;
-                DrawLabel(context, $"{edge.Similarity:F2}", midX, midY);
-            }
         }
     }
 

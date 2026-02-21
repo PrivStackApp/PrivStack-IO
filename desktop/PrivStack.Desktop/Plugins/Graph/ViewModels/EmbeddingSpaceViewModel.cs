@@ -18,6 +18,7 @@ internal partial class EmbeddingSpaceViewModel : ViewModelBase
 {
     private static readonly ILogger _log = Log.ForContext<EmbeddingSpaceViewModel>();
     private readonly EmbeddingDataService _dataService;
+    private readonly IInfoPanelService? _infoPanelService;
     private readonly IPluginSettings? _settings;
     private bool _isInitializing = true;
 
@@ -36,12 +37,8 @@ internal partial class EmbeddingSpaceViewModel : ViewModelBase
 
     // Selection
     [ObservableProperty] private int _selectedIndex = -1;
-    [ObservableProperty] private string? _selectedTitle;
-    [ObservableProperty] private string? _selectedEntityType;
-    [ObservableProperty] private string? _selectedChunkText;
-    [ObservableProperty] private List<NeighborInfo> _neighbors = [];
 
-    public record NeighborInfo(string Title, string EntityType, double Similarity);
+    private record NeighborInfo(string Title, string EntityType, double Similarity);
 
     // Entity type visibility
     [ObservableProperty] private bool _showNotes = true;
@@ -57,9 +54,10 @@ internal partial class EmbeddingSpaceViewModel : ViewModelBase
     public event EventHandler? RequestRefresh;
     public event EventHandler<bool>? AutoRotateChanged;
 
-    public EmbeddingSpaceViewModel(EmbeddingDataService dataService, IPluginSettings? settings = null)
+    public EmbeddingSpaceViewModel(EmbeddingDataService dataService, IInfoPanelService? infoPanelService = null, IPluginSettings? settings = null)
     {
         _dataService = dataService;
+        _infoPanelService = infoPanelService;
         _settings = settings;
 
         if (_settings != null)
@@ -113,9 +111,6 @@ internal partial class EmbeddingSpaceViewModel : ViewModelBase
         if (EmbeddingData == null || index < 0 || index >= EmbeddingData.Points.Count) return;
         var point = EmbeddingData.Points[index];
         SelectedIndex = index;
-        SelectedTitle = point.Title;
-        SelectedEntityType = point.EntityType;
-        SelectedChunkText = point.ChunkText;
 
         // Build neighbor list from edges
         var neighborList = new List<NeighborInfo>();
@@ -134,16 +129,25 @@ internal partial class EmbeddingSpaceViewModel : ViewModelBase
                 }
             }
         }
-        Neighbors = neighborList.OrderByDescending(n => n.Similarity).ToList();
+
+        // Push to shell info panel with details including chunk text and neighbors
+        if (_infoPanelService != null)
+        {
+            var details = new List<InfoPanelDetailField>();
+            if (!string.IsNullOrEmpty(point.ChunkText))
+                details.Add(new InfoPanelDetailField("Preview", point.ChunkText));
+
+            foreach (var n in neighborList.OrderByDescending(n => n.Similarity))
+                details.Add(new InfoPanelDetailField($"~{n.Similarity:F2}", n.Title));
+
+            _infoPanelService.SetActiveItem(point.LinkType, point.EntityId, point.Title, details);
+        }
     }
 
     public void OnPointDeselected()
     {
         SelectedIndex = -1;
-        SelectedTitle = null;
-        SelectedEntityType = null;
-        SelectedChunkText = null;
-        Neighbors = [];
+        _infoPanelService?.ClearActiveItem();
     }
 
     private string[]? BuildEntityTypeFilter()

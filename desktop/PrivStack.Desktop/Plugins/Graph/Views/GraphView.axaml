@@ -480,33 +480,6 @@
                             </StackPanel>
                         </Expander>
 
-                        <!-- Selection info -->
-                        <StackPanel x:Name="EmbeddingSelectionInfo" Spacing="4" IsVisible="False">
-                            <Border Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}" Margin="0,2"/>
-                            <TextBlock Text="SELECTED" FontSize="{DynamicResource ThemeFontSizeXsSm}" FontWeight="Bold" Opacity="0.5"/>
-                            <TextBlock Text="{Binding EmbeddingSpace.SelectedTitle}" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                       TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="3"
-                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                            <TextBlock Text="{Binding EmbeddingSpace.SelectedEntityType}" FontSize="{DynamicResource ThemeFontSizeXs}"
-                                       Opacity="0.5" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="{Binding EmbeddingSpace.SelectedChunkText}" FontSize="{DynamicResource ThemeFontSizeXs}"
-                                       TextWrapping="Wrap" MaxHeight="100" Opacity="0.6" TextTrimming="CharacterEllipsis"/>
-                            <!-- Neighbors list -->
-                            <TextBlock Text="NEIGHBORS" FontSize="{DynamicResource ThemeFontSizeXsSm}" FontWeight="Bold" Opacity="0.5" Margin="0,6,0,2"/>
-                            <ItemsControl ItemsSource="{Binding EmbeddingSpace.Neighbors}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid ColumnDefinitions="*,Auto" Margin="0,1">
-                                            <TextBlock Text="{Binding Title}" FontSize="{DynamicResource ThemeFontSizeXs}"
-                                                       TextTrimming="CharacterEllipsis" Opacity="0.8"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding Similarity, StringFormat='{}{0:F2}'}"
-                                                       FontSize="{DynamicResource ThemeFontSizeXs}" Opacity="0.5" Margin="4,0,0,0"/>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-
                         <Border Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}" Margin="0,2"/>
                         <Button Content="Refresh" Command="{Binding EmbeddingSpace.RefreshCommand}" Padding="12,8" HorizontalAlignment="Stretch"/>
                     </StackPanel>
