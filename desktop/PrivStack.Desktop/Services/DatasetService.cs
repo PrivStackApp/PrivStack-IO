@@ -329,48 +329,60 @@ public sealed partial class DatasetService : IDatasetService
     public Task<AggregateQueryResult> AggregateAsync(AggregateQuery query, CancellationToken ct)
     {
         var queryJson = JsonSerializer.Serialize(query, JsonOptions);
+        Log.Debug("AggregateAsync query: {Json}", queryJson);
         var ptr = DatasetNative.Aggregate(queryJson);
         try
         {
             var json = MarshalAndFree(ptr);
             if (json.Contains("\"error\""))
             {
-                Log.Warning("AggregateAsync error: {Json}", json);
-                return Task.FromResult(new AggregateQueryResult());
+                var errorMsg = ExtractErrorMessage(json);
+                Log.Warning("AggregateAsync error for dataset {DatasetId}: {Error}", query.DatasetId, errorMsg);
+                throw new InvalidOperationException($"Aggregate query failed: {errorMsg}");
             }
 
             var result = JsonSerializer.Deserialize<AggregateQueryResult>(json, JsonOptions)
                          ?? new AggregateQueryResult();
             return Task.FromResult(result);
         }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            Log.Error(ex, "AggregateAsync failed");
-            return Task.FromResult(new AggregateQueryResult());
+            Log.Error(ex, "AggregateAsync failed for dataset {DatasetId}", query.DatasetId);
+            throw;
         }
     }
 
     public Task<GroupedAggregateResult> AggregateGroupedAsync(GroupedAggregateQuery query, CancellationToken ct)
     {
         var queryJson = JsonSerializer.Serialize(query, JsonOptions);
+        Log.Debug("AggregateGroupedAsync query: {Json}", queryJson);
         var ptr = DatasetNative.AggregateGrouped(queryJson);
         try
         {
             var json = MarshalAndFree(ptr);
             if (json.Contains("\"error\""))
             {
-                Log.Warning("AggregateGroupedAsync error: {Json}", json);
-                return Task.FromResult(new GroupedAggregateResult());
+                var errorMsg = ExtractErrorMessage(json);
+                Log.Warning("AggregateGroupedAsync error for dataset {DatasetId}: {Error}", query.DatasetId, errorMsg);
+                throw new InvalidOperationException($"Grouped aggregate query failed: {errorMsg}");
             }
 
             var result = JsonSerializer.Deserialize<GroupedAggregateResult>(json, JsonOptions)
                          ?? new GroupedAggregateResult();
             return Task.FromResult(result);
         }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            Log.Error(ex, "AggregateGroupedAsync failed");
-            return Task.FromResult(new GroupedAggregateResult());
+            Log.Error(ex, "AggregateGroupedAsync failed for dataset {DatasetId}", query.DatasetId);
+            throw;
         }
     }
 
@@ -401,6 +413,18 @@ public sealed partial class DatasetService : IDatasetService
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────
+
+    private static string ExtractErrorMessage(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("error", out var errProp))
+                return errProp.GetString() ?? json;
+        }
+        catch { /* fallback to raw json */ }
+        return json;
+    }
 
     private static string MarshalAndFree(nint ptr)
     {
