@@ -1205,7 +1205,7 @@ impl EntityStore {
 
         let sql = format!(
             "SELECT entity_id, entity_type, plugin_id, chunk_path, title, link_type, \
-             embedding, chunk_text \
+             CAST(embedding AS VARCHAR), chunk_text \
              FROM rag_vectors {} LIMIT ?",
             type_filter
         );
@@ -1222,7 +1222,8 @@ impl EntityStore {
 
         let rows: Vec<serde_json::Value> = stmt
             .query_map(param_refs.as_slice(), |row| {
-                let embedding: Vec<f64> = row.get::<_, Vec<f64>>(6)?;
+                let emb_str: String = row.get::<_, String>(6)?;
+                let embedding: Vec<f64> = parse_duckdb_array(&emb_str);
                 Ok(serde_json::json!({
                     "entity_id": row.get::<_, String>(0)?,
                     "entity_type": row.get::<_, String>(1)?,
@@ -1239,6 +1240,19 @@ impl EntityStore {
 
         Ok(rows)
     }
+}
+
+/// Parses a DuckDB `CAST(DOUBLE[] AS VARCHAR)` result like `[0.1, 0.2, 0.3]`
+/// into a `Vec<f64>`. Returns empty vec on parse failure.
+fn parse_duckdb_array(s: &str) -> Vec<f64> {
+    let trimmed = s.trim().trim_start_matches('[').trim_end_matches(']');
+    if trimmed.is_empty() {
+        return vec![];
+    }
+    trimmed
+        .split(',')
+        .filter_map(|v| v.trim().parse::<f64>().ok())
+        .collect()
 }
 
 /// Returns the name of the primary database on this connection.
