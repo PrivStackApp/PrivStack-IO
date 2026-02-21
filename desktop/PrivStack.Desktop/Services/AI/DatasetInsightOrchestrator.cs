@@ -525,11 +525,16 @@ internal sealed class DatasetInsightOrchestrator
         yCol = validColumns.First(c => c.Equals(yCol, StringComparison.OrdinalIgnoreCase));
 
         props.TryGetValue("title", out var title);
+        if (title != null)
+            title = title.Trim('"', '\'');
+
         props.TryGetValue("agg", out var agg);
         props.TryGetValue("group", out var groupBy);
 
         if (agg != null && !ValidAggregations.Contains(agg.ToLowerInvariant()))
             agg = null;
+        else if (agg != null)
+            agg = agg.ToLowerInvariant();
 
         if (groupBy != null && !colSet.Contains(groupBy))
             groupBy = null;
