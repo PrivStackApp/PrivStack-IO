@@ -59,54 +59,25 @@ internal sealed class DatasetInsightOrchestrator
 
     private async Task GenerateInsightsAsync(DatasetInsightRequestMessage msg)
     {
-        var tabularText = BuildTabularText(msg.Columns, msg.ColumnTypes, msg.SampleRows);
+        var modelInfo = _aiService.GetActiveModelInfo();
+        var contextWindow = modelInfo?.ContextWindowTokens ?? 4_096;
+        var isLargeContext = contextWindow >= 100_000;
+
+        // Scale sample data budget and output tokens to model capability
+        var sampleBudget = isLargeContext ? 20_000 : 6_000;
+        var maxOutputTokens = isLargeContext ? 12_000 : 2_048;
+
+        var tabularText = BuildTabularText(msg.Columns, msg.ColumnTypes, msg.SampleRows, sampleBudget);
         var columnList = string.Join(", ", msg.Columns.Select((c, i) =>
             i < msg.ColumnTypes.Count ? $"{c} ({msg.ColumnTypes[i]})" : c));
 
+        var systemPrompt = isLargeContext
+            ? BuildCloudSystemPrompt(columnList)
+            : BuildLocalSystemPrompt(columnList);
+
         var request = new AiRequest
         {
-            SystemPrompt = $"""
-                You are a data analyst. Analyze the dataset below and provide structured insights.
-                Organize your response into sections using ## headers.
-                Include: data quality observations, key statistics, patterns, anomalies, and actionable recommendations.
-                Be specific and reference actual column names and values from the data.
-
-                CHART SUGGESTIONS:
-                Where a chart would help visualize an insight, include a chart marker on its own line:
-                [CHART: type=CHART_TYPE | title=Chart Title | x=column_name | y=column_name | agg=sum/count/avg/min/max | group=column_name]
-
-                Available chart types and when to use each:
-                - bar: Compare values across categories (e.g., revenue by product)
-                - line: Show trends over time or ordered sequences
-                - pie: Show proportions of a whole (best with <8 categories)
-                - donut: Same as pie but visually lighter — prefer for fewer categories
-                - area: Like line but emphasizes volume/magnitude of change over time
-                - scatter: Show correlation between two numeric columns
-                - stacked_bar: Compare totals AND their sub-component breakdown (requires group=column)
-                - grouped_bar: Side-by-side comparison of sub-groups within categories (requires group=column)
-                - horizontal_bar: Like bar but horizontal — better for long category labels or ranking
-                - timeline: NOT for insights (requires start/end date columns) — do not use
-
-                Rules for chart markers:
-                - type must be one of: {ChartTypeList}
-                - x and y must be exact column names from: {columnList}
-                - agg is optional (use when y needs aggregation, e.g., sum of budget grouped by status)
-                - group is required for stacked_bar and grouped_bar (categorical column to split series)
-                - group is optional for bar and line (creates multi-series version)
-                - For pie/donut: x is the category/label column, y is the value column
-                - For scatter: x and y should both be numeric columns
-                - Place the chart marker right after the paragraph that describes the insight it visualizes
-                - Only suggest charts where they genuinely add clarity — not every section needs one
-                - Prefer variety: use different chart types across sections when appropriate
-
-                FORMATTING:
-                - Use --- on its own line to insert a visual divider between major sections
-                - When presenting tabular data (e.g., top N values, comparisons, statistics), use markdown pipe tables:
-                  | Column A | Column B |
-                  |----------|----------|
-                  | value1   | value2   |
-                - Tables are rendered as rich interactive tables in the output — prefer them over bullet lists for structured data
-                """,
+            SystemPrompt = systemPrompt,
             UserPrompt = $"""
                 Dataset: "{msg.DatasetName}"
                 Total rows: {msg.TotalRowCount:N0}
@@ -115,7 +86,7 @@ internal sealed class DatasetInsightOrchestrator
 
                 {tabularText}
                 """,
-            MaxTokens = 4096,
+            MaxTokens = maxOutputTokens,
             Temperature = 0.3,
             FeatureId = "data.insights",
         };
@@ -383,12 +354,76 @@ internal sealed class DatasetInsightOrchestrator
         return parentId;
     }
 
+    // ── Prompt builders ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Full-featured prompt for cloud models with large context windows.
+    /// Includes all chart types, formatting instructions, and detailed guidance.
+    /// </summary>
+    private static string BuildCloudSystemPrompt(string columnList) => $"""
+        You are a data analyst. Analyze the dataset below and provide structured insights.
+        Organize your response into sections using ## headers.
+        Include: data quality observations, key statistics, patterns, anomalies, and actionable recommendations.
+        Be specific and reference actual column names and values from the data.
+
+        CHART SUGGESTIONS:
+        Where a chart would help visualize an insight, include a chart marker on its own line:
+        [CHART: type=CHART_TYPE | title=Chart Title | x=column_name | y=column_name | agg=sum/count/avg/min/max | group=column_name]
+
+        Available chart types and when to use each:
+        - bar: Compare values across categories (e.g., revenue by product)
+        - line: Show trends over time or ordered sequences
+        - pie: Show proportions of a whole (best with <8 categories)
+        - donut: Same as pie but visually lighter — prefer for fewer categories
+        - area: Like line but emphasizes volume/magnitude of change over time
+        - scatter: Show correlation between two numeric columns
+        - stacked_bar: Compare totals AND their sub-component breakdown (requires group=column)
+        - grouped_bar: Side-by-side comparison of sub-groups within categories (requires group=column)
+        - horizontal_bar: Like bar but horizontal — better for long category labels or ranking
+        - timeline: NOT for insights (requires start/end date columns) — do not use
+
+        Rules for chart markers:
+        - type must be one of: {ChartTypeList}
+        - x and y must be exact column names from: {columnList}
+        - agg is optional (use when y needs aggregation, e.g., sum of budget grouped by status)
+        - group is required for stacked_bar and grouped_bar (categorical column to split series)
+        - group is optional for bar and line (creates multi-series version)
+        - For pie/donut: x is the category/label column, y is the value column
+        - For scatter: x and y should both be numeric columns
+        - Place the chart marker right after the paragraph that describes the insight it visualizes
+        - Only suggest charts where they genuinely add clarity — not every section needs one
+        - Prefer variety: use different chart types across sections when appropriate
+
+        FORMATTING:
+        - Use --- on its own line to insert a visual divider between major sections
+        - When presenting tabular data (e.g., top N values, comparisons, statistics), use markdown pipe tables:
+          | Column A | Column B |
+          |----------|----------|
+          | value1   | value2   |
+        - Tables are rendered as rich interactive tables in the output — prefer them over bullet lists for structured data
+        """;
+
+    /// <summary>
+    /// Compact prompt for local models with limited context windows.
+    /// Strips advanced chart types and formatting to stay within budget.
+    /// </summary>
+    private static string BuildLocalSystemPrompt(string columnList) => $"""
+        You are a data analyst. Analyze the dataset and provide insights using ## headers.
+        Include: data quality, key statistics, patterns, and recommendations.
+        Reference actual column names.
+
+        CHARTS (optional — include on own line):
+        [CHART: type=TYPE | title=Title | x=column | y=column | agg=sum/count/avg]
+        Types: bar, line, pie. Columns must be from: {columnList}
+        """;
+
     // ── Parsing helpers ─────────────────────────────────────────────────
 
     private static string BuildTabularText(
         IReadOnlyList<string> columns,
         IReadOnlyList<string> columnTypes,
-        IReadOnlyList<IReadOnlyList<object?>> rows)
+        IReadOnlyList<IReadOnlyList<object?>> rows,
+        int charBudget = 6_000)
     {
         var sb = new StringBuilder();
 
@@ -400,7 +435,7 @@ internal sealed class DatasetInsightOrchestrator
         {
             var line = string.Join(" | ", row.Select(v => v?.ToString() ?? "NULL"));
             sb.AppendLine(line);
-            if (sb.Length > 6000) break;
+            if (sb.Length > charBudget) break;
         }
 
         return sb.ToString();
