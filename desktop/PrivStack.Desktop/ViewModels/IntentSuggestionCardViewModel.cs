@@ -1,6 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using PrivStack.Desktop.ViewModels.AiTray;
 using PrivStack.Sdk.Capabilities;
 using PrivStack.Sdk.Services;
 using Serilog;
@@ -11,7 +10,7 @@ namespace PrivStack.Desktop.ViewModels;
 /// ViewModel for a single intent suggestion card.
 /// Displays the suggestion summary, confidence, extracted slots, and action buttons.
 /// </summary>
-public partial class IntentSuggestionCardViewModel : ViewModelBase, IAiTrayCardViewModel
+public partial class IntentSuggestionCardViewModel : ViewModelBase
 {
     private static readonly ILogger _log = Log.ForContext<IntentSuggestionCardViewModel>();
 
@@ -23,13 +22,6 @@ public partial class IntentSuggestionCardViewModel : ViewModelBase, IAiTrayCardV
         _suggestion = suggestion;
         _intentEngine = intentEngine;
     }
-
-    // ── IAiTrayCardViewModel ─────────────────────────────────────────
-
-    public string CardId => _suggestion.SuggestionId;
-    string IAiTrayCardViewModel.Title => _suggestion.MatchedIntent.DisplayName;
-    string? IAiTrayCardViewModel.Summary => _suggestion.Summary;
-    public AiTrayCardType CardType => AiTrayCardType.Intent;
 
     // ── Display Properties ───────────────────────────────────────────
 
