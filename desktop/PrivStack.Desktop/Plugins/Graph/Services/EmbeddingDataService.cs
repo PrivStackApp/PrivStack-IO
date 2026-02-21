@@ -71,6 +71,7 @@ internal sealed class EmbeddingDataService
     {
         var request = new { entity_types = entityTypes, limit };
         var requestJson = JsonSerializer.Serialize(request);
+        _log.Information("RagFetchAll request: {Json}", requestJson);
         var resultPtr = NativeLib.RagFetchAll(requestJson);
 
         if (resultPtr == nint.Zero)
@@ -84,6 +85,11 @@ internal sealed class EmbeddingDataService
             var responseJson = Marshal.PtrToStringUTF8(resultPtr)
                 ?? throw new InvalidOperationException("Null string from FFI");
 
+            // Log first 500 chars of response for debugging
+            _log.Information("RagFetchAll response ({Len} chars): {Preview}",
+                responseJson.Length,
+                responseJson.Length > 500 ? responseJson[..500] + "..." : responseJson);
+
             using var doc = JsonDocument.Parse(responseJson);
             var root = doc.RootElement;
 
@@ -96,7 +102,10 @@ internal sealed class EmbeddingDataService
             }
 
             if (!root.TryGetProperty("data", out var dataProp) || dataProp.ValueKind != JsonValueKind.Array)
+            {
+                _log.Warning("RagFetchAll: no data array in response");
                 return [];
+            }
 
             var entries = new List<RawEmbeddingEntry>();
             foreach (var item in dataProp.EnumerateArray())
