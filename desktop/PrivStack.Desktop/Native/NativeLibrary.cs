@@ -93,6 +93,12 @@ internal static partial class NativeLibrary
     public static partial nint RagDelete(string json);
 
     /// <summary>
+    /// Delete all RAG vectors (data wipe/reseed). Returns JSON response (free with FreeString).
+    /// </summary>
+    [LibraryImport(LibraryName, EntryPoint = "privstack_rag_delete_all")]
+    public static partial nint RagDeleteAll();
+
+    /// <summary>
     /// Get content hashes for RAG vectors (incremental indexing). Returns JSON response (free with FreeString).
     /// </summary>
     [LibraryImport(LibraryName, EntryPoint = "privstack_rag_get_hashes", StringMarshalling = StringMarshalling.Utf8)]

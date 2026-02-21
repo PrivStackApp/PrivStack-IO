@@ -74,6 +74,13 @@ internal sealed class AiMemoryService
         SaveDebounced();
     }
 
+    public void ClearAll()
+    {
+        _memories.Clear();
+        Save();
+        _log.Information("All AI memories cleared");
+    }
+
     /// <summary>
     /// Formats all memories as a text block for injection into the system prompt.
     /// </summary>

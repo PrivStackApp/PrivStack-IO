@@ -1128,6 +1128,13 @@ impl EntityStore {
         Ok(())
     }
 
+    /// Delete all RAG vectors (used during data wipe/reseed).
+    pub fn rag_delete_all(&self) -> StorageResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM rag_vectors", params![])?;
+        Ok(())
+    }
+
     /// Get content hashes for all chunks of given entity types (for incremental skip).
     /// Returns (entity_id, chunk_path, content_hash) tuples.
     pub fn rag_get_hashes(

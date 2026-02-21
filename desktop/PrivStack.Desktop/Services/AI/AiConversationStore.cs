@@ -80,6 +80,13 @@ internal sealed class AiConversationStore
         SaveDebounced();
     }
 
+    public void ClearAll()
+    {
+        _sessions.Clear();
+        Save();
+        _log.Information("All AI conversation sessions cleared");
+    }
+
     public void Flush()
     {
         _saveTimer?.Stop();

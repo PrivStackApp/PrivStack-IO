@@ -1,11 +1,13 @@
 using System.Text.Json;
 using PrivStack.Desktop.Services.Abstractions;
+using PrivStack.Desktop.Services.AI;
 using PrivStack.Desktop.Services.Connections;
 using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Sdk;
 using PrivStack.Sdk.Capabilities;
 using PrivStack.Sdk.Helpers;
 using Serilog;
+using NativeLib = PrivStack.Desktop.Native.NativeLibrary;
 
 namespace PrivStack.Desktop.Services;
 
@@ -22,6 +24,8 @@ public sealed class SeedDataService
     private readonly IPluginRegistry _pluginRegistry;
     private readonly EntityMetadataService _entityMetadata;
     private readonly ConnectionService _connectionService;
+    private readonly AiConversationStore _conversationStore;
+    private readonly AiMemoryService _memoryService;
 
     /// <summary>
     /// System-level entity types that the host owns (not any plugin).
@@ -35,18 +39,22 @@ public sealed class SeedDataService
         ("privstack.system", "property_group"),
     ];
 
-    public SeedDataService(
+    internal SeedDataService(
         IPrivStackSdk sdk,
         IAppSettingsService appSettings,
         IPluginRegistry pluginRegistry,
         EntityMetadataService entityMetadata,
-        ConnectionService connectionService)
+        ConnectionService connectionService,
+        AiConversationStore conversationStore,
+        AiMemoryService memoryService)
     {
         _sdk = sdk;
         _appSettings = appSettings;
         _pluginRegistry = pluginRegistry;
         _entityMetadata = entityMetadata;
         _connectionService = connectionService;
+        _conversationStore = conversationStore;
+        _memoryService = memoryService;
     }
 
     /// <summary>
@@ -165,8 +173,48 @@ public sealed class SeedDataService
             }
         }
 
-        // 4. Disconnect all external service connections (GitHub, etc.)
+        // 4. Clear AI state (RAG vectors, conversation history, memories)
+        ClearAiState();
+
+        // 5. Disconnect all external service connections (GitHub, etc.)
         await DisconnectAllConnectionsAsync();
+    }
+
+    /// <summary>
+    /// Clears all AI-related state: RAG vectors, conversation history, and learned memories.
+    /// </summary>
+    private void ClearAiState()
+    {
+        try
+        {
+            // Clear RAG vector index
+            var resultPtr = NativeLib.RagDeleteAll();
+            if (resultPtr != nint.Zero)
+                NativeLib.FreeString(resultPtr);
+            _log.Information("RAG vector index cleared");
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Failed to clear RAG vectors during wipe");
+        }
+
+        try
+        {
+            _conversationStore.ClearAll();
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Failed to clear AI conversations during wipe");
+        }
+
+        try
+        {
+            _memoryService.ClearAll();
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Failed to clear AI memories during wipe");
+        }
     }
 
     /// <summary>
