@@ -58,20 +58,9 @@ internal sealed class EmbeddingService : IDisposable
 
             _tokenizer = await Task.Run(() =>
             {
-                using var stream = File.OpenRead(_modelManager.TokenizerPath);
-                return Tokenizer.CreateTiktokenForEncoding("cl100k_base");
+                using var vocabStream = File.OpenRead(_modelManager.VocabPath);
+                return Microsoft.ML.Tokenizers.WordPieceTokenizer.Create(vocabStream);
             }, ct);
-
-            // Try loading the actual tokenizer.json via the built-in API
-            try
-            {
-                _tokenizer = await Tokenizer.CreateAsync(_modelManager.TokenizerPath, ct);
-            }
-            catch (Exception ex)
-            {
-                _log.Warning(ex, "Failed to load tokenizer.json, falling back to cl100k_base");
-                // Keep the fallback tokenizer
-            }
 
             _log.Information("Embedding model loaded ({Dim}-dim)", EmbeddingDim);
         }
@@ -124,9 +113,10 @@ internal sealed class EmbeddingService : IDisposable
         var prefixedText = prefix + text;
 
         // Tokenize
-        var encoded = _tokenizer!.EncodeToIds(prefixedText, MaxTokens, out _, out _);
-        var inputIds = new long[encoded.Count];
-        for (var i = 0; i < encoded.Count; i++)
+        var encoded = _tokenizer!.EncodeToIds(prefixedText);
+        var tokenCount = Math.Min(encoded.Count, MaxTokens);
+        var inputIds = new long[tokenCount];
+        for (var i = 0; i < tokenCount; i++)
             inputIds[i] = encoded[i];
 
         var seqLen = inputIds.Length;

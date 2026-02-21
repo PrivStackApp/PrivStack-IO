@@ -2,7 +2,7 @@
 //!
 //! Provides upsert, search, delete, and hash-retrieval for semantic search vectors.
 
-use crate::{lock_handle, to_c_string, SdkResponse};
+use crate::{lock_handle, SdkResponse};
 use serde::Deserialize;
 use std::ffi::{c_char, CStr, CString};
 
