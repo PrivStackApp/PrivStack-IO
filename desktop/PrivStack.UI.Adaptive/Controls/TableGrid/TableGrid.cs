@@ -285,16 +285,11 @@ public sealed class TableGrid : Border
 
         _gridBorder = new Border
         {
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = new CornerRadius(0),
             ClipToBounds = true,
-            BoxShadow = BoxShadows.Parse("0 1 3 0 #18000000, 0 1 2 -1 #18000000"),
-            BorderThickness = new Thickness(1),
+            BorderThickness = new Thickness(0),
             Child = _scrollViewer
         };
-        _gridBorder.Bind(Border.BorderBrushProperty,
-            _gridBorder.GetResourceObservable("ThemeBorderSubtleBrush"));
-        _gridBorder.Bind(Border.BackgroundProperty,
-            _gridBorder.GetResourceObservable("ThemeSurfaceBrush"));
         root.Children.Add(_gridBorder);
         root.Children.Add(_captionBlock);
         root.Children.Add(_pagingBar);
