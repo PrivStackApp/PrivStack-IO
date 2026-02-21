@@ -656,6 +656,50 @@
         <!-- Subscription Detail Modal -->
         <views:SubscriptionDetailModal DataContext="{Binding SubscriptionBadgeVM}" ZIndex="1001"/>
 
+        <!-- Quick Action Overlay (modal backdrop + content) -->
+        <Border IsVisible="{Binding IsQuickActionOverlayOpen}"
+                ZIndex="1002"
+                Background="#80000000"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                PointerPressed="OnQuickActionBackdropPressed">
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MinWidth="400" MaxWidth="520"
+                    Background="{DynamicResource ThemeSurfaceBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource ThemeRadiusMd}"
+                    BoxShadow="0 8 32 0 #60000000"
+                    Padding="0"
+                    IsHitTestVisible="True"
+                    PointerPressed="OnQuickActionContentPressed">
+                <Grid RowDefinitions="Auto,*">
+                    <!-- Header -->
+                    <Border Grid.Row="0" Padding="20,16"
+                            BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+                            BorderThickness="0,0,0,1">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{Binding QuickActionOverlayTitle}"
+                                       FontWeight="SemiBold"
+                                       FontSize="{DynamicResource ThemeFontSizeMd}"
+                                       VerticalAlignment="Center"/>
+                            <Button Grid.Column="1"
+                                    Content="×"
+                                    Command="{Binding CloseQuickActionOverlayCommand}"
+                                    Background="Transparent"
+                                    FontSize="{DynamicResource ThemeFontSizeXl}"
+                                    Padding="8,2"
+                                    VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <!-- Dynamic content from the quick action provider -->
+                    <ContentPresenter Grid.Row="1" Content="{Binding QuickActionOverlayContent}"
+                                      Margin="20,16,20,20"/>
+                </Grid>
+            </Border>
+        </Border>
+
         <!-- Workspace Switcher Overlay -->
         <views:WorkspaceSwitcherOverlay DataContext="{Binding WorkspaceSwitcherVM}" ZIndex="1002"/>
 

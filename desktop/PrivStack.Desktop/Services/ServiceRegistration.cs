@@ -93,6 +93,7 @@ public static class ServiceRegistration
         services.AddSingleton<ViewStatePrefetchService>();
         services.AddSingleton<LinkProviderCacheService>();
         services.AddSingleton<IDatasetService, DatasetService>();
+        services.AddSingleton<QuickActionService>();
 
         // IPC server for browser extension bridge
         services.AddSingleton<IpcMessageRouter>();
