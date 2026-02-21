@@ -52,6 +52,7 @@ internal sealed class TableGridRowDrag
             Background = Brushes.Transparent,
             Cursor = new Cursor(StandardCursorType.Hand),
             Tag = rowIndex,
+            Opacity = 0,
             Child = new PathIcon
             {
                 Data = StreamGeometry.Parse("M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"),
@@ -63,6 +64,8 @@ internal sealed class TableGridRowDrag
             }
         };
 
+        handle.PointerEntered += (s, _) => { if (s is Border b) b.Opacity = 0.6; };
+        handle.PointerExited += (s, _) => { if (s is Border b && !_isDragging) b.Opacity = 0; };
         handle.PointerPressed += OnDragHandlePressed;
         handle.PointerMoved += OnDragHandleMoved;
         handle.PointerReleased += OnDragHandleReleased;
@@ -104,6 +107,10 @@ internal sealed class TableGridRowDrag
         _isDragging = false;
         e.Pointer.Capture(null);
         RemoveDropIndicator(grid);
+
+        // Reset handle opacity after drag ends
+        if (sender is Border dragHandle)
+            dragHandle.Opacity = 0;
 
         if (dropIndex >= 0 && dropIndex != _dragRowIndex && dropIndex != _dragRowIndex + 1)
         {
