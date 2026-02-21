@@ -975,6 +975,137 @@
                             </Grid>
                         </Border>
 
+                        <!-- AI Memory Management -->
+                        <StackPanel Spacing="8" IsVisible="{Binding AiEnabled}">
+                            <TextBlock Text="AI Memory" Classes="field-label"/>
+
+                            <!-- Personal Memories -->
+                            <Border Classes="card" Padding="16,14">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="Personal Memories"
+                                                       FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Medium"/>
+                                            <TextBlock Text="{Binding PersonalMemoryCount, StringFormat='{}{0} stored'}"
+                                                       FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Preferences and personal facts you've shared"
+                                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Clear"
+                                            Command="{Binding ClearPersonalMemoriesCommand}"
+                                            VerticalAlignment="Center"
+                                            Padding="12,6" FontSize="{DynamicResource ThemeFontSizeXs}"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Data Memories -->
+                            <Border Classes="card" Padding="16,14">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="Data Memories"
+                                                       FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Medium"/>
+                                            <TextBlock Text="{Binding DataMemoryCount, StringFormat='{}{0} stored'}"
+                                                       FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Content derived from notes, tasks, and other data"
+                                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Clear"
+                                            Command="{Binding ClearDataMemoriesCommand}"
+                                            VerticalAlignment="Center"
+                                            Padding="12,6" FontSize="{DynamicResource ThemeFontSizeXs}"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- View / Clear All row -->
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Button Grid.Column="0"
+                                        Command="{Binding ToggleMemoryListCommand}"
+                                        Padding="12,6" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                        HorizontalAlignment="Left">
+                                    <Panel>
+                                        <TextBlock Text="View All Memories" IsVisible="{Binding !IsMemoryListVisible}"/>
+                                        <TextBlock Text="Hide Memories" IsVisible="{Binding IsMemoryListVisible}"/>
+                                    </Panel>
+                                </Button>
+                                <Button Grid.Column="1" Content="Clear All Memories"
+                                        Command="{Binding ClearAllMemoriesCommand}"
+                                        Padding="12,6" FontSize="{DynamicResource ThemeFontSizeXs}"/>
+                            </Grid>
+
+                            <!-- Memory audit list -->
+                            <ItemsControl ItemsSource="{Binding AiMemories}" IsVisible="{Binding IsMemoryListVisible}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:AiMemoryDisplayItem">
+                                        <Border Classes="card" Padding="12,10" Margin="0,0,0,4">
+                                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                                                <!-- Category + Date -->
+                                                <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+                                                    <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="4" Padding="6,2">
+                                                        <TextBlock Text="{Binding CategoryLabel}"
+                                                                   FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                                    </Border>
+                                                    <TextBlock Text="{Binding DateLabel}"
+                                                               FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+
+                                                <!-- Action buttons -->
+                                                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                                    <!-- Edit button (visible when NOT editing) -->
+                                                    <Button Content="Edit"
+                                                            Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).EditMemoryCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            IsVisible="{Binding !IsEditing}"
+                                                            Padding="8,3" FontSize="{DynamicResource ThemeFontSize2Xs}"/>
+                                                    <!-- Save button (visible when editing) -->
+                                                    <Button Content="Save"
+                                                            Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).SaveMemoryCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            IsVisible="{Binding IsEditing}"
+                                                            Padding="8,3" FontSize="{DynamicResource ThemeFontSize2Xs}"/>
+                                                    <!-- Delete button -->
+                                                    <Button Content="&#x2715;"
+                                                            Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).DeleteMemoryCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            Padding="8,3" FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                            Foreground="{DynamicResource ThemeErrorBrush}"/>
+                                                </StackPanel>
+
+                                                <!-- Content (read-only) -->
+                                                <TextBlock Grid.Row="1" Grid.ColumnSpan="2"
+                                                           Text="{Binding Content}"
+                                                           IsVisible="{Binding !IsEditing}"
+                                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                           TextWrapping="Wrap"/>
+
+                                                <!-- Content (editing) -->
+                                                <TextBox Grid.Row="1" Grid.ColumnSpan="2"
+                                                         Text="{Binding Content, Mode=TwoWay}"
+                                                         IsVisible="{Binding IsEditing}"
+                                                         FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                         TextWrapping="Wrap"
+                                                         AcceptsReturn="True"
+                                                         MinHeight="40"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
                         <TextBlock Text="API keys are stored encrypted in your local vault. They never leave your device unencrypted."
                                    Foreground="{DynamicResource ThemeTextMutedBrush}"
                                    FontSize="{DynamicResource ThemeFontSizeXs}"

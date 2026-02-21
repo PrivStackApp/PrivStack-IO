@@ -209,11 +209,11 @@ public sealed class SeedDataService
 
         try
         {
-            _memoryService.ClearAll();
+            _memoryService.ClearDataMemories();
         }
         catch (Exception ex)
         {
-            _log.Warning(ex, "Failed to clear AI memories during wipe");
+            _log.Warning(ex, "Failed to clear data AI memories during wipe");
         }
     }
 
