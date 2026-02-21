@@ -39,6 +39,9 @@ internal partial class EmbeddingSpaceViewModel : ViewModelBase
     [ObservableProperty] private string? _selectedTitle;
     [ObservableProperty] private string? _selectedEntityType;
     [ObservableProperty] private string? _selectedChunkText;
+    [ObservableProperty] private List<NeighborInfo> _neighbors = [];
+
+    public record NeighborInfo(string Title, string EntityType, double Similarity);
 
     // Entity type visibility
     [ObservableProperty] private bool _showNotes = true;
@@ -113,6 +116,25 @@ internal partial class EmbeddingSpaceViewModel : ViewModelBase
         SelectedTitle = point.Title;
         SelectedEntityType = point.EntityType;
         SelectedChunkText = point.ChunkText;
+
+        // Build neighbor list from edges
+        var neighborList = new List<NeighborInfo>();
+        if (EmbeddingData.Edges != null)
+        {
+            foreach (var edge in EmbeddingData.Edges)
+            {
+                int neighborIdx = -1;
+                if (edge.SourceIndex == index) neighborIdx = edge.TargetIndex;
+                else if (edge.TargetIndex == index) neighborIdx = edge.SourceIndex;
+
+                if (neighborIdx >= 0 && neighborIdx < EmbeddingData.Points.Count)
+                {
+                    var np = EmbeddingData.Points[neighborIdx];
+                    neighborList.Add(new NeighborInfo(np.Title, np.EntityType, edge.Similarity));
+                }
+            }
+        }
+        Neighbors = neighborList.OrderByDescending(n => n.Similarity).ToList();
     }
 
     public void OnPointDeselected()
@@ -121,6 +143,7 @@ internal partial class EmbeddingSpaceViewModel : ViewModelBase
         SelectedTitle = null;
         SelectedEntityType = null;
         SelectedChunkText = null;
+        Neighbors = [];
     }
 
     private string[]? BuildEntityTypeFilter()
