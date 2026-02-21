@@ -17,6 +17,7 @@ internal static class IntentPromptBuilder
         sb.AppendLine("calendar.create_event = a CONFIRMED meeting/event at a specific time.");
         sb.AppendLine("tasks.create_task = something to DO (call, buy, send, fix, book, schedule).");
         sb.AppendLine("Generate a short clear title. Fill description with details from the text. Fill all applicable slots.");
+        sb.AppendLine("When a source entity is provided, use its title to generate a contextually accurate event/task title instead of generic labels.");
         sb.AppendLine();
 
         sb.AppendLine("Action IDs and slots:");
@@ -70,7 +71,9 @@ internal static class IntentPromptBuilder
 
     public static string BuildUserPrompt(string content, string? entityType, string? entityTitle)
     {
-        var sb = new StringBuilder(content.Length + 16);
+        var sb = new StringBuilder(content.Length + 128);
+        if (!string.IsNullOrEmpty(entityType) && !string.IsNullOrEmpty(entityTitle))
+            sb.AppendLine($"Source ({entityType}): \"{entityTitle}\"");
         sb.AppendLine("Text:");
         sb.Append(content.Length > 2000 ? content[..2000] + "..." : content);
         return sb.ToString();
