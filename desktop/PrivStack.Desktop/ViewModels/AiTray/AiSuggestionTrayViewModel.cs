@@ -112,6 +112,9 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
     private bool _isOpen;
 
     [ObservableProperty]
+    private bool _hasUnseenInsight;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasBalloonMessage))]
     private string? _balloonMessage;
 
