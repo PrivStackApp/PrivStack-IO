@@ -196,11 +196,19 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Row 3: Subtitle -->
-                    <TextBlock Grid.Row="3" Text="Your second brain, visualized"
-                               FontSize="{DynamicResource ThemeFontSizeSm}"
-                               Foreground="{DynamicResource ThemeTextMutedBrush}"
-                               Margin="0,2,0,0"/>
+                    <!-- Row 3: Tab strip -->
+                    <Border Grid.Row="3" Background="{DynamicResource ThemeSurfaceElevatedBrush}" CornerRadius="6" Padding="2"
+                            Margin="0,6,0,0" HorizontalAlignment="Left">
+                        <StackPanel Orientation="Horizontal" Spacing="2">
+                            <Button x:Name="TabKnowledgeGraph" Content="Knowledge Graph" Padding="10,6"
+                                    FontSize="{DynamicResource ThemeFontSizeSm}"
+                                    FontWeight="Bold"
+                                    Command="{Binding SwitchToKnowledgeGraphCommand}"/>
+                            <Button x:Name="TabEmbeddingSpace" Content="Embedding Space" Padding="10,6"
+                                    FontSize="{DynamicResource ThemeFontSizeSm}"
+                                    Command="{Binding SwitchToEmbeddingSpaceCommand}"/>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </Border>
 
@@ -226,7 +234,9 @@
                     </Border>
 
                     <ScrollViewer Grid.Row="1" Padding="8,4" IsVisible="{Binding !IsGraphSidebarCollapsed}">
-                    <StackPanel Spacing="8">
+                    <Grid>
+                    <!-- Knowledge Graph sidebar -->
+                    <StackPanel x:Name="KnowledgeGraphSidebar" Spacing="8">
 
                         <!-- View -->
                         <Expander IsExpanded="True" Padding="0" HorizontalAlignment="Stretch">
@@ -371,6 +381,119 @@
                         <Border Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}" Margin="0,2"/>
                         <Button Content="Clear Filters" Command="{Binding ClearFiltersCommand}" Padding="12,8" HorizontalAlignment="Stretch"/>
                     </StackPanel>
+
+                    <!-- Embedding Space sidebar -->
+                    <StackPanel x:Name="EmbeddingSpaceSidebar" Spacing="8" IsVisible="False">
+                        <Expander IsExpanded="True" Padding="0" HorizontalAlignment="Stretch">
+                            <Expander.Header>
+                                <TextBlock Text="PARAMETERS" FontSize="{DynamicResource ThemeFontSizeXsSm}" FontWeight="Bold" Opacity="0.5"
+                                           HorizontalAlignment="Stretch"/>
+                            </Expander.Header>
+                            <StackPanel Spacing="4" Margin="8,4">
+                                <StackPanel Spacing="2">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Text="Similarity" FontSize="{DynamicResource ThemeFontSizeXs}" Opacity="0.7"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding EmbeddingSpace.SimilarityThreshold, StringFormat='{}{0:F2}'}"
+                                                   FontSize="{DynamicResource ThemeFontSizeXs}" Opacity="0.5"/>
+                                    </Grid>
+                                    <Slider Value="{Binding EmbeddingSpace.SimilarityThreshold}" Minimum="0.7" Maximum="0.98"
+                                            TickFrequency="0.01" IsSnapToTickEnabled="True"/>
+                                </StackPanel>
+                                <StackPanel Spacing="2">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Text="Max Points" FontSize="{DynamicResource ThemeFontSizeXs}" Opacity="0.7"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding EmbeddingSpace.MaxPoints}"
+                                                   FontSize="{DynamicResource ThemeFontSizeXs}" Opacity="0.5"/>
+                                    </Grid>
+                                    <Slider Value="{Binding EmbeddingSpace.MaxPoints}" Minimum="100" Maximum="2000"
+                                            TickFrequency="100" IsSnapToTickEnabled="True"/>
+                                </StackPanel>
+                                <StackPanel Spacing="2">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Text="Max Neighbors" FontSize="{DynamicResource ThemeFontSizeXs}" Opacity="0.7"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding EmbeddingSpace.MaxNeighbors}"
+                                                   FontSize="{DynamicResource ThemeFontSizeXs}" Opacity="0.5"/>
+                                    </Grid>
+                                    <Slider Value="{Binding EmbeddingSpace.MaxNeighbors}" Minimum="1" Maximum="15"
+                                            TickFrequency="1" IsSnapToTickEnabled="True"/>
+                                </StackPanel>
+                                <CheckBox Content="Auto Rotate" IsChecked="{Binding EmbeddingSpace.AutoRotate}"
+                                          FontSize="{DynamicResource ThemeFontSizeXs}" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <Expander IsExpanded="True" Padding="0" HorizontalAlignment="Stretch">
+                            <Expander.Header>
+                                <TextBlock Text="ENTITY TYPES" FontSize="{DynamicResource ThemeFontSizeXsSm}" FontWeight="Bold" Opacity="0.5"
+                                           HorizontalAlignment="Stretch"/>
+                            </Expander.Header>
+                            <StackPanel Spacing="2" Margin="8,4">
+                                <ToggleButton Classes="node-legend" IsChecked="{Binding EmbeddingSpace.ShowNotes}">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Ellipse Width="10" Height="10" Classes="c-notes" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Grid.Column="1" Text="Notes" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </ToggleButton>
+                                <ToggleButton Classes="node-legend" IsChecked="{Binding EmbeddingSpace.ShowTasks}">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Ellipse Width="10" Height="10" Classes="c-tasks" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Grid.Column="1" Text="Tasks" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </ToggleButton>
+                                <ToggleButton Classes="node-legend" IsChecked="{Binding EmbeddingSpace.ShowContacts}">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Ellipse Width="10" Height="10" Classes="c-contacts" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Grid.Column="1" Text="Contacts" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </ToggleButton>
+                                <ToggleButton Classes="node-legend" IsChecked="{Binding EmbeddingSpace.ShowEvents}">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Ellipse Width="10" Height="10" Classes="c-events" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Grid.Column="1" Text="Events" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </ToggleButton>
+                                <ToggleButton Classes="node-legend" IsChecked="{Binding EmbeddingSpace.ShowJournal}">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Ellipse Width="10" Height="10" Classes="c-journal" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Grid.Column="1" Text="Journal" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </ToggleButton>
+                                <ToggleButton Classes="node-legend" IsChecked="{Binding EmbeddingSpace.ShowSnippets}">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Ellipse Width="10" Height="10" Classes="c-webclips" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Grid.Column="1" Text="Snippets" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </ToggleButton>
+                                <ToggleButton Classes="node-legend" IsChecked="{Binding EmbeddingSpace.ShowRss}">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Ellipse Width="10" Height="10" Classes="c-webclips" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Grid.Column="1" Text="RSS" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </ToggleButton>
+                                <ToggleButton Classes="node-legend" IsChecked="{Binding EmbeddingSpace.ShowFiles}">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Ellipse Width="10" Height="10" Classes="c-webclips" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Grid.Column="1" Text="Files" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </ToggleButton>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- Selection info -->
+                        <StackPanel x:Name="EmbeddingSelectionInfo" Spacing="4" IsVisible="False">
+                            <Border Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}" Margin="0,2"/>
+                            <TextBlock Text="SELECTED" FontSize="{DynamicResource ThemeFontSizeXsSm}" FontWeight="Bold" Opacity="0.5"/>
+                            <TextBlock Text="{Binding EmbeddingSpace.SelectedTitle}" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       TextWrapping="Wrap" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                            <TextBlock Text="{Binding EmbeddingSpace.SelectedEntityType}" FontSize="{DynamicResource ThemeFontSizeXs}" Opacity="0.5"/>
+                            <TextBlock Text="{Binding EmbeddingSpace.SelectedChunkText}" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                       TextWrapping="Wrap" MaxHeight="80" Opacity="0.6"/>
+                        </StackPanel>
+
+                        <Border Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}" Margin="0,2"/>
+                        <Button Content="Refresh" Command="{Binding EmbeddingSpace.RefreshCommand}" Padding="12,8" HorizontalAlignment="Stretch"/>
+                    </StackPanel>
+                    </Grid>
                     </ScrollViewer>
                 </Grid>
             </Border>
@@ -381,23 +504,37 @@
                     Padding="16,6"
                     BorderThickness="0,1,0,0"
                     BorderBrush="{DynamicResource ThemeBorderBrush}">
-                <StackPanel Orientation="Horizontal" Spacing="16">
-                    <StackPanel Orientation="Horizontal">
+                <Grid>
+                    <!-- Knowledge Graph footer -->
+                    <StackPanel x:Name="KnowledgeGraphFooter" Orientation="Horizontal" Spacing="16">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Opacity="0.6" VerticalAlignment="Center" FontSize="{DynamicResource ThemeFontSizeXsSm}">
+                                <Run Text="Nodes:"/>
+                                <Run Text="{Binding NodeCount}"/>
+                            </TextBlock>
+                            <TextBlock Opacity="0.6" VerticalAlignment="Center" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       IsVisible="{Binding IsNodeLimitActive}">
+                                <Run Text=" of"/>
+                                <Run Text="{Binding TotalFilteredCount}"/>
+                            </TextBlock>
+                        </StackPanel>
                         <TextBlock Opacity="0.6" VerticalAlignment="Center" FontSize="{DynamicResource ThemeFontSizeXsSm}">
-                            <Run Text="Nodes:"/>
-                            <Run Text="{Binding NodeCount}"/>
-                        </TextBlock>
-                        <TextBlock Opacity="0.6" VerticalAlignment="Center" FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                   IsVisible="{Binding IsNodeLimitActive}">
-                            <Run Text=" of"/>
-                            <Run Text="{Binding TotalFilteredCount}"/>
+                            <Run Text="Edges:"/>
+                            <Run Text="{Binding EdgeCount}"/>
                         </TextBlock>
                     </StackPanel>
-                    <TextBlock Opacity="0.6" VerticalAlignment="Center" FontSize="{DynamicResource ThemeFontSizeXsSm}">
-                        <Run Text="Edges:"/>
-                        <Run Text="{Binding EdgeCount}"/>
-                    </TextBlock>
-                </StackPanel>
+                    <!-- Embedding Space footer -->
+                    <StackPanel x:Name="EmbeddingSpaceFooter" Orientation="Horizontal" Spacing="16" IsVisible="False">
+                        <TextBlock Opacity="0.6" VerticalAlignment="Center" FontSize="{DynamicResource ThemeFontSizeXsSm}">
+                            <Run Text="Points:"/>
+                            <Run Text="{Binding EmbeddingSpace.PointCount}"/>
+                        </TextBlock>
+                        <TextBlock Opacity="0.6" VerticalAlignment="Center" FontSize="{DynamicResource ThemeFontSizeXsSm}">
+                            <Run Text="Edges:"/>
+                            <Run Text="{Binding EmbeddingSpace.EdgeCount}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
             </Border>
     </Grid>
 </UserControl>

@@ -8,6 +8,7 @@ namespace PrivStack.Desktop.Plugins.Graph.ViewModels;
 
 public enum OrphanFilterMode { Hide, Show, Only }
 public enum GraphVisualizationMode { ForceDirected, SolarSystem }
+public enum GraphTab { KnowledgeGraph, EmbeddingSpace }
 
 public partial class GraphViewModel : PrivStack.Sdk.ViewModelBase
 {
@@ -96,6 +97,11 @@ public partial class GraphViewModel : PrivStack.Sdk.ViewModelBase
     public double SolarSystemScale => 0.5 + (SolarSystemScaleSlider / 100.0 * 1.5);
     public double StarSpacingMultiplier => 0.5 + (StarSpacingSlider / 100.0 * 2.0);
     public double OrbitScaleMultiplier => 0.5 + (OrbitScaleSlider / 100.0 * 2.0);
+
+    // Tab support
+    [ObservableProperty] private GraphTab _activeTab = GraphTab.KnowledgeGraph;
+    public EmbeddingSpaceViewModel? EmbeddingSpace { get; set; }
+    public event EventHandler<GraphTab>? ActiveTabChanged;
 
     // Events for canvas
     public event EventHandler? RequestReheat;
@@ -262,6 +268,8 @@ public partial class GraphViewModel : PrivStack.Sdk.ViewModelBase
     [RelayCommand] private void SetVisualizationMode(GraphVisualizationMode mode) { if (VisualizationMode != mode) { VisualizationMode = mode; VisualizationModeChanged?.Invoke(this, mode); } }
     [RelayCommand] private void SwitchToForceDirected() => SetVisualizationMode(GraphVisualizationMode.ForceDirected);
     [RelayCommand] private void SwitchToSolarSystem() => SetVisualizationMode(GraphVisualizationMode.SolarSystem);
+    [RelayCommand] private void SwitchToKnowledgeGraph() => ActiveTab = GraphTab.KnowledgeGraph;
+    [RelayCommand] private void SwitchToEmbeddingSpace() => ActiveTab = GraphTab.EmbeddingSpace;
 
     public void OnNodeClicked(string nodeId)
     {
@@ -313,6 +321,7 @@ public partial class GraphViewModel : PrivStack.Sdk.ViewModelBase
     partial void OnTimelineMaxDateChanged(DateTimeOffset value) { OnPropertyChanged(nameof(TimelineEndDate)); OnPropertyChanged(nameof(TimelineEndLabel)); }
     partial void OnLocalDepthChanged(int value) { Save("local_depth", value); if (!_isInitializing && IsLocalView) _ = LoadGraphAsync(); }
     partial void OnIsGraphSidebarCollapsedChanged(bool value) { Save("sidebar_collapsed", value); }
+    partial void OnActiveTabChanged(GraphTab value) => ActiveTabChanged?.Invoke(this, value);
     private void OnPhysicsSettingsChanged(object? sender, EventArgs e)
     {
         Save("repel_radius", PhysicsSettings.RepelSlider);

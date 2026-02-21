@@ -104,6 +104,12 @@ internal static partial class NativeLibrary
     [LibraryImport(LibraryName, EntryPoint = "privstack_rag_get_hashes", StringMarshalling = StringMarshalling.Utf8)]
     public static partial nint RagGetHashes(string json);
 
+    /// <summary>
+    /// Fetch all RAG vectors with embeddings for 3D visualization. Returns JSON response (free with FreeString).
+    /// </summary>
+    [LibraryImport(LibraryName, EntryPoint = "privstack_rag_fetch_all", StringMarshalling = StringMarshalling.Utf8)]
+    public static partial nint RagFetchAll(string json);
+
     // =========================================================================
     // App-Level Authentication
     // =========================================================================
