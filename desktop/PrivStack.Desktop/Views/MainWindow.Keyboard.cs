@@ -96,20 +96,6 @@ public partial class MainWindow
             }
         }
 
-        // Quick Task: Cmd+T or Ctrl+T
-        if (isCmdOrCtrl && e.Key == Key.T)
-        {
-            var quickActionService = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
-                .GetService<Services.QuickActionService>(App.Services);
-            var entry = quickActionService?.FindAction("tasks.new_quick_task");
-            if (entry != null)
-            {
-                _ = quickActionService!.InvokeActionAsync(entry, vm);
-                e.Handled = true;
-                return;
-            }
-        }
-
         // Info Panel: Cmd+I or Ctrl+I
         if (isCmdOrCtrl && e.Key == Key.I)
         {
@@ -167,6 +153,25 @@ public partial class MainWindow
                     vm.SelectTabCommand.Execute("Contacts");
                     e.Handled = true;
                     return;
+            }
+        }
+
+        // Plugin-registered quick action shortcuts (e.g., Cmd+T → "New Quick Task").
+        // Runs after all shell-owned shortcuts so plugins cannot shadow Cmd+K, Cmd+I, etc.
+        if (isCmdOrCtrl)
+        {
+            var shortcutHint = BuildShortcutHint(e.KeyModifiers, e.Key);
+            if (shortcutHint != null)
+            {
+                var quickActionService = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+                    .GetService<Services.QuickActionService>(App.Services);
+                var entry = quickActionService?.FindActionByShortcut(shortcutHint);
+                if (entry != null)
+                {
+                    _ = quickActionService!.InvokeActionAsync(entry, vm);
+                    e.Handled = true;
+                    return;
+                }
             }
         }
 
@@ -243,5 +248,30 @@ public partial class MainWindow
                 return;
             }
         }
+    }
+
+    /// <summary>
+    /// Converts a key + modifiers into the normalized shortcut hint format
+    /// used by <see cref="Sdk.Capabilities.QuickActionDescriptor.DefaultShortcutHint"/>.
+    /// Returns null for keys that don't map to a single letter/symbol shortcut.
+    /// Format: "Cmd+T", "Cmd+Shift+S", etc.
+    /// </summary>
+    private static string? BuildShortcutHint(KeyModifiers modifiers, Key key)
+    {
+        // Only handle single-letter keys (A-Z) for quick action shortcuts
+        if (key < Key.A || key > Key.Z)
+            return null;
+
+        var parts = new System.Text.StringBuilder();
+        parts.Append("Cmd+");
+
+        if (modifiers.HasFlag(KeyModifiers.Shift))
+            parts.Append("Shift+");
+
+        if (modifiers.HasFlag(KeyModifiers.Alt))
+            parts.Append("Alt+");
+
+        parts.Append((char)('A' + (key - Key.A)));
+        return parts.ToString();
     }
 }
