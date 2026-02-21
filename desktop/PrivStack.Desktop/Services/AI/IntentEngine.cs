@@ -23,6 +23,7 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
     private static readonly ILogger _log = Log.ForContext<IntentEngine>();
     private const int MaxSuggestions = 50;
     private const int QueueCapacity = 20;
+    private static readonly TimeSpan SuggestionMaxAge = TimeSpan.FromDays(7);
 
     private static readonly TimeSpan DebounceInterval = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan DeduplicationWindow = TimeSpan.FromMinutes(5);
@@ -36,7 +37,9 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
     private readonly ConcurrentDictionary<string, DateTimeOffset> _recentAnalyses = new();
     private readonly ConcurrentDictionary<string, DateTimeOffset> _lastPluginSignal = new();
     private readonly CancellationTokenSource _disposeCts = new();
+    private readonly string _suggestionsFilePath;
     private Task? _consumerTask;
+    private System.Timers.Timer? _persistTimer;
 
     public IntentEngine(
         IAppSettingsService appSettings,
@@ -46,12 +49,15 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
         _appSettings = appSettings;
         _aiService = aiService;
         _pluginRegistry = pluginRegistry;
+        _suggestionsFilePath = Path.Combine(DataPaths.BaseDir, "intent-suggestions.json");
         _signalChannel = Channel.CreateBounded<IntentSignalMessage>(
             new BoundedChannelOptions(QueueCapacity)
             {
                 FullMode = BoundedChannelFullMode.DropOldest,
                 SingleReader = true,
             });
+
+        LoadSuggestionsFromDisk();
 
         WeakReferenceMessenger.Default.Register<IntentSignalMessage>(this);
         _consumerTask = Task.Run(() => ConsumeSignalsAsync(_disposeCts.Token));
@@ -193,6 +199,7 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
     {
         lock (_suggestionsLock)
             _suggestions.Clear();
+        SchedulePersist();
         SuggestionsCleared?.Invoke(this, EventArgs.Empty);
     }
 
@@ -456,6 +463,7 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
             }
             _suggestions.Add(suggestion);
         }
+        SchedulePersist();
         SuggestionAdded?.Invoke(this, suggestion);
     }
 
@@ -466,6 +474,7 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
             var idx = _suggestions.FindIndex(s => s.SuggestionId == suggestionId);
             if (idx >= 0) _suggestions.RemoveAt(idx);
         }
+        SchedulePersist();
         SuggestionRemoved?.Invoke(this, suggestionId);
     }
 
@@ -476,12 +485,78 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
         return Convert.ToHexString(hash[..8]);
     }
 
+    // ── Persistence ─────────────────────────────────────────────────
+
+    private static readonly JsonSerializerOptions _persistOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false,
+    };
+
+    private void LoadSuggestionsFromDisk()
+    {
+        try
+        {
+            if (!File.Exists(_suggestionsFilePath)) return;
+
+            var json = File.ReadAllText(_suggestionsFilePath);
+            var loaded = JsonSerializer.Deserialize<List<IntentSuggestion>>(json, _persistOptions);
+            if (loaded == null) return;
+
+            var cutoff = DateTimeOffset.UtcNow - SuggestionMaxAge;
+            lock (_suggestionsLock)
+            {
+                foreach (var s in loaded)
+                {
+                    if (s.CreatedAt >= cutoff && _suggestions.Count < MaxSuggestions)
+                        _suggestions.Add(s);
+                }
+            }
+
+            _log.Debug("Loaded {Count} persisted intent suggestions", _suggestions.Count);
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Failed to load persisted intent suggestions");
+        }
+    }
+
+    private void SchedulePersist()
+    {
+        _persistTimer?.Stop();
+        _persistTimer?.Dispose();
+        _persistTimer = new System.Timers.Timer(2000) { AutoReset = false };
+        _persistTimer.Elapsed += (_, _) => PersistSuggestionsToDisk();
+        _persistTimer.Start();
+    }
+
+    private void PersistSuggestionsToDisk()
+    {
+        try
+        {
+            List<IntentSuggestion> snapshot;
+            lock (_suggestionsLock)
+                snapshot = [.. _suggestions];
+
+            var json = JsonSerializer.Serialize(snapshot, _persistOptions);
+            File.WriteAllText(_suggestionsFilePath, json);
+            _log.Debug("Persisted {Count} intent suggestions to disk", snapshot.Count);
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Failed to persist intent suggestions");
+        }
+    }
+
     // ── IDisposable ──────────────────────────────────────────────────
 
     public void Dispose()
     {
         _disposeCts.Cancel();
         _signalChannel.Writer.TryComplete();
+        _persistTimer?.Stop();
+        _persistTimer?.Dispose();
+        PersistSuggestionsToDisk();
         WeakReferenceMessenger.Default.Unregister<IntentSignalMessage>(this);
         _disposeCts.Dispose();
     }
