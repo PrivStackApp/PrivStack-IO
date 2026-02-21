@@ -10,6 +10,8 @@ namespace PrivStack.Desktop.ViewModels.AiTray;
 /// </summary>
 public partial class AiSuggestionTrayViewModel
 {
+    public string ChatWatermark { get; } = $"Ask {AiPersona.Name}...";
+
     [ObservableProperty]
     private string? _chatInputText;
 
@@ -45,7 +47,7 @@ public partial class AiSuggestionTrayViewModel
         {
             var request = new AiRequest
             {
-                SystemPrompt = "You are Hugo, a helpful AI assistant embedded in PrivStack, a productivity app. " +
+                SystemPrompt = $"You are {AiPersona.Name}, a helpful AI assistant embedded in PrivStack, a productivity app. " +
                                "Be concise and direct. Answer in plain text without markdown formatting.",
                 UserPrompt = text,
                 MaxTokens = 1024,
