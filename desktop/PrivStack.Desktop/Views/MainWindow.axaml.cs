@@ -1,7 +1,7 @@
-using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using AvaloniaEdit;
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Desktop.Controls;
@@ -9,7 +9,6 @@ using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Desktop.ViewModels;
-using PrivStack.Sdk;
 using RichTextEditorControl = PrivStack.UI.Adaptive.Controls.RichTextEditor.RichTextEditor;
 
 namespace PrivStack.Desktop.Views;
@@ -30,6 +29,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // Tunnel routing: intercept global shortcuts before child controls consume them
+        AddHandler(KeyDownEvent, OnGlobalKeyDown, RoutingStrategies.Tunnel);
 
         // Enable window dragging from the title bar spacer
         TitleBarSpacer.PointerPressed += OnTitleBarPointerPressed;
@@ -63,7 +65,6 @@ public partial class MainWindow : Window
             vm.SpeechRecordingVM.TranscriptionReady += OnTranscriptionReady;
         }
 
-        // Also handle when DataContext changes
         this.DataContextChanged += (_, _) =>
         {
             if (DataContext is MainWindowViewModel newVm)
@@ -81,7 +82,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Insert transcription into the target control
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             switch (_speechTargetControl)
@@ -118,19 +118,20 @@ public partial class MainWindow : Window
         editor.Focus();
     }
 
+    // ========================================================================
+    // Window Lifecycle
+    // ========================================================================
+
     private void OnWindowOpened(object? sender, EventArgs e)
     {
         _isInitialized = true;
 
-        // Wire up the dialog service so modal dialogs have an owner window
         App.Services.GetRequiredService<IDialogService>().SetOwner(this);
 
-        // Subscribe to sidebar collapse changes for responsive layout recalculation
         if (DataContext is MainWindowViewModel vm)
         {
             vm.PropertyChanged += OnMainVmPropertyChanged;
 
-            // Initialize UniversalSearchService and register the dropdown
             _universalSearch = new UniversalSearchService(vm.CommandPaletteVM, vm);
             _universalSearch.SetDropdown(SearchDropdown);
 
@@ -146,7 +147,6 @@ public partial class MainWindow : Window
             }
         }
 
-        // Initial content area measurement
         UpdateContentAreaWidth();
     }
 
@@ -154,20 +154,14 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(MainWindowViewModel.IsSidebarCollapsed))
         {
-            // Sidebar toggle changes available content width
             UpdateContentAreaWidth();
         }
     }
 
-    /// <summary>
-    /// Computes content area width (window width minus nav sidebar) and feeds it
-    /// to the responsive layout service.
-    /// </summary>
     private void UpdateContentAreaWidth()
     {
         if (!_isInitialized) return;
 
-        // Nav sidebar is 220px expanded or 56px collapsed (from MainWindow.axaml styles)
         var sidebarCollapsed = (DataContext as MainWindowViewModel)?.IsSidebarCollapsed ?? false;
         var navSidebarWidth = sidebarCollapsed ? 56.0 : 220.0;
         var contentWidth = Bounds.Width - navSidebarWidth;
@@ -190,7 +184,6 @@ public partial class MainWindow : Window
     {
         if (!_isInitialized) return;
 
-        // Save when size or state changes
         if (e.Property == WidthProperty || e.Property == HeightProperty || e.Property == WindowStateProperty)
         {
             _settings.UpdateWindowBounds(this);
@@ -198,253 +191,29 @@ public partial class MainWindow : Window
         }
     }
 
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        _settings.UpdateWindowBounds(this);
+        _settings.Flush();
+
+        if (DataContext is MainWindowViewModel vm)
+        {
+            vm.Cleanup();
+        }
+
+        base.OnClosing(e);
+    }
+
+    // ========================================================================
+    // Title Bar + Pointer Handlers
+    // ========================================================================
+
     private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        // Only drag on left mouse button
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             BeginMoveDrag(e);
         }
-    }
-
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        if (DataContext is not MainWindowViewModel vm)
-        {
-            base.OnKeyDown(e);
-            return;
-        }
-
-        // Check for modifier key (Cmd on macOS, Ctrl on other platforms)
-        var isCmdOrCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Meta) ||
-                          e.KeyModifiers.HasFlag(KeyModifiers.Control);
-
-        // Chord second key: if chord prefix is active, check the next key
-        if (_chordPrefixActive)
-        {
-            _chordPrefixActive = false;
-            _chordTimer?.Stop();
-            _chordTimer?.Dispose();
-            _chordTimer = null;
-
-            if (e.Key == Key.W)
-            {
-                // Close palette (was opened immediately on Cmd+K) and run chord action
-                if (vm.CommandPaletteVM.IsOpen)
-                    vm.CommandPaletteVM.CloseCommand.Execute(null);
-                vm.WorkspaceSwitcherVM.OpenCommand.Execute(null);
-                e.Handled = true;
-                return;
-            }
-            // Other chord keys can be added here
-            // If unrecognized second key, fall through to normal handling
-        }
-
-        // Plugin Palette: Cmd+/ or Ctrl+/ — open the active plugin's "add_block" palette
-        if (isCmdOrCtrl && (e.Key == Key.Oem2 || e.Key == Key.OemQuestion))
-        {
-            vm.CommandPaletteVM.OpenPluginPaletteForActivePlugin("add_block");
-            e.Handled = true;
-            return;
-        }
-
-        // Universal Search: Cmd+K or Ctrl+K (also starts chord prefix)
-        if (isCmdOrCtrl && e.Key == Key.K)
-        {
-            // Focus the toolbar search bar (opens dropdown) AND start chord prefix.
-            // If a chord key (e.g. W) is pressed before KeyUp, we'll close the dropdown
-            // and execute the chord action instead.
-            _chordPrefixActive = true;
-            _chordTimer?.Stop();
-            _chordTimer?.Dispose();
-            _chordTimer = new System.Timers.Timer(300);
-            _chordTimer.AutoReset = false;
-            _chordTimer.Elapsed += (_, _) =>
-            {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    _chordPrefixActive = false;
-                });
-            };
-            _chordTimer.Start();
-            if (_universalSearch != null)
-                _universalSearch.FocusSearchBar();
-            else
-                vm.CommandPaletteVM.ToggleCommand.Execute(null);
-            e.Handled = true;
-            return;
-        }
-
-        // Toggle sidebar: Cmd+\ or Ctrl+\
-        if (isCmdOrCtrl && e.Key == Key.OemBackslash)
-        {
-            vm.ToggleSidebarCommand.Execute(null);
-            e.Handled = true;
-            return;
-        }
-
-        // New page from template: Cmd+Shift+N or Ctrl+Shift+N (when in Notes)
-        if (isCmdOrCtrl && e.KeyModifiers.HasFlag(KeyModifiers.Shift) && e.Key == Key.N)
-        {
-            // Use reflection-free check: if the current VM has OpenTemplatePickerCommand
-            if (vm.CurrentViewModel is CommunityToolkit.Mvvm.ComponentModel.ObservableObject currentVm
-                && vm.SelectedTab == "Notes")
-            {
-                var cmdProp = currentVm.GetType().GetProperty("OpenTemplatePickerCommand");
-                if (cmdProp?.GetValue(currentVm) is System.Windows.Input.ICommand cmd)
-                {
-                    cmd.Execute(null);
-                    e.Handled = true;
-                    return;
-                }
-            }
-        }
-
-        // Info Panel: Cmd+I or Ctrl+I
-        if (isCmdOrCtrl && e.Key == Key.I)
-        {
-            vm.ToggleInfoPanelCommand.Execute(null);
-            e.Handled = true;
-            return;
-        }
-
-        // Speech-to-text: Cmd+M or Ctrl+M
-        if (isCmdOrCtrl && e.Key == Key.M)
-        {
-            _ = HandleSpeechToTextAsync(vm);
-            e.Handled = true;
-            return;
-        }
-
-        // Quick navigation shortcuts
-        if (isCmdOrCtrl)
-        {
-            switch (e.Key)
-            {
-                // Cmd+1: Notes
-                case Key.D1:
-                    vm.SelectTabCommand.Execute("Notes");
-                    e.Handled = true;
-                    return;
-
-                // Cmd+2: Tasks
-                case Key.D2:
-                    vm.SelectTabCommand.Execute("Tasks");
-                    e.Handled = true;
-                    return;
-
-                // Cmd+3: Calendar
-                case Key.D3:
-                    vm.SelectTabCommand.Execute("Calendar");
-                    e.Handled = true;
-                    return;
-
-                // Cmd+4: Budget
-                case Key.D4:
-                    vm.SelectTabCommand.Execute("Budget");
-                    e.Handled = true;
-                    return;
-
-                // Cmd+5: Journal
-                case Key.D5:
-                    vm.SelectTabCommand.Execute("Journal");
-                    e.Handled = true;
-                    return;
-
-                // Cmd+6: Files
-                case Key.D6:
-                    vm.SelectTabCommand.Execute("Files");
-                    e.Handled = true;
-                    return;
-
-                // Cmd+7: Snippets
-                case Key.D7:
-                    vm.SelectTabCommand.Execute("Snippets");
-                    e.Handled = true;
-                    return;
-
-                // Cmd+8: RSS
-                case Key.D8:
-                    vm.SelectTabCommand.Execute("RSS");
-                    e.Handled = true;
-                    return;
-
-                // Cmd+9: Contacts
-                case Key.D9:
-                    vm.SelectTabCommand.Execute("Contacts");
-                    e.Handled = true;
-                    return;
-            }
-        }
-
-        // Escape to close overlays/menus
-        if (e.Key == Key.Escape)
-        {
-            if (vm.SubscriptionBadgeVM.IsModalOpen)
-            {
-                vm.SubscriptionBadgeVM.CloseModalCommand.Execute(null);
-                e.Handled = true;
-                return;
-            }
-
-            if (vm.WorkspaceSwitcherVM.IsOpen)
-            {
-                vm.WorkspaceSwitcherVM.CloseCommand.Execute(null);
-                e.Handled = true;
-                return;
-            }
-
-            if (vm.CommandPaletteVM.IsOpen)
-            {
-                vm.CommandPaletteVM.CloseCommand.Execute(null);
-                e.Handled = true;
-                return;
-            }
-
-            if (vm.SettingsVM.ThemeEditor.IsOpen)
-            {
-                vm.SettingsVM.ThemeEditor.CancelCommand.Execute(null);
-                e.Handled = true;
-                return;
-            }
-
-            if (vm.IsUserMenuOpen)
-            {
-                vm.CloseUserMenuCommand.Execute(null);
-                e.Handled = true;
-                return;
-            }
-
-            if (vm.IsSettingsPanelOpen)
-            {
-                vm.CloseSettingsCommand.Execute(null);
-                e.Handled = true;
-                return;
-            }
-
-            if (vm.IsSyncPanelOpen)
-            {
-                vm.ToggleSyncPanelCommand.Execute(null);
-                e.Handled = true;
-                return;
-            }
-
-            if (vm.UpdateVM.IsUpdateModalOpen)
-            {
-                vm.UpdateVM.CloseModalCommand.Execute(null);
-                e.Handled = true;
-                return;
-            }
-
-            if (vm.InfoPanelVM.IsOpen)
-            {
-                vm.InfoPanelVM.CloseCommand.Execute(null);
-                e.Handled = true;
-                return;
-            }
-        }
-
-        base.OnKeyDown(e);
     }
 
     // ========================================================================
@@ -469,7 +238,7 @@ public partial class MainWindow : Window
         if (DataContext is not MainWindowViewModel vm) return;
 
         var currentX = e.GetPosition(this).X;
-        var delta = _infoPanelResizeStartX - currentX; // drag left = wider
+        var delta = _infoPanelResizeStartX - currentX;
         var newWidth = Math.Clamp(_infoPanelResizeStartWidth + delta, 220, 600);
         vm.InfoPanelVM.PanelWidth = newWidth;
         e.Handled = true;
@@ -494,7 +263,6 @@ public partial class MainWindow : Window
 
     private void OnOverlayPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        // Close user menu when clicking outside of it
         if (DataContext is MainWindowViewModel vm && vm.IsUserMenuOpen)
         {
             vm.CloseUserMenuCommand.Execute(null);
@@ -511,83 +279,18 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task HandleSpeechToTextAsync(MainWindowViewModel vm)
+    private void OnQuickActionBackdropPressed(object? sender, PointerPressedEventArgs e)
     {
-        var speechVm = vm.SpeechRecordingVM;
-
-        // If in download flow, let the overlay handle interactions
-        if (speechVm.IsPromptingDownload || speechVm.IsDownloading)
+        if (DataContext is MainWindowViewModel vm && vm.IsQuickActionOverlayOpen)
         {
-            return;
-        }
-
-        // If already recording, stop and transcribe
-        if (speechVm.IsRecording)
-        {
-            await speechVm.StopAndTranscribeAsync();
-            return;
-        }
-
-        // If transcribing, ignore
-        if (speechVm.IsTranscribing)
-        {
-            return;
-        }
-
-        // Get the currently focused element and store it for text insertion
-        var focusedElement = FocusManager?.GetFocusedElement();
-        var targetControl = FindTextInputControl(focusedElement);
-
-        if (targetControl != null)
-        {
-            _speechTargetControl = targetControl;
-            // TryStartAsync handles: feature enabled check, model download prompt, and recording start
-            await speechVm.TryStartAsync();
+            vm.CloseQuickActionOverlay();
+            e.Handled = true;
         }
     }
 
-    private static Control? FindTextInputControl(object? focusedElement)
+    private void OnQuickActionContentPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (focusedElement is TextBox textBox)
-            return textBox;
-
-        if (focusedElement is TextEditor editor)
-            return editor;
-
-        if (focusedElement is RichTextEditorControl rte)
-            return rte;
-
-        // Check parent chain for text editors (sometimes focus is on inner elements)
-        if (focusedElement is Control control)
-        {
-            var parent = control.Parent;
-            while (parent != null)
-            {
-                if (parent is TextBox parentTextBox)
-                    return parentTextBox;
-                if (parent is TextEditor parentEditor)
-                    return parentEditor;
-                if (parent is RichTextEditorControl parentRte)
-                    return parentRte;
-                parent = parent.Parent;
-            }
-        }
-
-        return null;
-    }
-
-    protected override void OnClosing(WindowClosingEventArgs e)
-    {
-        // Save final window state
-        _settings.UpdateWindowBounds(this);
-        _settings.Flush();
-
-        // Cleanup resources when window closes
-        if (DataContext is MainWindowViewModel vm)
-        {
-            vm.Cleanup();
-        }
-
-        base.OnClosing(e);
+        // Prevent backdrop click-through when clicking inside the form
+        e.Handled = true;
     }
 }

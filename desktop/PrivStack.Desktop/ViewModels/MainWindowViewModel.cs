@@ -232,8 +232,37 @@ public partial class MainWindowViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsAnyOverlayPanelOpen))]
     private bool _isSettingsPanelOpen;
 
+    // ============================================================
+    // Quick Action Overlay
+    // ============================================================
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAnyOverlayPanelOpen))]
+    private bool _isQuickActionOverlayOpen;
+
+    [ObservableProperty]
+    private string _quickActionOverlayTitle = string.Empty;
+
+    [ObservableProperty]
+    private object? _quickActionOverlayContent;
+
+    public void ShowQuickActionOverlay(string title, object content)
+    {
+        QuickActionOverlayTitle = title;
+        QuickActionOverlayContent = content;
+        IsQuickActionOverlayOpen = true;
+    }
+
+    [RelayCommand]
+    public void CloseQuickActionOverlay()
+    {
+        IsQuickActionOverlayOpen = false;
+        QuickActionOverlayContent = null;
+        QuickActionOverlayTitle = string.Empty;
+    }
+
     public bool IsAnyOverlayPanelOpen =>
-        IsSyncPanelOpen || IsSettingsPanelOpen || IsIntentTrayOpen;
+        IsSyncPanelOpen || IsSettingsPanelOpen || IsIntentTrayOpen || IsQuickActionOverlayOpen;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SidebarCollapseTooltip))]

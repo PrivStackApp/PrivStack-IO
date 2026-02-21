@@ -417,6 +417,13 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
             RegisterCommandProvider(plugin, mainViewModel);
         }
 
+        // Register QuickActionService as a command provider so quick actions appear in the palette
+        var quickActionService = App.Services.GetService<QuickActionService>();
+        if (quickActionService != null)
+        {
+            mainViewModel.CommandPaletteVM.RegisterProvider(quickActionService);
+        }
+
         _log.Debug("MainViewModel set, command providers registered");
     }
 
@@ -1724,6 +1731,12 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
             if (plugin is IConnectionConsumer connectionConsumer)
             {
                 HostFactory.CapabilityBroker.Register<IConnectionConsumer>(connectionConsumer);
+            }
+
+            // Auto-register quick action providers with the capability broker
+            if (plugin is IQuickActionProvider quickActionProvider)
+            {
+                HostFactory.CapabilityBroker.Register<IQuickActionProvider>(quickActionProvider);
             }
 
             _log.Debug("Plugin activated: {PluginId}", plugin.Metadata.Id);
