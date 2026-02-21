@@ -7,7 +7,7 @@
              mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="600"
              x:Class="PrivStack.Desktop.Views.ManagePluginsDialog"
              x:DataType="vm:SettingsViewModel"
-             IsVisible="{Binding IsManagePluginsDialogOpen}">
+             IsVisible="{Binding IsManagePluginsDialogOpen, FallbackValue=False}">
 
     <UserControl.Styles>
         <!-- Progress bar style for resource metrics -->

@@ -9,7 +9,7 @@ namespace PrivStack.Desktop.Services.AI;
 /// Follows the same debounced-JSON pattern as <see cref="AiMemoryService"/>.
 /// File: {DataPaths.BaseDir}/ai-conversations.json (global, not per-workspace).
 /// </summary>
-internal sealed class AiConversationStore
+public sealed class AiConversationStore
 {
     private const int MaxSessions = 100;
     private static readonly ILogger _log = Log.ForContext<AiConversationStore>();
@@ -136,7 +136,7 @@ internal sealed class AiConversationStore
     }
 }
 
-internal sealed class ConversationSession
+public sealed class ConversationSession
 {
     [JsonPropertyName("id")]
     public string Id { get; init; } = string.Empty;
@@ -157,7 +157,7 @@ internal sealed class ConversationSession
     public List<ConversationMessage> Messages { get; init; } = [];
 }
 
-internal sealed class ConversationMessage
+public sealed class ConversationMessage
 {
     [JsonPropertyName("role")]
     public string Role { get; init; } = string.Empty;
