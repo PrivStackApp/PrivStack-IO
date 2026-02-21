@@ -68,6 +68,16 @@ public sealed class QuickActionService : ICommandProvider
     }
 
     /// <summary>
+    /// Finds a quick action by its <see cref="QuickActionDescriptor.DefaultShortcutHint"/>.
+    /// The hint uses a normalized format like "Cmd+T", "Cmd+Shift+S", etc.
+    /// </summary>
+    public QuickActionEntry? FindActionByShortcut(string shortcutHint)
+    {
+        return GetAllActions().FirstOrDefault(a =>
+            string.Equals(a.Descriptor.DefaultShortcutHint, shortcutHint, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
     /// Invokes a quick action. For HasUI actions, shows the overlay via MainWindowViewModel.
     /// For immediate actions, calls ExecuteQuickActionAsync directly.
     /// </summary>
