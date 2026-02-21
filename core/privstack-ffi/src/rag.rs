@@ -178,6 +178,32 @@ unsafe fn rag_delete_inner(json: *const c_char) -> SdkResponse {
     }
 }
 
+/// Delete all RAG vectors (used during data wipe/reseed).
+///
+/// # Safety
+/// No arguments required.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn privstack_rag_delete_all() -> *mut c_char {
+    let response = rag_delete_all_inner();
+    let json_out = serde_json::to_string(&response).unwrap_or_else(|_| {
+        r#"{"success":false,"error_code":"json_error","error_message":"Failed to serialize response"}"#.to_string()
+    });
+    CString::new(json_out).unwrap_or_default().into_raw()
+}
+
+fn rag_delete_all_inner() -> SdkResponse {
+    let handle = lock_handle();
+    let handle = match handle.as_ref() {
+        Some(h) => h,
+        None => return SdkResponse::err("not_initialized", "PrivStack runtime not initialized"),
+    };
+
+    match handle.entity_store.rag_delete_all() {
+        Ok(()) => SdkResponse::ok_empty(),
+        Err(e) => SdkResponse::err("storage_error", &format!("RAG delete all failed: {e}")),
+    }
+}
+
 /// Get content hashes for RAG vectors (for incremental indexing skip).
 ///
 /// # Safety
