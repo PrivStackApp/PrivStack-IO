@@ -254,11 +254,21 @@ internal sealed class DatasetInsightOrchestrator
     private static readonly Regex DividerRegex = new(
         @"^\s*[-*_]{3,}\s*$", RegexOptions.Compiled);
 
-    private static bool IsTableRow(string line) =>
-        line.TrimStart().StartsWith('|') && line.TrimEnd().EndsWith('|');
+    private static bool IsTableRow(string line)
+    {
+        var trimmed = line.Trim();
+        // Must start with pipe and have at least one more pipe (column separator)
+        return trimmed.StartsWith('|') && trimmed.IndexOf('|', 1) > 0;
+    }
 
-    private static bool IsTableSeparator(string line) =>
-        IsTableRow(line) && Regex.IsMatch(line, @"^\s*\|[\s:_-|]+\|\s*$");
+    private static bool IsTableSeparator(string line)
+    {
+        var trimmed = line.Trim();
+        if (!trimmed.StartsWith('|')) return false;
+        // Strip pipes and check remainder is only dashes, colons, and whitespace
+        var inner = trimmed.Replace("|", "").Trim();
+        return inner.Length > 0 && inner.All(c => c is '-' or ':' or ' ');
+    }
 
     private static (List<string> headers, List<List<string>> rows, int linesConsumed)
         ParseMarkdownTable(string[] lines, int startIndex)
