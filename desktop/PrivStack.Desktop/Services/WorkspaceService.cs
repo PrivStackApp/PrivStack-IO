@@ -162,24 +162,57 @@ public sealed partial class WorkspaceService : IWorkspaceService
 
     /// <summary>
     /// Common resolver for cloud/NAS subdirectories under PrivStack/{subdir}/{workspaceId}.
+    /// Returns null if the storage root is not accessible (e.g., unmounted NAS volume).
     /// </summary>
     private static string? ResolveCloudSubdir(string workspaceId, StorageLocation? location, string subdir)
     {
         if (location == null || location.Type == "Default")
             return null;
 
-        return location.Type switch
+        var basePath = location.Type switch
         {
-            "Custom" when !string.IsNullOrEmpty(location.CustomPath) =>
-                Path.Combine(location.CustomPath, "PrivStack", subdir, workspaceId),
-            "GoogleDrive" => CloudPathResolver.GetGoogleDrivePath() is { } gd
-                ? Path.Combine(gd, "PrivStack", subdir, workspaceId)
-                : null,
-            "ICloud" => CloudPathResolver.GetICloudPath() is { } ic
-                ? Path.Combine(ic, "PrivStack", subdir, workspaceId)
-                : null,
+            "Custom" when !string.IsNullOrEmpty(location.CustomPath) => location.CustomPath,
+            "GoogleDrive" => CloudPathResolver.GetGoogleDrivePath(),
+            "ICloud" => CloudPathResolver.GetICloudPath(),
             _ => null,
         };
+
+        if (basePath == null)
+            return null;
+
+        // Verify the storage root is accessible. Network/NAS mounts (e.g., /Volumes/home)
+        // may be disconnected at shutdown or intermittently unavailable.
+        if (!IsMountAccessible(basePath))
+        {
+            Log.ForContext<WorkspaceService>().Warning(
+                "Storage path not accessible: {Path} — skipping {Subdir} resolution", basePath, subdir);
+            return null;
+        }
+
+        return Path.Combine(basePath, "PrivStack", subdir, workspaceId);
+    }
+
+    /// <summary>
+    /// Checks whether the mount point for a given path is accessible.
+    /// On macOS, paths under /Volumes/{name} require the volume to be mounted.
+    /// </summary>
+    private static bool IsMountAccessible(string path)
+    {
+        // macOS: /Volumes/{mount_name}/... — verify the mount point exists
+        var segments = path.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length >= 2 && segments[0].Equals("Volumes", StringComparison.OrdinalIgnoreCase))
+        {
+            var mountPoint = Path.Combine("/", segments[0], segments[1]);
+            return Directory.Exists(mountPoint);
+        }
+
+        // For other paths, check if the immediate parent of the target exists
+        // (e.g., a custom path pointing to an external drive)
+        var root = Path.GetPathRoot(path);
+        if (root != null && root != "/" && root != Path.DirectorySeparatorChar.ToString())
+            return Directory.Exists(root);
+
+        return true;
     }
 
     /// <summary>
