@@ -9,13 +9,14 @@ namespace PrivStack.Desktop.Plugins.Graph;
 public sealed class GraphPlugin : PluginBase<GraphViewModel>
 {
     private GraphDataService? _graphService;
+    private EmbeddingDataService? _embeddingService;
 
     public override PluginMetadata Metadata { get; } = new()
     {
         Id = "privstack.graph",
         Name = "Graph",
         Description = "Knowledge graph visualization with force-directed layout",
-        Version = new Version(1, 0, 0),
+        Version = new Version(1, 1, 0),
         Author = "PrivStack",
         Icon = "Graph",
         NavigationOrder = 105,
@@ -44,12 +45,15 @@ public sealed class GraphPlugin : PluginBase<GraphViewModel>
     {
         var pluginRegistry = App.Services.GetRequiredService<IPluginRegistry>();
         _graphService = new GraphDataService(Host!.Sdk, pluginRegistry);
+        _embeddingService = new EmbeddingDataService();
         return await Task.FromResult(true);
     }
 
     protected override GraphViewModel CreateViewModelCore()
     {
-        return new GraphViewModel(_graphService!, Host?.InfoPanel, Host?.Settings);
+        var vm = new GraphViewModel(_graphService!, Host?.InfoPanel, Host?.Settings);
+        vm.EmbeddingSpace = new EmbeddingSpaceViewModel(_embeddingService!, Host?.Settings);
+        return vm;
     }
 
     public override async Task OnNavigatedToAsync(CancellationToken cancellationToken = default)
