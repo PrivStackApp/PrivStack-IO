@@ -9,6 +9,7 @@ using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Desktop.ViewModels;
+using PrivStack.Sdk;
 using RichTextEditorControl = PrivStack.UI.Adaptive.Controls.RichTextEditor.RichTextEditor;
 
 namespace PrivStack.Desktop.Views;
