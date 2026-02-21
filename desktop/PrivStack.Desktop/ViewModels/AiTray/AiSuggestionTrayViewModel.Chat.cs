@@ -47,11 +47,10 @@ public partial class AiSuggestionTrayViewModel
         {
             var request = new AiRequest
             {
-                SystemPrompt = $"You are {AiPersona.Name}, a helpful AI assistant embedded in PrivStack, a productivity app. " +
-                               "Be concise and direct. Answer in plain text without markdown formatting.",
+                SystemPrompt = AiPersona.SystemPrompt,
                 UserPrompt = text,
-                MaxTokens = 1024,
-                Temperature = 0.7,
+                MaxTokens = 200,
+                Temperature = 0.4,
                 FeatureId = "tray.chat"
             };
 
