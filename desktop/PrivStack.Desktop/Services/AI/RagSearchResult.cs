@@ -12,4 +12,5 @@ public sealed record RagSearchResult
     public required string Title { get; init; }
     public required string LinkType { get; init; }
     public required double Score { get; init; }
+    public string ChunkText { get; init; } = "";
 }

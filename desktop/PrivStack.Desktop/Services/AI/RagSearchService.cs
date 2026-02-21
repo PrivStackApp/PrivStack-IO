@@ -87,6 +87,7 @@ internal sealed class RagSearchService
                     Title = item.GetProperty("title").GetString() ?? "",
                     LinkType = item.GetProperty("link_type").GetString() ?? "",
                     Score = item.GetProperty("score").GetDouble(),
+                    ChunkText = item.TryGetProperty("chunk_text", out var chunkTextProp) ? chunkTextProp.GetString() ?? "" : "",
                 });
             }
 
