@@ -10,13 +10,27 @@
              x:DataType="vm:GraphViewModel">
 
     <UserControl.Styles>
-        <!-- Make Expanders stretch full width and style the header -->
+        <!-- Make Expanders stretch full width and use transparent background to blend with glass sidebar -->
         <Style Selector="Expander">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/>
         </Style>
         <Style Selector="Expander /template/ ToggleButton#PART_toggle">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Expander /template/ ToggleButton#PART_toggle /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Expander /template/ ToggleButton#PART_toggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Expander /template/ ToggleButton#PART_toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Expander /template/ ToggleButton#PART_toggle:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
         </Style>
         <!-- Node type legend toggles -->
         <Style Selector="ToggleButton.node-legend">
@@ -44,7 +58,7 @@
             <Setter Property="Background" Value="Transparent"/>
         </Style>
         <Style Selector="ToggleButton.node-legend TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource ThemeTextBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}"/>
         </Style>
         <Style Selector="ToggleButton.node-legend Ellipse">
             <Setter Property="StrokeThickness" Value="1.5"/>
