@@ -2,9 +2,10 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.AI;
-using PrivStack.Sdk.Capabilities;
+using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Sdk.Messaging;
 using PrivStack.Sdk.Services;
 using Serilog;
@@ -13,8 +14,7 @@ namespace PrivStack.Desktop.ViewModels.AiTray;
 
 /// <summary>
 /// Unified ViewModel for the global AI chat tray.
-/// Renders intent and content suggestions as conversation bubbles (User → Assistant),
-/// and supports free-form chat input at the bottom.
+/// Split into partial files: Chat, Intents, History.
 /// </summary>
 public partial class AiSuggestionTrayViewModel : ViewModelBase,
     IRecipient<IntentSettingsChangedMessage>,
@@ -22,20 +22,17 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
     IRecipient<ContentSuggestionUpdatedMessage>,
     IRecipient<ContentSuggestionRemovedMessage>
 {
-    private static readonly ILogger _log = Log.ForContext<AiSuggestionTrayViewModel>();
+    private static readonly ILogger _log = Serilog.Log.ForContext<AiSuggestionTrayViewModel>();
 
     private readonly IIntentEngine _intentEngine;
     private readonly IUiDispatcher _dispatcher;
     private readonly IAppSettingsService _appSettings;
-    internal readonly IAiService _aiService;
+    internal readonly AiService _aiService;
     private readonly AiMemoryService _memoryService;
     private readonly AiMemoryExtractor _memoryExtractor;
-
-    /// <summary>Maps SuggestionId → Assistant MessageId for update routing.</summary>
-    private readonly Dictionary<string, string> _suggestionToAssistantId = new();
-
-    /// <summary>Maps SuggestionId → User MessageId for removal.</summary>
-    private readonly Dictionary<string, string> _suggestionToUserMsgId = new();
+    private readonly AiConversationStore _conversationStore;
+    private readonly InfoPanelService _infoPanelService;
+    private readonly IPluginRegistry _pluginRegistry;
 
     /// <summary>
     /// Set by MainWindowViewModel to enable source entity navigation without coupling.
@@ -46,9 +43,12 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         IIntentEngine intentEngine,
         IUiDispatcher dispatcher,
         IAppSettingsService appSettings,
-        IAiService aiService,
+        AiService aiService,
         AiMemoryService memoryService,
-        AiMemoryExtractor memoryExtractor)
+        AiMemoryExtractor memoryExtractor,
+        AiConversationStore conversationStore,
+        InfoPanelService infoPanelService,
+        IPluginRegistry pluginRegistry)
     {
         _intentEngine = intentEngine;
         _dispatcher = dispatcher;
@@ -56,6 +56,9 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         _aiService = aiService;
         _memoryService = memoryService;
         _memoryExtractor = memoryExtractor;
+        _conversationStore = conversationStore;
+        _infoPanelService = infoPanelService;
+        _pluginRegistry = pluginRegistry;
 
         // Subscribe to IntentEngine events
         _intentEngine.SuggestionAdded += OnIntentSuggestionAdded;
@@ -68,15 +71,26 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         WeakReferenceMessenger.Default.Register<ContentSuggestionUpdatedMessage>(this);
         WeakReferenceMessenger.Default.Register<ContentSuggestionRemovedMessage>(this);
 
-        // Load existing intent suggestions as assistant messages
+        // Subscribe to active item changes for context injection
+        _infoPanelService.ActiveItemChanged += OnActiveItemChanged;
+
+        // Load existing intent suggestions
         foreach (var suggestion in _intentEngine.PendingSuggestions)
             AddIntentAsAssistantMessage(suggestion);
         UpdateCounts();
     }
 
-    // ── Properties ───────────────────────────────────────────────────
+    // ── Collections ──────────────────────────────────────────────────
 
-    public ObservableCollection<AiChatMessageViewModel> Messages { get; } = [];
+    public ObservableCollection<AiChatMessageViewModel> ChatMessages { get; } = [];
+    public ObservableCollection<AiChatMessageViewModel> IntentMessages { get; } = [];
+
+    // ── Tab Selection ────────────────────────────────────────────────
+
+    [ObservableProperty]
+    private int _selectedTabIndex;
+
+    // ── Properties ───────────────────────────────────────────────────
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasCards))]
@@ -100,6 +114,34 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
     /// <summary>Raised when the view should scroll to the bottom.</summary>
     public event EventHandler? ScrollToBottomRequested;
 
+    // ── Active Item Context ──────────────────────────────────────────
+
+    private string? _activeItemContextBlock;
+
+    private void OnActiveItemChanged()
+    {
+        _activeItemContextBlock = BuildActiveItemContext();
+    }
+
+    private string? BuildActiveItemContext()
+    {
+        var linkType = _infoPanelService.ActiveLinkType;
+        var itemId = _infoPanelService.ActiveItemId;
+        var title = _infoPanelService.ActiveItemTitle;
+
+        if (string.IsNullOrEmpty(linkType) || string.IsNullOrEmpty(itemId) || string.IsNullOrEmpty(title))
+            return null;
+
+        var details = _infoPanelService.ActiveItemDetails;
+        if (details is { Count: > 0 })
+        {
+            var fields = string.Join(", ", details.Select(d => $"{d.Label}: {d.Value}"));
+            return $"The user is currently viewing: {title} ({linkType}). Details: {fields}";
+        }
+
+        return $"The user is currently viewing: {title} ({linkType})";
+    }
+
     // ── Commands ─────────────────────────────────────────────────────
 
     [RelayCommand]
@@ -117,181 +159,31 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
     {
         _intentEngine.ClearAll();
 
-        // Dismiss all content-linked assistant messages via messenger
-        var contentMsgs = Messages
+        var contentMsgs = IntentMessages
             .Where(m => m is { Role: ChatMessageRole.Assistant, SuggestionId: not null, SourcePluginId: not null })
             .ToList();
         foreach (var msg in contentMsgs)
             msg.DismissCommand.Execute(null);
 
-        Messages.Clear();
+        ChatMessages.Clear();
+        IntentMessages.Clear();
         _suggestionToAssistantId.Clear();
         _suggestionToUserMsgId.Clear();
         UpdateCounts();
     }
 
-    // ── Intent Engine Event Handlers ─────────────────────────────────
-
-    private void OnIntentSuggestionAdded(object? sender, IntentSuggestion suggestion)
-    {
-        _dispatcher.Post(() =>
-        {
-            AddIntentAsAssistantMessage(suggestion);
-            UpdateCounts();
-            ShowBalloon($"I noticed something: {suggestion.Summary}");
-        });
-    }
-
-    private void OnIntentSuggestionRemoved(object? sender, string suggestionId)
-    {
-        _dispatcher.Post(() =>
-        {
-            RemoveMessageBySuggestionId(suggestionId);
-            UpdateCounts();
-        });
-    }
-
-    private void OnIntentSuggestionsCleared(object? sender, EventArgs e)
-    {
-        _dispatcher.Post(() =>
-        {
-            var intentMsgs = Messages.Where(m => m.SuggestionId?.StartsWith("intent:") == true).ToList();
-            foreach (var msg in intentMsgs)
-                Messages.Remove(msg);
-            UpdateCounts();
-        });
-    }
-
-    private void AddIntentAsAssistantMessage(IntentSuggestion suggestion)
-    {
-        var assistantMsg = new AiChatMessageViewModel(ChatMessageRole.Assistant)
-        {
-            SuggestionId = $"intent:{suggestion.SuggestionId}",
-            Content = suggestion.Summary,
-            State = ChatMessageState.Ready,
-            SourcePluginId = suggestion.MatchedIntent.PluginId,
-            SourceEntityId = suggestion.SourceSignal.EntityId,
-            SourceEntityType = suggestion.SourceSignal.EntityType,
-            SourceEntityTitle = suggestion.SourceSignal.EntityTitle,
-            NavigateToSourceFunc = NavigateToLinkedItemFunc
-        };
-
-        // Intent suggestions don't have standard SuggestionAction buttons —
-        // the IntentSuggestionCardViewModel handled accept/edit/dismiss via IntentEngine.
-        // For now we show intent messages as read-only assistant bubbles.
-        Messages.Add(assistantMsg);
-        RequestScrollToBottom();
-    }
-
-    // ── Messenger Handlers ───────────────────────────────────────────
+    // ── Messenger Handler ────────────────────────────────────────────
 
     public void Receive(IntentSettingsChangedMessage message)
     {
         _dispatcher.Post(() => OnPropertyChanged(nameof(IsEnabled)));
     }
 
-    public void Receive(ContentSuggestionPushedMessage message)
-    {
-        _dispatcher.Post(() =>
-        {
-            var card = message.Card;
-
-            // Create user bubble
-            var userLabel = card.UserPromptLabel ?? $"Hey {AiPersona.Name}, {card.Title}";
-            var userMsg = new AiChatMessageViewModel(ChatMessageRole.User)
-            {
-                SuggestionId = card.SuggestionId,
-                UserLabel = userLabel,
-                SourceEntityId = card.SourceEntityId,
-                SourceEntityType = card.SourceEntityType,
-                SourceEntityTitle = card.SourceEntityTitle,
-                SourcePluginId = card.PluginId,
-                NavigateToSourceFunc = NavigateToLinkedItemFunc
-            };
-            Messages.Add(userMsg);
-            _suggestionToUserMsgId[card.SuggestionId] = userMsg.MessageId;
-
-            // Create assistant bubble
-            var assistantMsg = new AiChatMessageViewModel(ChatMessageRole.Assistant)
-            {
-                SuggestionId = card.SuggestionId,
-                Content = card.Content,
-                State = AiChatMessageViewModel.MapState(card.State),
-                SourcePluginId = card.PluginId,
-                SourceEntityId = card.SourceEntityId,
-                SourceEntityType = card.SourceEntityType,
-                SourceEntityTitle = card.SourceEntityTitle,
-                NavigateToSourceFunc = NavigateToLinkedItemFunc
-            };
-            foreach (var action in card.Actions)
-                assistantMsg.Actions.Add(action);
-
-            Messages.Add(assistantMsg);
-            _suggestionToAssistantId[card.SuggestionId] = assistantMsg.MessageId;
-
-            UpdateCounts();
-            RequestScrollToBottom();
-
-            if (card.State == ContentSuggestionState.Loading)
-                ShowBalloon($"Working on your request...");
-        });
-    }
-
-    public void Receive(ContentSuggestionUpdatedMessage message)
-    {
-        _dispatcher.Post(() =>
-        {
-            if (!_suggestionToAssistantId.TryGetValue(message.SuggestionId, out var assistantMsgId))
-                return;
-
-            var assistantMsg = Messages.FirstOrDefault(m => m.MessageId == assistantMsgId);
-            if (assistantMsg == null) return;
-
-            assistantMsg.ApplyUpdate(message);
-
-            if (message.NewState == ContentSuggestionState.Ready)
-                ShowBalloon("Your result is ready!");
-        });
-    }
-
-    public void Receive(ContentSuggestionRemovedMessage message)
-    {
-        _dispatcher.Post(() =>
-        {
-            RemoveMessageBySuggestionId(message.SuggestionId);
-            UpdateCounts();
-        });
-    }
-
     // ── Internals ────────────────────────────────────────────────────
-
-    private void RemoveMessageBySuggestionId(string suggestionId)
-    {
-        // Remove user message
-        if (_suggestionToUserMsgId.TryGetValue(suggestionId, out var userMsgId))
-        {
-            var userMsg = Messages.FirstOrDefault(m => m.MessageId == userMsgId);
-            if (userMsg != null) Messages.Remove(userMsg);
-            _suggestionToUserMsgId.Remove(suggestionId);
-        }
-
-        // Remove assistant message
-        if (_suggestionToAssistantId.TryGetValue(suggestionId, out var assistantMsgId))
-        {
-            var assistantMsg = Messages.FirstOrDefault(m => m.MessageId == assistantMsgId);
-            if (assistantMsg != null) Messages.Remove(assistantMsg);
-            _suggestionToAssistantId.Remove(suggestionId);
-        }
-
-        // Also check intent-prefixed IDs
-        var intentKey = $"intent:{suggestionId}";
-        var intentMsg = Messages.FirstOrDefault(m => m.SuggestionId == intentKey);
-        if (intentMsg != null) Messages.Remove(intentMsg);
-    }
 
     private void UpdateCounts()
     {
-        PendingCount = Messages.Count;
+        PendingCount = ChatMessages.Count + IntentMessages.Count;
     }
 
     internal void RequestScrollToBottom()

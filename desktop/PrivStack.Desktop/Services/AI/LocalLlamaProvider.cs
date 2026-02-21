@@ -39,8 +39,16 @@ internal sealed class LocalLlamaProvider : IAiProvider
             Id = m,
             DisplayName = m,
             SizeBytes = _modelManager.GetModelSize(m),
-            IsDownloaded = _modelManager.IsModelDownloaded(m)
+            IsDownloaded = _modelManager.IsModelDownloaded(m),
+            ContextWindowTokens = GetContextWindowForModel(m)
         }).ToList();
+
+    private static int GetContextWindowForModel(string modelName)
+    {
+        if (modelName.StartsWith("mistral", StringComparison.OrdinalIgnoreCase))
+            return 32_768;
+        return 4_096; // phi-3-mini, llama-3.2 default
+    }
 
     public Task<bool> ValidateAsync(CancellationToken ct = default)
     {

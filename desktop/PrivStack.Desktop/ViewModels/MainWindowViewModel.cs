@@ -179,9 +179,12 @@ public partial class MainWindowViewModel : ViewModelBase
             App.Services.GetRequiredService<IIntentEngine>(),
             App.Services.GetRequiredService<IUiDispatcher>(),
             App.Services.GetRequiredService<IAppSettingsService>(),
-            App.Services.GetRequiredService<IAiService>(),
+            App.Services.GetRequiredService<Services.AI.AiService>(),
             App.Services.GetRequiredService<Services.AI.AiMemoryService>(),
-            App.Services.GetRequiredService<Services.AI.AiMemoryExtractor>());
+            App.Services.GetRequiredService<Services.AI.AiMemoryExtractor>(),
+            App.Services.GetRequiredService<Services.AI.AiConversationStore>(),
+            App.Services.GetRequiredService<Services.InfoPanelService>(),
+            App.Services.GetRequiredService<IPluginRegistry>());
         vm.NavigateToLinkedItemFunc = NavigateToLinkedItemAsync;
         return vm;
     }

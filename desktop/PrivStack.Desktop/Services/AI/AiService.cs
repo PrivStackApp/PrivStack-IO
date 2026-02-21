@@ -98,6 +98,24 @@ internal sealed class AiService : IAiService
         }).ToList();
     }
 
+    internal AiModelInfo? GetActiveModelInfo()
+    {
+        var provider = GetActiveProvider();
+        if (provider == null) return null;
+
+        var modelId = provider.IsLocal
+            ? _appSettings.Settings.AiLocalModel
+            : _appSettings.Settings.AiModel;
+
+        if (!string.IsNullOrEmpty(modelId))
+        {
+            var match = provider.AvailableModels.FirstOrDefault(m => m.Id == modelId);
+            if (match != null) return match;
+        }
+
+        return provider.AvailableModels.FirstOrDefault();
+    }
+
     internal IAiProvider? GetProvider(string id)
     {
         EnsureProviders();
