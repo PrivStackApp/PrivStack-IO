@@ -23,6 +23,7 @@ public partial class AiSuggestionTrayViewModel
         {
             AddIntentAsAssistantMessage(suggestion);
             UpdateCounts();
+            HasUnseenInsight = true;
             ShowBalloon($"I noticed something: {suggestion.Summary}");
         });
     }
