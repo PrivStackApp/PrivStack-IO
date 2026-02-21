@@ -100,7 +100,7 @@ public partial class GraphViewModel : PrivStack.Sdk.ViewModelBase
 
     // Tab support
     [ObservableProperty] private GraphTab _activeTab = GraphTab.KnowledgeGraph;
-    public EmbeddingSpaceViewModel? EmbeddingSpace { get; set; }
+    internal EmbeddingSpaceViewModel? EmbeddingSpace { get; set; }
     public event EventHandler<GraphTab>? ActiveTabChanged;
 
     // Events for canvas
