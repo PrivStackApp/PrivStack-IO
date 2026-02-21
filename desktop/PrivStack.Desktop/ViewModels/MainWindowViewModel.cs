@@ -452,6 +452,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // Activate dataset insight orchestrator (subscribes to messenger)
         _ = App.Services.GetRequiredService<Services.AI.DatasetInsightOrchestrator>();
+
+        // Eagerly initialize the AI suggestion tray so it subscribes to IntentEngine.SuggestionAdded
+        // before any plugin signals arrive. Lazy init caused missed notifications (balloon + badge)
+        // because the event had no subscriber until the user first opened the tray.
+        _ = AiTrayVM;
     }
 
     private void WireCommandPaletteDelegates(CommandPaletteViewModel palette)
