@@ -764,6 +764,10 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
             await StartSyncForWorkspace(workspace);
             Log.Information("Cloud sync auto-started on app launch for workspace {WorkspaceId}", workspace.Id);
         }
+        catch (PrivStackException ex) when (ex.ErrorCode == PrivStackError.CloudAuthError)
+        {
+            Log.Debug("Cloud sync auto-start skipped: {Reason}", ex.ErrorCode);
+        }
         catch (Exception ex)
         {
             Log.Warning(ex, "Failed to auto-start cloud sync");
