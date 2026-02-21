@@ -1182,6 +1182,63 @@ impl EntityStore {
 
         Ok(rows)
     }
+
+    /// Fetch all RAG vector entries with their embeddings for visualization.
+    /// Returns JSON objects with entity_id, entity_type, plugin_id, title, link_type,
+    /// chunk_text, and the raw embedding array.
+    pub fn rag_fetch_all(
+        &self,
+        entity_types: Option<&[&str]>,
+        limit: usize,
+    ) -> StorageResult<Vec<serde_json::Value>> {
+        let conn = self.conn.lock().unwrap();
+
+        let (type_filter, type_params) = if let Some(types) = entity_types {
+            let placeholders: Vec<&str> = types.iter().map(|_| "?").collect();
+            (
+                format!("WHERE entity_type IN ({})", placeholders.join(",")),
+                types.to_vec(),
+            )
+        } else {
+            (String::new(), vec![])
+        };
+
+        let sql = format!(
+            "SELECT entity_id, entity_type, plugin_id, chunk_path, title, link_type, \
+             embedding, chunk_text \
+             FROM rag_vectors {} LIMIT ?",
+            type_filter
+        );
+
+        let mut stmt = conn.prepare(&sql)?;
+
+        let limit_i64 = limit as i64;
+        let mut param_values: Vec<Box<dyn duckdb::ToSql>> = Vec::new();
+        for t in &type_params {
+            param_values.push(Box::new(t.to_string()));
+        }
+        param_values.push(Box::new(limit_i64));
+        let param_refs: Vec<&dyn duckdb::ToSql> = param_values.iter().map(|b| b.as_ref()).collect();
+
+        let rows: Vec<serde_json::Value> = stmt
+            .query_map(param_refs.as_slice(), |row| {
+                let embedding: Vec<f64> = row.get::<_, Vec<f64>>(6)?;
+                Ok(serde_json::json!({
+                    "entity_id": row.get::<_, String>(0)?,
+                    "entity_type": row.get::<_, String>(1)?,
+                    "plugin_id": row.get::<_, String>(2)?,
+                    "chunk_path": row.get::<_, String>(3)?,
+                    "title": row.get::<_, String>(4)?,
+                    "link_type": row.get::<_, String>(5)?,
+                    "embedding": embedding,
+                    "chunk_text": row.get::<_, Option<String>>(7)?.unwrap_or_default(),
+                }))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(rows)
+    }
 }
 
 /// Returns the name of the primary database on this connection.
