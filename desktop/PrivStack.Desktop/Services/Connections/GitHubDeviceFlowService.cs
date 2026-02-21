@@ -33,10 +33,14 @@ public sealed class GitHubDeviceFlowService
     private static readonly HttpClient Http = CreateHttpClient();
 
     // GitHub App client ID — permissions (issues:write, contents:write) are
-    // configured on the app itself at https://github.com/settings/apps
-    private static readonly string ClientId =
+    // configured on the app itself at https://github.com/settings/apps.
+    // Lazy to avoid TypeInitializationException when env var is not set
+    // but GitHub connections are not being used.
+    private static readonly Lazy<string> _clientId = new(() =>
         Environment.GetEnvironmentVariable("PRIVSTACK_GITHUB_CLIENT_ID")
-        ?? throw new InvalidOperationException("PRIVSTACK_GITHUB_CLIENT_ID env var not set");
+        ?? throw new InvalidOperationException("PRIVSTACK_GITHUB_CLIENT_ID env var not set"));
+
+    private static string ClientId => _clientId.Value;
 
     private static HttpClient CreateHttpClient()
     {
