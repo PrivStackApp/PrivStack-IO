@@ -1026,6 +1026,152 @@ impl EntityStore {
 
         Ok((size_before, size_after))
     }
+
+    // ── RAG Vector Index ──
+
+    /// Upsert a RAG vector entry (INSERT OR REPLACE).
+    pub fn rag_upsert(
+        &self,
+        entity_id: &str,
+        chunk_path: &str,
+        plugin_id: &str,
+        entity_type: &str,
+        content_hash: &str,
+        dim: i32,
+        embedding: &[f64],
+        title: &str,
+        link_type: &str,
+        indexed_at: i64,
+    ) -> StorageResult<()> {
+        let conn = self.conn.lock().unwrap();
+        let components: Vec<String> = embedding.iter().map(|f| f.to_string()).collect();
+        let array_literal = format!("[{}]", components.join(","));
+        conn.execute(
+            &format!(
+                "INSERT OR REPLACE INTO rag_vectors \
+                 (entity_id, chunk_path, plugin_id, entity_type, content_hash, dim, embedding, title, link_type, indexed_at) \
+                 VALUES (?, ?, ?, ?, ?, ?, {}::DOUBLE[], ?, ?, ?)",
+                array_literal
+            ),
+            params![entity_id, chunk_path, plugin_id, entity_type, content_hash, dim, title, link_type, indexed_at],
+        )?;
+        Ok(())
+    }
+
+    /// Search RAG vectors by cosine similarity to a query embedding.
+    /// Returns JSON array of results with score, ordered descending.
+    pub fn rag_search(
+        &self,
+        query_embedding: &[f64],
+        limit: usize,
+        entity_types: Option<&[&str]>,
+    ) -> StorageResult<Vec<serde_json::Value>> {
+        let conn = self.conn.lock().unwrap();
+        let components: Vec<String> = query_embedding.iter().map(|f| f.to_string()).collect();
+        let array_literal = format!("[{}]", components.join(","));
+
+        let (type_filter, type_params) = if let Some(types) = entity_types {
+            let placeholders: Vec<&str> = types.iter().map(|_| "?").collect();
+            (
+                format!("WHERE entity_type IN ({})", placeholders.join(",")),
+                types.to_vec(),
+            )
+        } else {
+            (String::new(), vec![])
+        };
+
+        let sql = format!(
+            "SELECT entity_id, entity_type, plugin_id, chunk_path, title, link_type, \
+             list_cosine_similarity(embedding, {}::DOUBLE[]) AS score \
+             FROM rag_vectors {} \
+             ORDER BY score DESC LIMIT ?",
+            array_literal, type_filter
+        );
+
+        let mut stmt = conn.prepare(&sql)?;
+
+        // Build params: type filters + limit
+        let limit_i64 = limit as i64;
+        let mut param_values: Vec<Box<dyn duckdb::ToSql>> = Vec::new();
+        for t in &type_params {
+            param_values.push(Box::new(t.to_string()));
+        }
+        param_values.push(Box::new(limit_i64));
+
+        let param_refs: Vec<&dyn duckdb::ToSql> = param_values.iter().map(|b| b.as_ref()).collect();
+
+        let rows: Vec<serde_json::Value> = stmt
+            .query_map(param_refs.as_slice(), |row| {
+                Ok(serde_json::json!({
+                    "entity_id": row.get::<_, String>(0)?,
+                    "entity_type": row.get::<_, String>(1)?,
+                    "plugin_id": row.get::<_, String>(2)?,
+                    "chunk_path": row.get::<_, String>(3)?,
+                    "title": row.get::<_, String>(4)?,
+                    "link_type": row.get::<_, String>(5)?,
+                    "score": row.get::<_, f64>(6)?,
+                }))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(rows)
+    }
+
+    /// Delete all RAG vectors for a given entity.
+    pub fn rag_delete(&self, entity_id: &str) -> StorageResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM rag_vectors WHERE entity_id = ?",
+            params![entity_id],
+        )?;
+        Ok(())
+    }
+
+    /// Get content hashes for all chunks of given entity types (for incremental skip).
+    /// Returns (entity_id, chunk_path, content_hash) tuples.
+    pub fn rag_get_hashes(
+        &self,
+        entity_types: Option<&[&str]>,
+    ) -> StorageResult<Vec<(String, String, String)>> {
+        let conn = self.conn.lock().unwrap();
+
+        let (sql, type_params) = if let Some(types) = entity_types {
+            let placeholders: Vec<&str> = types.iter().map(|_| "?").collect();
+            (
+                format!(
+                    "SELECT entity_id, chunk_path, content_hash FROM rag_vectors WHERE entity_type IN ({})",
+                    placeholders.join(",")
+                ),
+                types.to_vec(),
+            )
+        } else {
+            (
+                "SELECT entity_id, chunk_path, content_hash FROM rag_vectors".to_string(),
+                vec![],
+            )
+        };
+
+        let mut stmt = conn.prepare(&sql)?;
+        let mut param_values: Vec<Box<dyn duckdb::ToSql>> = Vec::new();
+        for t in &type_params {
+            param_values.push(Box::new(t.to_string()));
+        }
+        let param_refs: Vec<&dyn duckdb::ToSql> = param_values.iter().map(|b| b.as_ref()).collect();
+
+        let rows: Vec<(String, String, String)> = stmt
+            .query_map(param_refs.as_slice(), |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(rows)
+    }
 }
 
 /// Returns the name of the primary database on this connection.
@@ -1551,6 +1697,22 @@ fn initialize_entity_schema(conn: &Connection) -> StorageResult<()> {
         );
         CREATE INDEX IF NOT EXISTS idx_plugin_fuel_plugin_id ON plugin_fuel_history(plugin_id);
         CREATE INDEX IF NOT EXISTS idx_plugin_fuel_recorded_at ON plugin_fuel_history(plugin_id, recorded_at DESC);
+
+        -- RAG vector index for semantic search across plugin content
+        CREATE TABLE IF NOT EXISTS rag_vectors (
+            entity_id VARCHAR NOT NULL,
+            chunk_path VARCHAR NOT NULL,
+            plugin_id VARCHAR NOT NULL,
+            entity_type VARCHAR NOT NULL,
+            content_hash VARCHAR NOT NULL,
+            dim INTEGER NOT NULL,
+            embedding DOUBLE[],
+            title VARCHAR,
+            link_type VARCHAR,
+            indexed_at BIGINT NOT NULL,
+            PRIMARY KEY (entity_id, chunk_path)
+        );
+        CREATE INDEX IF NOT EXISTS idx_rag_vectors_type ON rag_vectors(entity_type);
         "#,
     )?;
 

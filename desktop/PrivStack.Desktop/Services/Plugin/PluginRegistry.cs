@@ -1739,6 +1739,12 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
                 HostFactory.CapabilityBroker.Register<IQuickActionProvider>(quickActionProvider);
             }
 
+            // Auto-register indexable content providers with the capability broker
+            if (plugin is IIndexableContentProvider indexableContentProvider)
+            {
+                HostFactory.CapabilityBroker.Register<IIndexableContentProvider>(indexableContentProvider);
+            }
+
             _log.Debug("Plugin activated: {PluginId}", plugin.Metadata.Id);
             RaisePluginStateChanged(plugin, PluginState.Active);
         }
