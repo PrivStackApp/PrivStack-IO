@@ -18,6 +18,8 @@ struct RagUpsertRequest {
     title: String,
     link_type: String,
     indexed_at: i64,
+    #[serde(default)]
+    chunk_text: String,
 }
 
 #[derive(Deserialize)]
@@ -82,6 +84,7 @@ unsafe fn rag_upsert_inner(json: *const c_char) -> SdkResponse {
         &req.title,
         &req.link_type,
         req.indexed_at,
+        &req.chunk_text,
     ) {
         Ok(()) => SdkResponse::ok_empty(),
         Err(e) => SdkResponse::err("storage_error", &format!("RAG upsert failed: {e}")),

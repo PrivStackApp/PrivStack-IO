@@ -235,7 +235,7 @@ public partial class AiSuggestionTrayViewModel
 
     /// <summary>
     /// Runs semantic search against the RAG vector index and formats matching results
-    /// as context for the system prompt.
+    /// as context for the system prompt. Uses chunk text from the index for real content.
     /// </summary>
     private async Task<string?> BuildRagContextAsync(string query)
     {
@@ -245,25 +245,35 @@ public partial class AiSuggestionTrayViewModel
         try
         {
             var isCloud = !IsActiveProviderLocal();
-            var limit = isCloud ? 10 : 5; // fewer results for local models with smaller context
+            var limit = isCloud ? 10 : 5;
+            var maxChunkChars = isCloud ? 500 : 200;
 
             var results = await _ragSearchService.SearchAsync(query, limit);
 
             if (results.Count == 0)
                 return null;
 
-            // Filter by minimum relevance score
             var relevant = results.Where(r => r.Score >= 0.3).ToList();
             if (relevant.Count == 0)
                 return null;
 
             var sb = new StringBuilder();
             sb.AppendLine("Relevant information from the user's data:");
+            sb.AppendLine();
 
             foreach (var result in relevant)
             {
-                var typeLabel = FormatEntityTypeLabel(result.EntityType);
-                sb.AppendLine($"- [{typeLabel}] {result.Title} (relevance: {result.Score:F2})");
+                sb.AppendLine($"[{result.EntityType}] {result.Title} (score: {result.Score:F2})");
+
+                if (!string.IsNullOrWhiteSpace(result.ChunkText))
+                {
+                    var text = result.ChunkText.Length > maxChunkChars
+                        ? result.ChunkText[..maxChunkChars] + "..."
+                        : result.ChunkText;
+                    sb.AppendLine(text);
+                }
+
+                sb.AppendLine();
             }
 
             _log.Debug("RAG context: {Count} results injected into system prompt", relevant.Count);
@@ -274,23 +284,5 @@ public partial class AiSuggestionTrayViewModel
             _log.Warning(ex, "RAG search failed during chat, continuing without context");
             return null;
         }
-    }
-
-    private static string FormatEntityTypeLabel(string entityType)
-    {
-        return entityType switch
-        {
-            "page" => "Note",
-            "task" => "Task",
-            "contact" => "Contact",
-            "event" => "Event",
-            "journal_entry" => "Journal",
-            "snippet" => "Snippet",
-            "rss_item" => "RSS",
-            "web_clip" => "Web Clip",
-            "email" => "Email",
-            "file" => "File",
-            _ => entityType
-        };
     }
 }

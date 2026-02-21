@@ -1042,6 +1042,7 @@ impl EntityStore {
         title: &str,
         link_type: &str,
         indexed_at: i64,
+        chunk_text: &str,
     ) -> StorageResult<()> {
         let conn = self.conn.lock().unwrap();
         let components: Vec<String> = embedding.iter().map(|f| f.to_string()).collect();
@@ -1049,11 +1050,11 @@ impl EntityStore {
         conn.execute(
             &format!(
                 "INSERT OR REPLACE INTO rag_vectors \
-                 (entity_id, chunk_path, plugin_id, entity_type, content_hash, dim, embedding, title, link_type, indexed_at) \
-                 VALUES (?, ?, ?, ?, ?, ?, {}::DOUBLE[], ?, ?, ?)",
+                 (entity_id, chunk_path, plugin_id, entity_type, content_hash, dim, embedding, title, link_type, indexed_at, chunk_text) \
+                 VALUES (?, ?, ?, ?, ?, ?, {}::DOUBLE[], ?, ?, ?, ?)",
                 array_literal
             ),
-            params![entity_id, chunk_path, plugin_id, entity_type, content_hash, dim, title, link_type, indexed_at],
+            params![entity_id, chunk_path, plugin_id, entity_type, content_hash, dim, title, link_type, indexed_at, chunk_text],
         )?;
         Ok(())
     }
@@ -1082,7 +1083,8 @@ impl EntityStore {
 
         let sql = format!(
             "SELECT entity_id, entity_type, plugin_id, chunk_path, title, link_type, \
-             list_cosine_similarity(embedding, {}::DOUBLE[]) AS score \
+             list_cosine_similarity(embedding, {}::DOUBLE[]) AS score, \
+             chunk_text \
              FROM rag_vectors {} \
              ORDER BY score DESC LIMIT ?",
             array_literal, type_filter
@@ -1110,6 +1112,7 @@ impl EntityStore {
                     "title": row.get::<_, String>(4)?,
                     "link_type": row.get::<_, String>(5)?,
                     "score": row.get::<_, f64>(6)?,
+                    "chunk_text": row.get::<_, Option<String>>(7)?.unwrap_or_default(),
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -1639,6 +1642,22 @@ fn initialize_entity_schema(conn: &Connection) -> StorageResult<()> {
         }
     }
 
+    // Migration: add chunk_text column to rag_vectors if missing (stores original text for search result context)
+    {
+        let has_chunk_text: bool = conn
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM information_schema.columns \
+                 WHERE table_name = 'rag_vectors' AND column_name = 'chunk_text'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(false);
+        if !has_chunk_text {
+            conn.execute_batch("ALTER TABLE rag_vectors ADD COLUMN chunk_text TEXT")
+                .ok(); // ok() — table might not exist yet on first run
+        }
+    }
+
     conn.execute_batch(
         r#"
         CREATE TABLE IF NOT EXISTS entities (
@@ -1717,6 +1736,7 @@ fn initialize_entity_schema(conn: &Connection) -> StorageResult<()> {
             title VARCHAR,
             link_type VARCHAR,
             indexed_at BIGINT NOT NULL,
+            chunk_text TEXT,
             PRIMARY KEY (entity_id, chunk_path)
         );
         CREATE INDEX IF NOT EXISTS idx_rag_vectors_type ON rag_vectors(entity_type);

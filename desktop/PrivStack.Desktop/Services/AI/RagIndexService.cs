@@ -257,6 +257,7 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
             title = chunk.Title,
             link_type = chunk.LinkType,
             indexed_at = now,
+            chunk_text = chunk.Text,
         };
 
         var requestJson = JsonSerializer.Serialize(request);
