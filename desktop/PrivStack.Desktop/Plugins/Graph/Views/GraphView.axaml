@@ -397,7 +397,7 @@
                                         <TextBlock Grid.Column="1" Text="{Binding EmbeddingSpace.SimilarityThreshold, StringFormat='{}{0:F2}'}"
                                                    FontSize="{DynamicResource ThemeFontSizeXs}" Opacity="0.5"/>
                                     </Grid>
-                                    <Slider Value="{Binding EmbeddingSpace.SimilarityThreshold}" Minimum="0.7" Maximum="0.98"
+                                    <Slider Value="{Binding EmbeddingSpace.SimilarityThreshold}" Minimum="0.3" Maximum="0.98"
                                             TickFrequency="0.01" IsSnapToTickEnabled="True"/>
                                 </StackPanel>
                                 <StackPanel Spacing="2">
