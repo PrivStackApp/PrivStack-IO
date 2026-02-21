@@ -62,8 +62,7 @@ internal static class TableGridCellFactory
 
         var border = new Border
         {
-            BorderThickness = isHeader ? new Thickness(0, 0, 0, 1) : new Thickness(0),
-            BorderBrush = isHeader ? GetBrush(themeSource, "ThemeBorderSubtleBrush") : null,
+            BorderThickness = new Thickness(0),
             Background = backgroundColor,
             Child = tb
         };
@@ -226,8 +225,7 @@ internal static class TableGridCellFactory
 
         var border = new Border
         {
-            BorderThickness = isHeader ? new Thickness(0, 0, 0, 1) : new Thickness(0),
-            BorderBrush = isHeader ? GetBrush(themeSource, "ThemeBorderSubtleBrush") : null,
+            BorderThickness = new Thickness(0),
             Background = backgroundColor,
             Child = tb
         };
@@ -246,7 +244,8 @@ internal static class TableGridCellFactory
                 var themed = GetBrush(themeSource, themeHeaderKey);
                 if (themed != null) return themed;
             }
-            return GetBrush(themeSource, "ThemeSurfaceElevatedBrush");
+            return GetBrush(themeSource, "ThemeTableHeaderBrush")
+                   ?? GetBrush(themeSource, "ThemeSurfaceElevatedBrush");
         }
 
         if (isStriped && dataRowIndex % 2 == 1)

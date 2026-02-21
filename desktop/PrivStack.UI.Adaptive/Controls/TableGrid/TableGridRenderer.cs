@@ -207,8 +207,11 @@ internal static class TableGridRenderer
                 new GridLength(0, GridUnitType.Pixel)));
             for (var c = effectiveFrozenCols; c < colCount; c++)
             {
-                grid.ColumnDefinitions.Add(new ColumnDefinition(
-                    new GridLength(widths[c], GridUnitType.Pixel)));
+                var isLast = c == colCount - 1;
+                var colDef = isLast
+                    ? new ColumnDefinition { MinWidth = widths[c], Width = new GridLength(1, GridUnitType.Star) }
+                    : new ColumnDefinition(new GridLength(widths[c], GridUnitType.Pixel));
+                grid.ColumnDefinitions.Add(colDef);
                 grid.ColumnDefinitions.Add(new ColumnDefinition(
                     new GridLength(2, GridUnitType.Pixel)));
             }
@@ -219,8 +222,11 @@ internal static class TableGridRenderer
                 new GridLength(showDragHandles ? 20 : 0, GridUnitType.Pixel)));
             for (var c = 0; c < colCount; c++)
             {
-                grid.ColumnDefinitions.Add(new ColumnDefinition(
-                    new GridLength(widths[c], GridUnitType.Pixel)));
+                var isLast = c == colCount - 1;
+                var colDef = isLast
+                    ? new ColumnDefinition { MinWidth = widths[c], Width = new GridLength(1, GridUnitType.Star) }
+                    : new ColumnDefinition(new GridLength(widths[c], GridUnitType.Pixel));
+                grid.ColumnDefinitions.Add(colDef);
                 grid.ColumnDefinitions.Add(new ColumnDefinition(
                     new GridLength(2, GridUnitType.Pixel)));
             }
