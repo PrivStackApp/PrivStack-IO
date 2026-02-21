@@ -3,6 +3,8 @@ namespace PrivStack.Desktop.Services.Connections;
 /// <summary>
 /// OAuth2 provider configuration for shell-level connections.
 /// Contains endpoints, combined scopes, and client IDs for Google and Microsoft.
+/// Configs are lazily initialized to avoid crashes when env vars are not set
+/// but connections are not being used.
 /// </summary>
 public sealed record OAuthProviderConfig
 {
@@ -16,6 +18,7 @@ public sealed record OAuthProviderConfig
 
     /// <summary>
     /// Returns the OAuth config for a provider ID, or null if not supported.
+    /// Throws InvalidOperationException if the required env var is not set.
     /// </summary>
     public static OAuthProviderConfig? ForProvider(string providerId) => providerId switch
     {
@@ -32,7 +35,7 @@ public sealed record OAuthProviderConfig
 
     // ── Google ───────────────────────────────────────────────────────
     // Combined scopes: Gmail + Calendar + identity
-    public static readonly OAuthProviderConfig Google = new()
+    private static readonly Lazy<OAuthProviderConfig> _google = new(() => new()
     {
         ProviderId = "google",
         ProviderDisplayName = "Google",
@@ -42,11 +45,13 @@ public sealed record OAuthProviderConfig
         AuthorizeEndpoint = "https://accounts.google.com/o/oauth2/v2/auth",
         TokenEndpoint = "https://oauth2.googleapis.com/token",
         Scopes = "https://mail.google.com/ https://www.googleapis.com/auth/calendar email openid",
-    };
+    });
+
+    public static OAuthProviderConfig Google => _google.Value;
 
     // ── Microsoft ───────────────────────────────────────────────────
     // Combined scopes: Outlook IMAP/SMTP + identity
-    public static readonly OAuthProviderConfig Microsoft = new()
+    private static readonly Lazy<OAuthProviderConfig> _microsoft = new(() => new()
     {
         ProviderId = "microsoft",
         ProviderDisplayName = "Microsoft",
@@ -55,5 +60,7 @@ public sealed record OAuthProviderConfig
         AuthorizeEndpoint = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
         TokenEndpoint = "https://login.microsoftonline.com/common/oauth2/v2.0/token",
         Scopes = "https://outlook.office365.com/IMAP.AccessAsUser.All https://outlook.office365.com/SMTP.Send offline_access openid email",
-    };
+    });
+
+    public static OAuthProviderConfig Microsoft => _microsoft.Value;
 }
