@@ -46,6 +46,7 @@ internal sealed class DatasetInsightOrchestrator
 
         WeakReferenceMessenger.Default.Register<DatasetInsightRequestMessage>(this, OnInsightRequested);
         WeakReferenceMessenger.Default.Register<ContentSuggestionActionRequestedMessage>(this, OnActionRequested);
+        WeakReferenceMessenger.Default.Register<ChartQueryErrorMessage>(this, OnChartQueryError);
     }
 
     private async void OnInsightRequested(object recipient, DatasetInsightRequestMessage msg)
@@ -89,6 +90,9 @@ internal sealed class DatasetInsightOrchestrator
             ? BuildCloudSystemPrompt(columnList, chartColumnList)
             : BuildLocalSystemPrompt(columnList, chartColumnList);
 
+        _suggestionService.Update(msg.SuggestionId, "privstack.data",
+            newContent: "Sending data to AI model...");
+
         var request = new AiRequest
         {
             SystemPrompt = systemPrompt,
@@ -114,6 +118,9 @@ internal sealed class DatasetInsightOrchestrator
                 errorMessage: response.ErrorMessage ?? "AI returned empty response");
             return;
         }
+
+        _suggestionService.Update(msg.SuggestionId, "privstack.data",
+            newContent: "Processing AI response...");
 
         var sections = ParseSections(response.Content);
         var result = new DatasetInsightResult(
@@ -172,6 +179,75 @@ internal sealed class DatasetInsightOrchestrator
         }
     }
 
+    // ── Chart query error recovery ────────────────────────────────────
+
+    private async void OnChartQueryError(object recipient, ChartQueryErrorMessage msg)
+    {
+        try
+        {
+            var columnInfo = string.Join("\n", msg.AvailableColumns.Zip(msg.ColumnTypes,
+                (c, t) => $"  - {c} ({t})"));
+
+            var prompt = $"""
+                A chart query failed with this error:
+                {msg.ErrorMessage}
+
+                Original chart configuration:
+                - Type: {msg.ChartType}
+                - X Column: {msg.XColumn}
+                - Y Column: {msg.YColumn}
+                - Aggregation: {msg.Aggregation ?? "(none)"}
+                - Group By: {msg.GroupBy ?? "(none)"}
+
+                Available dataset columns:
+                {columnInfo}
+
+                Fix the chart configuration. The y_column must be numeric and compatible with
+                the aggregation function. If the query uses GROUP BY, an aggregation (sum, avg,
+                count, min, max) MUST be specified.
+
+                Respond with ONLY a single corrected chart marker line:
+                [CHART: type=TYPE | title=Title | x=column | y=column | agg=FUNCTION | group=column]
+                """;
+
+            var response = await _aiService.CompleteAsync(new AiRequest
+            {
+                SystemPrompt = "You fix broken SQL chart queries. Return only the corrected [CHART:...] marker.",
+                UserPrompt = prompt,
+                MaxTokens = 256,
+                Temperature = 0.1,
+                FeatureId = "data.chart_fix",
+            });
+
+            if (response.Success && !string.IsNullOrWhiteSpace(response.Content))
+            {
+                var parsed = TryParseChartMarker(response.Content.Trim(), msg.AvailableColumns);
+                if (parsed != null)
+                {
+                    msg.OnFixed?.Invoke(new ChartQueryFixResult
+                    {
+                        ChartType = parsed.ChartType,
+                        Title = parsed.Title,
+                        XColumn = parsed.XColumn,
+                        YColumn = parsed.YColumn,
+                        Aggregation = parsed.Aggregation,
+                        GroupBy = parsed.GroupBy,
+                    });
+                    return;
+                }
+            }
+
+            msg.OnFixed?.Invoke(null);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Chart query error recovery failed");
+            msg.OnFixed?.Invoke(null);
+        }
+    }
+
+    // ── Note creation ───────────────────────────────────────────────────
+
     private async Task CreateInsightNotesAsync(DatasetInsightResult result)
     {
         var parentTitle = $"{AiPersona.Name} Generated Data Insights";
@@ -192,10 +268,15 @@ internal sealed class DatasetInsightOrchestrator
         var chartDatasetMap = new Dictionary<string, string>(); // chart key → generated dataset ID
         if (result.SampleRows is { Count: > 0 } && allCharts.Count > 0)
         {
+            var chartIndex = 0;
             foreach (var chart in allCharts)
             {
                 var key = $"{chart.ChartType}:{chart.XColumn}:{chart.YColumn}:{chart.GroupBy}";
-                if (chartDatasetMap.ContainsKey(key)) continue;
+                if (chartDatasetMap.ContainsKey(key)) { chartIndex++; continue; }
+
+                chartIndex++;
+                _suggestionService.Update(result.SuggestionId, "privstack.data",
+                    newContent: $"Generating chart datasets ({chartIndex}/{allCharts.Count})...");
 
                 var generatedId = await _chartGenerator.GenerateAsync(
                     chart, result.Columns, result.SampleRows, result.DatasetName);
@@ -224,6 +305,9 @@ internal sealed class DatasetInsightOrchestrator
         // If no parsed sections, add raw content as paragraphs
         if (result.Sections.Count == 0)
             BuildSectionBlocks(result.RawContent, result, chartDatasetMap, blocks);
+
+        _suggestionService.Update(result.SuggestionId, "privstack.data",
+            newContent: "Saving insights to Notes...");
 
         var payload = InsightPageBuilder.BuildCreatePayload(subPageId, subPageTitle, parentId, blocks);
 
