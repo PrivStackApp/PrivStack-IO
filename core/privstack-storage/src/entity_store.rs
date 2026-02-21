@@ -831,41 +831,44 @@ impl EntityStore {
         Ok(())
     }
 
-    /// Finds orphan entities whose (created_by, entity_type) don't match any known
-    /// plugin schema. Returns JSON array of orphan summaries.
+    /// Finds orphan entities whose entity_type doesn't match any known plugin schema.
+    /// Returns JSON array of orphan summaries.
     /// `valid_types` is a list of (plugin_id, entity_type) pairs from registered plugins.
+    /// NOTE: Only `entity_type` is checked — `created_by` is a peer ID (device UUID),
+    /// not a plugin ID, so it cannot be used for ownership matching.
     pub fn find_orphan_entities(
         &self,
         valid_types: &[(String, String)],
     ) -> StorageResult<Vec<serde_json::Value>> {
         let conn = self.conn.lock().unwrap();
 
-        // Get all distinct (created_by, entity_type) combos in the DB
+        // Collect all known entity_type values
+        let known_types: std::collections::HashSet<&str> = valid_types
+            .iter()
+            .map(|(_, etype)| etype.as_str())
+            .collect();
+
+        // Get all distinct entity_type combos in the DB
         let mut stmt = conn.prepare(
-            "SELECT created_by, entity_type, COUNT(*) as cnt
+            "SELECT entity_type, COUNT(*) as cnt
              FROM entities
-             GROUP BY created_by, entity_type"
+             GROUP BY entity_type"
         )?;
 
-        let db_types: Vec<(String, String, i64)> = stmt
+        let db_types: Vec<(String, i64)> = stmt
             .query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(1)?,
                 ))
             })?
             .filter_map(|r| r.ok())
             .collect();
 
         let mut orphans = Vec::new();
-        for (plugin_id, entity_type, count) in &db_types {
-            let is_known = valid_types.iter().any(|(pid, etype)| {
-                pid == plugin_id && etype == entity_type
-            });
-            if !is_known {
+        for (entity_type, count) in &db_types {
+            if !known_types.contains(entity_type.as_str()) {
                 orphans.push(serde_json::json!({
-                    "plugin_id": plugin_id,
                     "entity_type": entity_type,
                     "count": count,
                 }));
@@ -874,33 +877,32 @@ impl EntityStore {
         Ok(orphans)
     }
 
-    /// Deletes orphan entities whose (created_by, entity_type) don't match any known
-    /// plugin schema. Also cascades to auxiliary tables. Returns count of deleted entities.
+    /// Deletes orphan entities whose entity_type doesn't match any known plugin schema.
+    /// Also cascades to auxiliary tables. Returns count of deleted entities.
+    /// NOTE: Only `entity_type` is checked — `created_by` is a peer ID (device UUID),
+    /// not a plugin ID, so it cannot be used for ownership matching.
     pub fn delete_orphan_entities(
         &self,
         valid_types: &[(String, String)],
     ) -> StorageResult<usize> {
         let conn = self.conn.lock().unwrap();
 
-        // Build WHERE clause to exclude known types
         if valid_types.is_empty() {
             return Ok(0);
         }
 
-        // Find orphan IDs first
-        let mut conditions = Vec::new();
-        for (pid, etype) in valid_types {
-            conditions.push(format!(
-                "(created_by = '{}' AND entity_type = '{}')",
-                pid.replace('\'', "''"),
-                etype.replace('\'', "''"),
-            ));
-        }
-        let where_known = conditions.join(" OR ");
+        // Build WHERE clause to exclude known entity types
+        let known_types: Vec<String> = valid_types
+            .iter()
+            .map(|(_, etype)| format!("'{}'", etype.replace('\'', "''")))
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        let in_clause = known_types.join(",");
 
         let query = format!(
-            "SELECT id FROM entities WHERE NOT ({})",
-            where_known
+            "SELECT id FROM entities WHERE entity_type NOT IN ({})",
+            in_clause
         );
         let mut stmt = conn.prepare(&query)?;
         let orphan_ids: Vec<String> = stmt
@@ -916,13 +918,13 @@ impl EntityStore {
         let id_list: Vec<String> = orphan_ids.iter().map(|id| {
             format!("'{}'", id.replace('\'', "''"))
         }).collect();
-        let in_clause = id_list.join(",");
+        let id_in = id_list.join(",");
 
         conn.execute_batch(&format!(
-            "DELETE FROM entity_vectors WHERE entity_id IN ({in_clause});
-             DELETE FROM sync_ledger WHERE entity_id IN ({in_clause});
-             DELETE FROM entity_links WHERE source_id IN ({in_clause}) OR target_id IN ({in_clause});
-             DELETE FROM entities WHERE id IN ({in_clause});"
+            "DELETE FROM entity_vectors WHERE entity_id IN ({id_in});
+             DELETE FROM sync_ledger WHERE entity_id IN ({id_in});
+             DELETE FROM entity_links WHERE source_id IN ({id_in}) OR target_id IN ({id_in});
+             DELETE FROM entities WHERE id IN ({id_in});"
         ))?;
 
         Ok(orphan_ids.len())
