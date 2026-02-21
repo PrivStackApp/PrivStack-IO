@@ -1,6 +1,18 @@
 namespace PrivStack.Sdk.Services;
 
 /// <summary>
+/// A single message in a conversation history (role + content).
+/// </summary>
+public sealed record AiChatMessage
+{
+    /// <summary>Role: "user", "assistant", or "system".</summary>
+    public required string Role { get; init; }
+
+    /// <summary>The message content.</summary>
+    public required string Content { get; init; }
+}
+
+/// <summary>
 /// Request payload for an AI completion.
 /// </summary>
 public sealed record AiRequest
@@ -19,6 +31,12 @@ public sealed record AiRequest
 
     /// <summary>Identifies the calling feature for telemetry/logging (e.g. "notes.summarize").</summary>
     public string? FeatureId { get; init; }
+
+    /// <summary>
+    /// Optional conversation history for multi-turn chat. When present, cloud providers
+    /// prepend these messages before the final UserPrompt. Ignored by local providers.
+    /// </summary>
+    public IReadOnlyList<AiChatMessage>? ConversationHistory { get; init; }
 }
 
 /// <summary>
