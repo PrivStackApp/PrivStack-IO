@@ -18,7 +18,12 @@ pub unsafe extern "C" fn privstack_dataset_aggregate(
         with_store_json!(r#"{"error":"not initialized"}"#, |store| {
             let dataset_id = match uuid::Uuid::parse_str(&req.dataset_id) {
                 Ok(u) => privstack_datasets::DatasetId(u),
-                Err(_) => return to_c_string(r#"{"error":"invalid dataset id"}"#),
+                Err(e) => {
+                    eprintln!("[FFI DATASET] aggregate: invalid dataset id '{}': {e}", req.dataset_id);
+                    return to_c_string(&super::error_json(&format!(
+                        "invalid dataset id '{}': {e}", req.dataset_id
+                    )));
+                }
             };
 
             match store.aggregate_query(
@@ -68,7 +73,12 @@ pub unsafe extern "C" fn privstack_dataset_aggregate_grouped(
         with_store_json!(r#"{"error":"not initialized"}"#, |store| {
             let dataset_id = match uuid::Uuid::parse_str(&req.dataset_id) {
                 Ok(u) => privstack_datasets::DatasetId(u),
-                Err(_) => return to_c_string(r#"{"error":"invalid dataset id"}"#),
+                Err(e) => {
+                    eprintln!("[FFI DATASET] aggregate_grouped: invalid dataset id '{}': {e}", req.dataset_id);
+                    return to_c_string(&super::error_json(&format!(
+                        "invalid dataset id '{}': {e}", req.dataset_id
+                    )));
+                }
             };
 
             match store.aggregate_query_grouped(
