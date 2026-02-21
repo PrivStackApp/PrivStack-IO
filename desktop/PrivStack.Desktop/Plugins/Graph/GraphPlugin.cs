@@ -52,7 +52,7 @@ public sealed class GraphPlugin : PluginBase<GraphViewModel>
     protected override GraphViewModel CreateViewModelCore()
     {
         var vm = new GraphViewModel(_graphService!, Host?.InfoPanel, Host?.Settings);
-        vm.EmbeddingSpace = new EmbeddingSpaceViewModel(_embeddingService!, Host?.Settings);
+        vm.EmbeddingSpace = new EmbeddingSpaceViewModel(_embeddingService!, Host?.InfoPanel, Host?.Settings);
         return vm;
     }
 

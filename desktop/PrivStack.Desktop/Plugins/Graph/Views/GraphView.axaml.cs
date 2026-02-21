@@ -67,12 +67,7 @@ public partial class GraphView : UserControl
         if (e.PropertyName == nameof(EmbeddingSpaceViewModel.EmbeddingData))
             UpdateEmbeddingCanvas();
 
-        if (e.PropertyName == nameof(EmbeddingSpaceViewModel.SelectedIndex))
-        {
-            var selInfo = this.FindControl<StackPanel>("EmbeddingSelectionInfo");
-            if (selInfo != null)
-                selInfo.IsVisible = (_vm?.EmbeddingSpace?.SelectedIndex ?? -1) >= 0;
-        }
+        // SelectedIndex changes are handled by the shell Info panel via IInfoPanelService
     }
 
     // ========================================================================
