@@ -40,7 +40,7 @@ public sealed partial class EmbeddingSpaceControl
         }
     }
 
-    protected override void OnPointerMoved(PointerMoveEventArgs e)
+    protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
         var pos = e.GetPosition(this);
