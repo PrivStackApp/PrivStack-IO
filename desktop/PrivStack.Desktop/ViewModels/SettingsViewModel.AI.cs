@@ -91,6 +91,11 @@ public partial class SettingsViewModel
     private AiModelInfo? _selectedAiCloudModel;
 
     [ObservableProperty]
+    private string? _aiModelSaveStatus;
+
+    private bool _isLoadingAiSettings;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanDownloadAiLocalModel))]
     [NotifyPropertyChangedFor(nameof(AiLocalModelDownloadLabel))]
     private AiLocalModelOption? _selectedAiLocalModel;
@@ -181,44 +186,52 @@ public partial class SettingsViewModel
 
     private void LoadAiSettings()
     {
-        var settings = _settingsService.Settings;
-        AiEnabled = settings.AiEnabled;
-        AiTemperature = settings.AiTemperature;
-
-        // Populate provider options
-        AiProviderOptions.Clear();
-        AiProviderOptions.Add(new AiProviderOption("none", "None (Disabled)"));
-        AiProviderOptions.Add(new AiProviderOption("openai", "OpenAI"));
-        AiProviderOptions.Add(new AiProviderOption("anthropic", "Anthropic"));
-        AiProviderOptions.Add(new AiProviderOption("gemini", "Google Gemini"));
-        AiProviderOptions.Add(new AiProviderOption("local", "Local (LLamaSharp)"));
-
-        SelectedAiProvider = AiProviderOptions.FirstOrDefault(p => p.Id == settings.AiProvider)
-                             ?? AiProviderOptions[0];
-
-        // Populate local models
-        RefreshAiLocalModels();
-
-        // Load cloud models for active provider
-        RefreshAiCloudModels();
-
-        // Load cloud model selection
-        if (!string.IsNullOrEmpty(settings.AiModel))
+        _isLoadingAiSettings = true;
+        try
         {
-            SelectedAiCloudModel = AiCloudModels.FirstOrDefault(m => m.Id == settings.AiModel);
-        }
+            var settings = _settingsService.Settings;
+            AiEnabled = settings.AiEnabled;
+            AiTemperature = settings.AiTemperature;
 
-        // Load local model selection
-        if (!string.IsNullOrEmpty(settings.AiLocalModel))
+            // Populate provider options
+            AiProviderOptions.Clear();
+            AiProviderOptions.Add(new AiProviderOption("none", "None (Disabled)"));
+            AiProviderOptions.Add(new AiProviderOption("openai", "OpenAI"));
+            AiProviderOptions.Add(new AiProviderOption("anthropic", "Anthropic"));
+            AiProviderOptions.Add(new AiProviderOption("gemini", "Google Gemini"));
+            AiProviderOptions.Add(new AiProviderOption("local", "Local (LLamaSharp)"));
+
+            SelectedAiProvider = AiProviderOptions.FirstOrDefault(p => p.Id == settings.AiProvider)
+                                 ?? AiProviderOptions[0];
+
+            // Populate local models
+            RefreshAiLocalModels();
+
+            // Load cloud models for active provider
+            RefreshAiCloudModels();
+
+            // Load cloud model selection — must come AFTER RefreshAiCloudModels
+            if (!string.IsNullOrEmpty(settings.AiModel))
+            {
+                SelectedAiCloudModel = AiCloudModels.FirstOrDefault(m => m.Id == settings.AiModel);
+            }
+
+            // Load local model selection
+            if (!string.IsNullOrEmpty(settings.AiLocalModel))
+            {
+                SelectedAiLocalModel = AiLocalModels.FirstOrDefault(m => m.Id == settings.AiLocalModel);
+            }
+
+            AiIntentEnabled = settings.AiIntentEnabled;
+            AiIntentAutoAnalyze = settings.AiIntentAutoAnalyze;
+
+            RefreshMemoryCounts();
+            LoadSavedApiKeys();
+        }
+        finally
         {
-            SelectedAiLocalModel = AiLocalModels.FirstOrDefault(m => m.Id == settings.AiLocalModel);
+            _isLoadingAiSettings = false;
         }
-
-        AiIntentEnabled = settings.AiIntentEnabled;
-        AiIntentAutoAnalyze = settings.AiIntentAutoAnalyze;
-
-        RefreshMemoryCounts();
-        LoadSavedApiKeys();
     }
 
     private void RefreshAiCloudModels()
@@ -281,6 +294,7 @@ public partial class SettingsViewModel
 
     partial void OnAiEnabledChanged(bool value)
     {
+        if (_isLoadingAiSettings) return;
         _settingsService.Settings.AiEnabled = value;
         _settingsService.SaveDebounced();
         WeakReferenceMessenger.Default.Send(new IntentSettingsChangedMessage());
@@ -289,8 +303,11 @@ public partial class SettingsViewModel
     partial void OnSelectedAiProviderChanged(AiProviderOption? value)
     {
         if (value == null) return;
-        _settingsService.Settings.AiProvider = value.Id;
-        _settingsService.SaveDebounced();
+        if (!_isLoadingAiSettings)
+        {
+            _settingsService.Settings.AiProvider = value.Id;
+            _settingsService.SaveDebounced();
+        }
 
         // Reset API key display
         AiApiKey = null;
@@ -302,26 +319,29 @@ public partial class SettingsViewModel
 
     partial void OnSelectedAiCloudModelChanged(AiModelInfo? value)
     {
-        if (value == null) return;
+        if (value == null || _isLoadingAiSettings) return;
         _settingsService.Settings.AiModel = value.Id;
         _settingsService.SaveDebounced();
+        ShowModelSaveStatus();
     }
 
     partial void OnSelectedAiLocalModelChanged(AiLocalModelOption? value)
     {
-        if (value == null) return;
+        if (value == null || _isLoadingAiSettings) return;
         _settingsService.Settings.AiLocalModel = value.Id;
         _settingsService.SaveDebounced();
     }
 
     partial void OnAiTemperatureChanged(double value)
     {
+        if (_isLoadingAiSettings) return;
         _settingsService.Settings.AiTemperature = value;
         _settingsService.SaveDebounced();
     }
 
     partial void OnAiIntentEnabledChanged(bool value)
     {
+        if (_isLoadingAiSettings) return;
         _settingsService.Settings.AiIntentEnabled = value;
         _settingsService.SaveDebounced();
         WeakReferenceMessenger.Default.Send(new IntentSettingsChangedMessage());
@@ -329,8 +349,16 @@ public partial class SettingsViewModel
 
     partial void OnAiIntentAutoAnalyzeChanged(bool value)
     {
+        if (_isLoadingAiSettings) return;
         _settingsService.Settings.AiIntentAutoAnalyze = value;
         _settingsService.SaveDebounced();
+    }
+
+    private async void ShowModelSaveStatus()
+    {
+        AiModelSaveStatus = "Saved";
+        await Task.Delay(2000);
+        AiModelSaveStatus = null;
     }
 
     // ── Commands ───────────────────────────────────────────────────────
