@@ -189,7 +189,6 @@ public partial class MainWindowViewModel : ViewModelBase
         new IntentSlotEditorViewModel(App.Services.GetRequiredService<IIntentEngine>());
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsAnyOverlayPanelOpen))]
     private bool _isAiTrayOpen;
 
     /// <summary>
@@ -280,7 +279,7 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     public bool IsAnyOverlayPanelOpen =>
-        IsSyncPanelOpen || IsSettingsPanelOpen || IsAiTrayOpen || IsQuickActionOverlayOpen;
+        IsSyncPanelOpen || IsSettingsPanelOpen || IsQuickActionOverlayOpen;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SidebarCollapseTooltip))]
@@ -875,7 +874,6 @@ public partial class MainWindowViewModel : ViewModelBase
             SyncVM.StopRefreshTimer();
         }
         IsSettingsPanelOpen = false;
-        IsAiTrayOpen = false;
         IsUserMenuOpen = false;
     }
 
