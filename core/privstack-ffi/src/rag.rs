@@ -39,6 +39,17 @@ struct RagGetHashesRequest {
     entity_types: Option<Vec<String>>,
 }
 
+#[derive(Deserialize)]
+struct RagFetchAllRequest {
+    entity_types: Option<Vec<String>>,
+    #[serde(default = "default_fetch_limit")]
+    limit: usize,
+}
+
+fn default_fetch_limit() -> usize {
+    1000
+}
+
 /// Upsert a RAG vector entry.
 ///
 /// # Safety
@@ -265,5 +276,54 @@ unsafe fn rag_get_hashes_inner(json: *const c_char) -> SdkResponse {
             SdkResponse::ok(serde_json::Value::Array(arr))
         }
         Err(e) => SdkResponse::err("storage_error", &format!("RAG get hashes failed: {e}")),
+    }
+}
+
+/// Fetch all RAG vector entries with embeddings for 3D visualization.
+///
+/// # Safety
+/// `json` must be a valid null-terminated UTF-8 JSON string.
+/// The returned pointer must be freed with `privstack_free_string`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn privstack_rag_fetch_all(json: *const c_char) -> *mut c_char {
+    unsafe {
+        let response = rag_fetch_all_inner(json);
+        let json_out = serde_json::to_string(&response).unwrap_or_else(|_| {
+            r#"{"success":false,"error_code":"json_error","error_message":"Failed to serialize response"}"#.to_string()
+        });
+        CString::new(json_out).unwrap_or_default().into_raw()
+    }
+}
+
+unsafe fn rag_fetch_all_inner(json: *const c_char) -> SdkResponse {
+    if json.is_null() {
+        return SdkResponse::err("null_pointer", "JSON is null");
+    }
+    let json_str = match unsafe { CStr::from_ptr(json) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return SdkResponse::err("invalid_utf8", "JSON is not valid UTF-8"),
+    };
+    let req: RagFetchAllRequest = match serde_json::from_str(json_str) {
+        Ok(r) => r,
+        Err(e) => return SdkResponse::err("json_parse_error", &format!("Invalid JSON: {e}")),
+    };
+
+    let handle = lock_handle();
+    let handle = match handle.as_ref() {
+        Some(h) => h,
+        None => return SdkResponse::err("not_initialized", "PrivStack runtime not initialized"),
+    };
+
+    let types_refs: Option<Vec<&str>> = req
+        .entity_types
+        .as_ref()
+        .map(|v| v.iter().map(|s| s.as_str()).collect());
+
+    match handle
+        .entity_store
+        .rag_fetch_all(types_refs.as_deref(), req.limit)
+    {
+        Ok(results) => SdkResponse::ok(serde_json::Value::Array(results)),
+        Err(e) => SdkResponse::err("storage_error", &format!("RAG fetch all failed: {e}")),
     }
 }
