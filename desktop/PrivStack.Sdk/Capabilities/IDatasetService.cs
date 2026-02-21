@@ -63,6 +63,9 @@ public interface IDatasetService
     /// <summary>Execute an aggregate query for charts/visualizations.</summary>
     Task<AggregateQueryResult> AggregateAsync(AggregateQuery query, CancellationToken ct = default);
 
+    /// <summary>Execute a grouped aggregate query for multi-series chart data.</summary>
+    Task<GroupedAggregateResult> AggregateGroupedAsync(GroupedAggregateQuery query, CancellationToken ct = default);
+
     /// <summary>Execute arbitrary read-only SQL against the datasets database.</summary>
     Task<DatasetQueryResult> ExecuteSqlAsync(string sql, int page, int pageSize, CancellationToken ct = default);
 

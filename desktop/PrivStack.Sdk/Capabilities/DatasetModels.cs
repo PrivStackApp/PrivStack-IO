@@ -176,6 +176,40 @@ public sealed record AggregateQueryResult
     [JsonPropertyName("values")] public IReadOnlyList<double> Values { get; init; } = [];
 }
 
+// ── Grouped Aggregation (multi-series charts) ───────────────────────────
+
+/// <summary>
+/// Query parameters for grouped aggregate queries producing multi-series chart data.
+/// </summary>
+public sealed record GroupedAggregateQuery
+{
+    [JsonPropertyName("dataset_id")] public required string DatasetId { get; init; }
+    [JsonPropertyName("x_column")] public required string XColumn { get; init; }
+    [JsonPropertyName("y_column")] public required string YColumn { get; init; }
+    [JsonPropertyName("group_column")] public required string GroupColumn { get; init; }
+    [JsonPropertyName("aggregation")] public string? Aggregation { get; init; }
+    [JsonPropertyName("filter_text")] public string? FilterText { get; init; }
+}
+
+/// <summary>
+/// A single series within a grouped aggregate result.
+/// </summary>
+public sealed record AggregateSeriesResult
+{
+    [JsonPropertyName("series_name")] public required string SeriesName { get; init; }
+    [JsonPropertyName("labels")] public IReadOnlyList<string> Labels { get; init; } = [];
+    [JsonPropertyName("values")] public IReadOnlyList<double> Values { get; init; } = [];
+}
+
+/// <summary>
+/// Result of a grouped aggregate query: shared x-axis labels with multiple value series.
+/// </summary>
+public sealed record GroupedAggregateResult
+{
+    [JsonPropertyName("x_labels")] public IReadOnlyList<string> XLabels { get; init; } = [];
+    [JsonPropertyName("series")] public IReadOnlyList<AggregateSeriesResult> Series { get; init; } = [];
+}
+
 // ── Mutations & SQL v2 ──────────────────────────────────────────────────
 
 /// <summary>Column definition for creating empty datasets.</summary>
