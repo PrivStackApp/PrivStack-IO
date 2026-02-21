@@ -567,6 +567,7 @@ public partial class DashboardViewModel : ViewModelBase
     /// <summary>
     /// Builds a JSON array of all valid (plugin_id, entity_type) pairs from registered plugins
     /// plus system-level entity types. Used to detect orphan entities.
+    /// NOTE: Rust side only uses entity_type for matching (created_by is a peer UUID, not plugin ID).
     /// </summary>
     private string BuildValidEntityTypesJson()
     {
