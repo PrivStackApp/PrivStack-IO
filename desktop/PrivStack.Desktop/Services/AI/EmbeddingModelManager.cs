@@ -12,9 +12,9 @@ public sealed class EmbeddingModelManager : INotifyPropertyChanged
     private static readonly ILogger _log = Log.ForContext<EmbeddingModelManager>();
 
     private const string ModelFileName = "model.onnx";
-    private const string TokenizerFileName = "tokenizer.json";
+    private const string VocabFileName = "vocab.txt";
     private const string ModelUrl = "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/onnx/model.onnx";
-    private const string TokenizerUrl = "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/tokenizer.json";
+    private const string VocabUrl = "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/vocab.txt";
     private const long ApproxModelSizeBytes = 270_000_000;
 
     private string? _cachedModelsDirectory;
@@ -59,8 +59,8 @@ public sealed class EmbeddingModelManager : INotifyPropertyChanged
     }
 
     public string ModelPath => Path.Combine(ModelsDirectory, ModelFileName);
-    public string TokenizerPath => Path.Combine(ModelsDirectory, TokenizerFileName);
-    public bool IsModelDownloaded => File.Exists(ModelPath) && File.Exists(TokenizerPath);
+    public string VocabPath => Path.Combine(ModelsDirectory, VocabFileName);
+    public bool IsModelDownloaded => File.Exists(ModelPath) && File.Exists(VocabPath);
 
     public string ModelSizeDisplay => $"{ApproxModelSizeBytes / 1_000_000.0:F0} MB";
 
@@ -82,9 +82,9 @@ public sealed class EmbeddingModelManager : INotifyPropertyChanged
             IsDownloading = true;
             DownloadProgress = 0;
 
-            // Download tokenizer first (small)
-            _log.Information("Downloading embedding tokenizer from {Url}", TokenizerUrl);
-            await DownloadFileAsync(TokenizerUrl, TokenizerPath, 0, 5, _downloadCts.Token);
+            // Download vocab first (small)
+            _log.Information("Downloading embedding vocab from {Url}", VocabUrl);
+            await DownloadFileAsync(VocabUrl, VocabPath, 0, 5, _downloadCts.Token);
 
             // Download model (large)
             _log.Information("Downloading embedding model from {Url}", ModelUrl);
@@ -154,7 +154,7 @@ public sealed class EmbeddingModelManager : INotifyPropertyChanged
     public void DeleteModel()
     {
         if (File.Exists(ModelPath)) File.Delete(ModelPath);
-        if (File.Exists(TokenizerPath)) File.Delete(TokenizerPath);
+        if (File.Exists(VocabPath)) File.Delete(VocabPath);
         _log.Information("Deleted embedding model files");
     }
 

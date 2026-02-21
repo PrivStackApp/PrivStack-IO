@@ -1,7 +1,5 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
 using CommunityToolkit.Mvvm.Messaging;
@@ -28,7 +26,7 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
     private readonly EmbeddingService _embeddingService;
     private readonly IPluginRegistry _pluginRegistry;
     private readonly Channel<RagIndexRequest> _channel;
-    private readonly ConcurrentDictionary<string, Timer> _debounceTimers = new();
+    private readonly ConcurrentDictionary<string, System.Threading.Timer> _debounceTimers = new();
     private readonly CancellationTokenSource _disposeCts = new();
     private Task? _consumerTask;
     private bool _disposed;
@@ -89,9 +87,9 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
             existingTimer.Dispose();
         }
 
-        var timer = new Timer(_ =>
+        var timer = new System.Threading.Timer(_ =>
         {
-            _debounceTimers.TryRemove(key, out _);
+            _debounceTimers.TryRemove(key, out System.Threading.Timer? _);
             _channel.Writer.TryWrite(request);
         }, null, DebounceInterval, Timeout.InfiniteTimeSpan);
 
