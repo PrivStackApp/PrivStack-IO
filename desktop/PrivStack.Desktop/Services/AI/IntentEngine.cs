@@ -162,6 +162,21 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
         try
         {
             var result = await provider.ExecuteIntentAsync(request, ct);
+
+            if (result.Success && !string.IsNullOrEmpty(result.CreatedEntityId)
+                && !string.IsNullOrEmpty(suggestion.SourceSignal.EntityId))
+            {
+                WeakReferenceMessenger.Default.Send(new IntentExecutedMessage
+                {
+                    SourcePluginId = suggestion.SourceSignal.SourcePluginId,
+                    SourceEntityType = suggestion.SourceSignal.EntityType ?? "",
+                    SourceEntityId = suggestion.SourceSignal.EntityId,
+                    CreatedEntityId = result.CreatedEntityId,
+                    CreatedEntityType = result.CreatedEntityType ?? "",
+                    NavigationLinkType = result.NavigationLinkType,
+                });
+            }
+
             RemoveSuggestion(suggestionId);
             return result;
         }
