@@ -92,12 +92,12 @@ public sealed class PerspectiveCamera
         var camY = dx * ux + dy * uy + dz * uz;
         var camZ = dx * fx + dy * fy + dz * fz;
 
-        if (camZ >= -0.01) // Behind camera
-            return (0, 0, camZ);
+        if (camZ <= 0.01) // Behind camera (positive camZ = in front)
+            return (0, 0, -1);
 
-        var screenX = viewportCenterX + Fov * camX / -camZ;
-        var screenY = viewportCenterY - Fov * camY / -camZ;
+        var screenX = viewportCenterX + Fov * camX / camZ;
+        var screenY = viewportCenterY - Fov * camY / camZ;
 
-        return (screenX, screenY, -camZ);
+        return (screenX, screenY, camZ);
     }
 }
