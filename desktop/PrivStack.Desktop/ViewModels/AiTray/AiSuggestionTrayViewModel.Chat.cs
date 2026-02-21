@@ -1,5 +1,7 @@
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PrivStack.Desktop.Services.AI;
 using PrivStack.Sdk.Services;
 using Serilog;
 
@@ -88,11 +90,18 @@ public partial class AiSuggestionTrayViewModel
             var tier = AiPersona.Classify(text);
             var isCloud = !IsActiveProviderLocal();
 
+            // Semantic search across all indexed content for relevant context
+            var ragContext = await BuildRagContextAsync(text);
+
             AiRequest request;
             if (isCloud)
             {
                 var memoryContext = _memoryService.FormatForPrompt();
                 var systemPrompt = AiPersona.GetCloudSystemPrompt(tier, userName, memoryContext);
+
+                // Inject RAG search results as knowledge context
+                if (!string.IsNullOrEmpty(ragContext))
+                    systemPrompt += $"\n\n{ragContext}";
 
                 // Inject full entity context for cloud models (they can handle it)
                 if (!string.IsNullOrEmpty(_activeItemContextFull))
@@ -111,6 +120,10 @@ public partial class AiSuggestionTrayViewModel
             else
             {
                 var systemPrompt = AiPersona.GetSystemPrompt(tier, userName);
+
+                // Inject RAG search results (trimmed for local models)
+                if (!string.IsNullOrEmpty(ragContext))
+                    systemPrompt += $"\n\n{ragContext}";
 
                 // Inject short context for local models (limited context window)
                 if (!string.IsNullOrEmpty(_activeItemContextShort))
@@ -218,5 +231,66 @@ public partial class AiSuggestionTrayViewModel
             Role = m.Role == ChatMessageRole.User ? "user" : "assistant",
             Content = m.Role == ChatMessageRole.User ? m.UserLabel ?? "" : m.Content ?? ""
         }).ToList();
+    }
+
+    /// <summary>
+    /// Runs semantic search against the RAG vector index and formats matching results
+    /// as context for the system prompt.
+    /// </summary>
+    private async Task<string?> BuildRagContextAsync(string query)
+    {
+        if (!_ragSearchService.IsReady)
+            return null;
+
+        try
+        {
+            var isCloud = !IsActiveProviderLocal();
+            var limit = isCloud ? 10 : 5; // fewer results for local models with smaller context
+
+            var results = await _ragSearchService.SearchAsync(query, limit);
+
+            if (results.Count == 0)
+                return null;
+
+            // Filter by minimum relevance score
+            var relevant = results.Where(r => r.Score >= 0.3).ToList();
+            if (relevant.Count == 0)
+                return null;
+
+            var sb = new StringBuilder();
+            sb.AppendLine("Relevant information from the user's data:");
+
+            foreach (var result in relevant)
+            {
+                var typeLabel = FormatEntityTypeLabel(result.EntityType);
+                sb.AppendLine($"- [{typeLabel}] {result.Title} (relevance: {result.Score:F2})");
+            }
+
+            _log.Debug("RAG context: {Count} results injected into system prompt", relevant.Count);
+            return sb.ToString().TrimEnd();
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "RAG search failed during chat, continuing without context");
+            return null;
+        }
+    }
+
+    private static string FormatEntityTypeLabel(string entityType)
+    {
+        return entityType switch
+        {
+            "page" => "Note",
+            "task" => "Task",
+            "contact" => "Contact",
+            "event" => "Event",
+            "journal_entry" => "Journal",
+            "snippet" => "Snippet",
+            "rss_item" => "RSS",
+            "web_clip" => "Web Clip",
+            "email" => "Email",
+            "file" => "File",
+            _ => entityType
+        };
     }
 }

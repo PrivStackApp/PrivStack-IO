@@ -194,7 +194,8 @@ public partial class MainWindowViewModel : ViewModelBase
             App.Services.GetRequiredService<Services.AI.AiConversationStore>(),
             App.Services.GetRequiredService<Services.InfoPanelService>(),
             App.Services.GetRequiredService<IPluginRegistry>(),
-            App.Services.GetRequiredService<IPrivStackSdk>());
+            App.Services.GetRequiredService<IPrivStackSdk>(),
+            App.Services.GetRequiredService<Services.AI.RagSearchService>());
         vm.NavigateToLinkedItemFunc = NavigateToLinkedItemAsync;
         return vm;
     }
