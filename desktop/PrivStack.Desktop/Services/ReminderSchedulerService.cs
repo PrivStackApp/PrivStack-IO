@@ -114,6 +114,7 @@ public sealed class ReminderSchedulerService : IDisposable
                             {
                                 "privstack.tasks" => "Tasks",
                                 "privstack.calendar" => "Calendar",
+                                "privstack.habits" => "Habits & Goals",
                                 _ => null
                             },
                             _appSettings.Settings.NotificationSoundEnabled);
