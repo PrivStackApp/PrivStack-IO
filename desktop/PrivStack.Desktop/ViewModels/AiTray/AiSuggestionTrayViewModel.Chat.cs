@@ -94,9 +94,9 @@ public partial class AiSuggestionTrayViewModel
                 var memoryContext = _memoryService.FormatForPrompt();
                 var systemPrompt = AiPersona.GetCloudSystemPrompt(tier, userName, memoryContext);
 
-                // Inject active item context
-                if (!string.IsNullOrEmpty(_activeItemContextBlock))
-                    systemPrompt += $"\n\n{_activeItemContextBlock}";
+                // Inject full entity context for cloud models (they can handle it)
+                if (!string.IsNullOrEmpty(_activeItemContextFull))
+                    systemPrompt += $"\n\n{_activeItemContextFull}";
 
                 request = new AiRequest
                 {
@@ -112,15 +112,9 @@ public partial class AiSuggestionTrayViewModel
             {
                 var systemPrompt = AiPersona.GetSystemPrompt(tier, userName);
 
-                // Inject shorter context for local models
-                if (!string.IsNullOrEmpty(_activeItemContextBlock))
-                {
-                    var shortContext = _infoPanelService.ActiveItemTitle != null
-                        ? $"Currently viewing: {_infoPanelService.ActiveItemTitle} ({_infoPanelService.ActiveLinkType})"
-                        : null;
-                    if (shortContext != null)
-                        systemPrompt += $"\n\n{shortContext}";
-                }
+                // Inject short context for local models (limited context window)
+                if (!string.IsNullOrEmpty(_activeItemContextShort))
+                    systemPrompt += $"\n\n{_activeItemContextShort}";
 
                 request = new AiRequest
                 {
