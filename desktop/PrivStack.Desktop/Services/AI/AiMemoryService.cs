@@ -8,7 +8,7 @@ namespace PrivStack.Desktop.Services.AI;
 /// Persists AI assistant learned facts about the user across sessions.
 /// Stores in <see cref="DataPaths.BaseDir"/>/ai-memories.json (global, not per-workspace).
 /// </summary>
-internal sealed class AiMemoryService
+public sealed class AiMemoryService
 {
     private const int MaxMemories = 50;
     private static readonly ILogger _log = Log.ForContext<AiMemoryService>();
@@ -173,7 +173,7 @@ internal sealed class AiMemoryService
     }
 }
 
-internal sealed class AiMemoryEntry
+public sealed class AiMemoryEntry
 {
     [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;

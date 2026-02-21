@@ -7,7 +7,7 @@
              mc:Ignorable="d" d:DesignWidth="440" d:DesignHeight="320"
              x:Class="PrivStack.Desktop.Views.GitHubDeviceFlowDialog"
              x:DataType="vm:ConnectionsViewModel"
-             IsVisible="{Binding IsDeviceFlowModalOpen}">
+             IsVisible="{Binding IsDeviceFlowModalOpen, FallbackValue=False}">
 
     <!-- Full-screen backdrop -->
     <Panel>

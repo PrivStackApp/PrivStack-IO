@@ -39,7 +39,7 @@ public sealed class SeedDataService
         ("privstack.system", "property_group"),
     ];
 
-    internal SeedDataService(
+    public SeedDataService(
         IPrivStackSdk sdk,
         IAppSettingsService appSettings,
         IPluginRegistry pluginRegistry,
@@ -127,6 +127,9 @@ public sealed class SeedDataService
         _appSettings.Settings.SampleDataSeeded = true;
         _appSettings.Save();
         _log.Information("Sample data reseeded successfully");
+
+        // Kick off full RAG re-index in the background now that fresh data exists
+        TriggerFullRagIndex();
     }
 
     /// <summary>
@@ -252,6 +255,20 @@ public sealed class SeedDataService
             {
                 _log.Warning(ex, "Failed to seed data for provider");
             }
+        }
+    }
+
+    private void TriggerFullRagIndex()
+    {
+        try
+        {
+            var ragIndexService = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+                .GetRequiredService<AI.RagIndexService>(App.Services);
+            _ = Task.Run(() => ragIndexService.StartFullIndexAsync());
+        }
+        catch (Exception ex)
+        {
+            _log.Debug(ex, "RAG re-index after reseed skipped (service not available)");
         }
     }
 }

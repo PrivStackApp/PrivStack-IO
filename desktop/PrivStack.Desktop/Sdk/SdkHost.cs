@@ -1,8 +1,10 @@
 using System.Text.Json;
+using CommunityToolkit.Mvvm.Messaging;
 using PrivStack.Desktop.Native;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Sdk;
 using PrivStack.Sdk.Json;
+using PrivStack.Sdk.Messaging;
 using Serilog;
 using NativeLib = PrivStack.Desktop.Native.NativeLibrary;
 
@@ -680,6 +682,14 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
 
         // Prefer full entity from response; fall back to request payload
         _syncOutbound.NotifyEntityChanged(entityId, message.EntityType, snapshotPayload ?? message.Payload);
+
+        // Notify RAG index service of the local mutation so embeddings stay current
+        WeakReferenceMessenger.Default.Send(new EntitySyncedMessage
+        {
+            EntityId = entityId,
+            EntityType = message.EntityType,
+            IsRemoval = message.Action is SdkAction.Delete or SdkAction.Trash,
+        });
     }
 
     public void Dispose()

@@ -7,7 +7,7 @@
              mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="780"
              x:Class="PrivStack.Desktop.Views.ThemeEditorDialog"
              x:DataType="vm:ThemeEditorViewModel"
-             IsVisible="{Binding IsOpen}">
+             IsVisible="{Binding IsOpen, FallbackValue=False}">
 
     <Panel>
         <!-- Semi-transparent backdrop -->

@@ -133,17 +133,26 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             if (_settingsVM == null)
             {
-                _settingsVM = App.Services.GetRequiredService<SettingsViewModel>();
-                _settingsVM.SwitchWorkspaceRequested += (_, _) =>
+                try
                 {
-                    IsSettingsPanelOpen = false;
-                    WorkspaceSwitcherVM.OpenCommand.Execute(null);
-                };
-                _settingsVM.LogoutRequested += (_, _) =>
+                    _settingsVM = App.Services.GetRequiredService<SettingsViewModel>();
+                    _settingsVM.SwitchWorkspaceRequested += (_, _) =>
+                    {
+                        IsSettingsPanelOpen = false;
+                        WorkspaceSwitcherVM.OpenCommand.Execute(null);
+                    };
+                    _settingsVM.LogoutRequested += (_, _) =>
+                    {
+                        IsSettingsPanelOpen = false;
+                        (App.Current as App)?.RequestLogout();
+                    };
+                }
+                catch (Exception ex)
                 {
-                    IsSettingsPanelOpen = false;
-                    (App.Current as App)?.RequestLogout();
-                };
+                    Serilog.Log.Error(ex, "Failed to create SettingsViewModel");
+                    Console.Error.WriteLine($"[FATAL] SettingsViewModel construction failed: {ex}");
+                    throw;
+                }
             }
             return _settingsVM;
         }
