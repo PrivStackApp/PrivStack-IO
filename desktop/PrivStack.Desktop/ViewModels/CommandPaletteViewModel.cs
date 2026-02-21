@@ -290,12 +290,12 @@ public partial class CommandPaletteViewModel : ViewModelBase
             new CommandItem("Start Sync", "Start P2P sync", "sync start", "Sync", () => _mainVm.SyncVM.StartSyncCommand.Execute(null)),
             new CommandItem("Stop Sync", "Stop P2P sync", "sync stop", "Sync", () => _mainVm.SyncVM.StopSyncCommand.Execute(null)),
 
-            // Hugo AI
-            new CommandItem("Open Hugo", "Open the Hugo AI assistant", "ai hugo chat assistant", "AI", () => {
+            // AI assistant commands
+            new CommandItem($"Open {AiPersona.Name}", $"Open the {AiPersona.Name} AI assistant", $"ai {AiPersona.Name.ToLowerInvariant()} chat assistant", "AI", () => {
                 if (!_mainVm.IsAiTrayOpen)
                     _mainVm.ToggleAiTrayCommand.Execute(null);
             }),
-            new CommandItem("Close Hugo", "Close the Hugo AI assistant", "ai hugo chat close", "AI", () => {
+            new CommandItem($"Close {AiPersona.Name}", $"Close the {AiPersona.Name} AI assistant", $"ai {AiPersona.Name.ToLowerInvariant()} chat close", "AI", () => {
                 if (_mainVm.IsAiTrayOpen)
                     _mainVm.ToggleAiTrayCommand.Execute(null);
             }),
