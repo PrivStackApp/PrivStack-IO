@@ -32,15 +32,20 @@ public sealed class GitHubDeviceFlowService
     private static readonly ILogger Log = Serilog.Log.ForContext<GitHubDeviceFlowService>();
     private static readonly HttpClient Http = CreateHttpClient();
 
-    // GitHub App client ID — permissions (issues:write, contents:write) are
-    // configured on the app itself at https://github.com/settings/apps.
-    // Lazy to avoid TypeInitializationException when env var is not set
-    // but GitHub connections are not being used.
-    private static readonly Lazy<string> _clientId = new(() =>
-        Environment.GetEnvironmentVariable("PRIVSTACK_GITHUB_CLIENT_ID")
-        ?? throw new InvalidOperationException("PRIVSTACK_GITHUB_CLIENT_ID env var not set"));
+    // GitHub App client ID — resolved from environment variable only.
+    // No secrets are compiled into the binary.
+    private static readonly string ClientId = ResolveClientId();
 
-    private static string ClientId => _clientId.Value;
+    private static string ResolveClientId()
+    {
+        var value = Environment.GetEnvironmentVariable("PRIVSTACK_GITHUB_CLIENT_ID");
+        if (string.IsNullOrEmpty(value))
+        {
+            Log.Warning("PRIVSTACK_GITHUB_CLIENT_ID environment variable is not set — GitHub integration will not function");
+            return string.Empty;
+        }
+        return value;
+    }
 
     private static HttpClient CreateHttpClient()
     {
