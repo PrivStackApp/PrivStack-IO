@@ -18,9 +18,9 @@ internal sealed class AnthropicProvider : AiProviderBase
 
     private static readonly AiModelInfo[] Models =
     [
-        new() { Id = "claude-sonnet-4-20250514", DisplayName = "Claude Sonnet 4" },
-        new() { Id = "claude-haiku-4-5-20251001", DisplayName = "Claude Haiku 4.5" },
-        new() { Id = "claude-sonnet-4-5-20250929", DisplayName = "Claude Sonnet 4.5" },
+        new() { Id = "claude-sonnet-4-20250514", DisplayName = "Claude Sonnet 4", ContextWindowTokens = 200_000 },
+        new() { Id = "claude-haiku-4-5-20251001", DisplayName = "Claude Haiku 4.5", ContextWindowTokens = 200_000 },
+        new() { Id = "claude-sonnet-4-5-20250929", DisplayName = "Claude Sonnet 4.5", ContextWindowTokens = 200_000 },
     ];
 
     private readonly IPrivStackSdk _sdk;

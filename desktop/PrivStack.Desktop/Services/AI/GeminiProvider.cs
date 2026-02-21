@@ -17,9 +17,9 @@ internal sealed class GeminiProvider : AiProviderBase
 
     private static readonly AiModelInfo[] Models =
     [
-        new() { Id = "gemini-2.0-flash", DisplayName = "Gemini 2.0 Flash" },
-        new() { Id = "gemini-2.0-flash-lite", DisplayName = "Gemini 2.0 Flash Lite" },
-        new() { Id = "gemini-2.5-pro-preview-05-06", DisplayName = "Gemini 2.5 Pro" },
+        new() { Id = "gemini-2.0-flash", DisplayName = "Gemini 2.0 Flash", ContextWindowTokens = 1_000_000 },
+        new() { Id = "gemini-2.0-flash-lite", DisplayName = "Gemini 2.0 Flash Lite", ContextWindowTokens = 1_000_000 },
+        new() { Id = "gemini-2.5-pro-preview-05-06", DisplayName = "Gemini 2.5 Pro", ContextWindowTokens = 1_000_000 },
     ];
 
     private readonly IPrivStackSdk _sdk;

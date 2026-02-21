@@ -6,12 +6,12 @@ using Serilog;
 namespace PrivStack.Desktop.ViewModels.AiTray;
 
 /// <summary>
-/// Free-form chat input logic for the AI suggestion tray.
-/// Branches between local (minimal prompt, no history) and cloud (rich prompt, history, memory).
+/// Free-form chat input logic with conversation persistence and token tracking.
 /// </summary>
 public partial class AiSuggestionTrayViewModel
 {
     private const int MaxHistoryMessages = 20;
+    private const double TokenWarningThreshold = 0.8;
 
     public string ChatWatermark { get; } = $"Ask {AiPersona.Name}...";
 
@@ -20,6 +20,33 @@ public partial class AiSuggestionTrayViewModel
 
     [ObservableProperty]
     private bool _isSendingChat;
+
+    [ObservableProperty]
+    private string? _activeSessionId;
+
+    [ObservableProperty]
+    private int _estimatedTokensUsed;
+
+    [ObservableProperty]
+    private int _contextWindowSize;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TokenWarningText))]
+    private bool _isNearTokenLimit;
+
+    public string TokenWarningText => "Context is getting long. Start a new chat for best results.";
+
+    [RelayCommand]
+    private void StartNewChat()
+    {
+        // Current session is already persisted via AddMessage calls
+        ActiveSessionId = null;
+        EstimatedTokensUsed = 0;
+        IsNearTokenLimit = false;
+        ChatMessages.Clear();
+        UpdateCounts();
+        RefreshConversationHistory();
+    }
 
     [RelayCommand(CanExecute = nameof(CanSendChat))]
     private async Task SendChatMessageAsync()
@@ -30,19 +57,27 @@ public partial class AiSuggestionTrayViewModel
         ChatInputText = null;
         IsSendingChat = true;
 
-        // User bubble
-        var userMsg = new AiChatMessageViewModel(ChatMessageRole.User)
+        // Ensure we have an active session
+        if (ActiveSessionId == null)
         {
-            UserLabel = text
-        };
-        Messages.Add(userMsg);
+            var session = _conversationStore.CreateSession();
+            ActiveSessionId = session.Id;
+            RefreshContextWindowSize();
+        }
+
+        // Persist user message
+        _conversationStore.AddMessage(ActiveSessionId, "user", text);
+
+        // User bubble
+        var userMsg = new AiChatMessageViewModel(ChatMessageRole.User) { UserLabel = text };
+        ChatMessages.Add(userMsg);
 
         // Assistant bubble (loading)
         var assistantMsg = new AiChatMessageViewModel(ChatMessageRole.Assistant)
         {
             State = ChatMessageState.Loading
         };
-        Messages.Add(assistantMsg);
+        ChatMessages.Add(assistantMsg);
         UpdateCounts();
         RequestScrollToBottom();
 
@@ -57,9 +92,15 @@ public partial class AiSuggestionTrayViewModel
             if (isCloud)
             {
                 var memoryContext = _memoryService.FormatForPrompt();
+                var systemPrompt = AiPersona.GetCloudSystemPrompt(tier, userName, memoryContext);
+
+                // Inject active item context
+                if (!string.IsNullOrEmpty(_activeItemContextBlock))
+                    systemPrompt += $"\n\n{_activeItemContextBlock}";
+
                 request = new AiRequest
                 {
-                    SystemPrompt = AiPersona.GetCloudSystemPrompt(tier, userName, memoryContext),
+                    SystemPrompt = systemPrompt,
                     UserPrompt = text,
                     MaxTokens = AiPersona.CloudMaxTokensFor(tier),
                     Temperature = 0.4,
@@ -69,9 +110,21 @@ public partial class AiSuggestionTrayViewModel
             }
             else
             {
+                var systemPrompt = AiPersona.GetSystemPrompt(tier, userName);
+
+                // Inject shorter context for local models
+                if (!string.IsNullOrEmpty(_activeItemContextBlock))
+                {
+                    var shortContext = _infoPanelService.ActiveItemTitle != null
+                        ? $"Currently viewing: {_infoPanelService.ActiveItemTitle} ({_infoPanelService.ActiveLinkType})"
+                        : null;
+                    if (shortContext != null)
+                        systemPrompt += $"\n\n{shortContext}";
+                }
+
                 request = new AiRequest
                 {
-                    SystemPrompt = AiPersona.GetSystemPrompt(tier, userName),
+                    SystemPrompt = systemPrompt,
                     UserPrompt = text,
                     MaxTokens = AiPersona.MaxTokensFor(tier),
                     Temperature = 0.4,
@@ -89,6 +142,9 @@ public partial class AiSuggestionTrayViewModel
 
                 assistantMsg.Content = content;
                 assistantMsg.State = ChatMessageState.Ready;
+
+                // Persist assistant message
+                _conversationStore.AddMessage(ActiveSessionId!, "assistant", content);
 
                 // Fire-and-forget memory extraction for cloud responses
                 if (isCloud)
@@ -109,6 +165,7 @@ public partial class AiSuggestionTrayViewModel
         finally
         {
             IsSendingChat = false;
+            UpdateTokenEstimate();
             RequestScrollToBottom();
         }
     }
@@ -118,27 +175,37 @@ public partial class AiSuggestionTrayViewModel
     partial void OnChatInputTextChanged(string? value) => SendChatMessageCommand.NotifyCanExecuteChanged();
     partial void OnIsSendingChatChanged(bool value) => SendChatMessageCommand.NotifyCanExecuteChanged();
 
-    /// <summary>
-    /// Checks whether the currently active AI provider is a local model.
-    /// </summary>
+    private void UpdateTokenEstimate()
+    {
+        if (ActiveSessionId == null) return;
+        var session = _conversationStore.GetSession(ActiveSessionId);
+        if (session == null) return;
+
+        EstimatedTokensUsed = session.EstimatedTokens;
+        IsNearTokenLimit = ContextWindowSize > 0
+            && EstimatedTokensUsed > ContextWindowSize * TokenWarningThreshold;
+    }
+
+    private void RefreshContextWindowSize()
+    {
+        var modelInfo = _aiService.GetActiveModelInfo();
+        ContextWindowSize = modelInfo?.ContextWindowTokens ?? 0;
+    }
+
     private bool IsActiveProviderLocal()
     {
         var providerId = _appSettings.Settings.AiProvider;
         if (string.IsNullOrEmpty(providerId) || providerId == "none")
-            return true; // default to local behavior
+            return true;
 
         var providers = _aiService.GetProviders();
         var active = providers.FirstOrDefault(p => p.Id == providerId);
         return active?.IsLocal ?? true;
     }
 
-    /// <summary>
-    /// Builds conversation history from the last N free-form chat messages (skip suggestion-linked).
-    /// Excludes the current user message (it will be the UserPrompt).
-    /// </summary>
     private IReadOnlyList<AiChatMessage>? BuildConversationHistory()
     {
-        var chatMessages = Messages
+        var chatMessages = ChatMessages
             .Where(m => m.SuggestionId == null
                 && !(m.Role == ChatMessageRole.Assistant && m.State == ChatMessageState.Loading))
             .TakeLast(MaxHistoryMessages)
