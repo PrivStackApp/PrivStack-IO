@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:PrivStack.Desktop.ViewModels"
              xmlns:views="using:PrivStack.Desktop.Views"
-             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="700"
+             mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="780"
              x:Class="PrivStack.Desktop.Views.ThemeEditorDialog"
              x:DataType="vm:ThemeEditorViewModel"
              IsVisible="{Binding IsOpen}">
@@ -19,7 +19,7 @@
         <!-- Dialog Container -->
         <Border HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Width="900" MaxHeight="700"
+                Width="1100" MaxHeight="780"
                 Background="{DynamicResource ThemeSurfaceElevatedBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="1"
@@ -152,7 +152,7 @@
                                                                 <!-- Hex input -->
                                                                 <TextBox Grid.Column="2"
                                                                          Text="{Binding HexText}"
-                                                                         Width="80"
+                                                                         Width="95"
                                                                          FontSize="{DynamicResource ThemeFontSizeXs}"
                                                                          FontFamily="{DynamicResource ThemeFontMono}"
                                                                          Padding="4,3"
