@@ -114,7 +114,7 @@
 
     <Panel>
         <!-- Main layout: Title bar on top, optional license banner, then Sidebar + Content below -->
-        <Grid RowDefinitions="Auto,Auto,*">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
             <!-- Title bar drag region / spacer for macOS traffic lights -->
             <Border Grid.Row="0" x:Name="TitleBarSpacer"
                     Background="{DynamicResource ThemeBackgroundBrush}"
@@ -146,11 +146,9 @@
                                          DataContext="{Binding}"/>
 
                 <!-- Content Area -->
-                <Grid Grid.Column="1" RowDefinitions="*,Auto" ClipToBounds="True">
+                <Panel Grid.Column="1" ClipToBounds="True">
                     <!-- Main Content Area + Info Panel overlay -->
-                    <Panel Grid.Row="0" ClipToBounds="True">
-                        <ContentControl Content="{Binding CurrentViewModel}" ClipToBounds="True"
-                                        Margin="0,0,0,4"/>
+                        <ContentControl Content="{Binding CurrentViewModel}" ClipToBounds="True"/>
 
                         <!-- Info Panel: Collapsed side tab (visible when panel is closed and not on Graph/Nexus) -->
                         <!-- Hover region: wider hit-test area that fades in the tab button -->
@@ -335,21 +333,22 @@
                                 <views:InfoPanel DataContext="{Binding InfoPanelVM}"/>
                             </Border>
                         </StackPanel>
-                    </Panel>
+                </Panel>
+            </Grid>
 
-                    <!-- Status Bar -->
-                    <Border Grid.Row="1" Background="{DynamicResource ThemeBackgroundBrush}"
-                            BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
-                            BorderThickness="0,1,0,0"
-                            BoxShadow="0 -1 4 0 #0A000000"
-                            Padding="16,6"
-                            IsVisible="{Binding !IsFocusMode}">
-                        <Grid ColumnDefinitions="Auto,*,Auto">
-                            <!-- Left side: Status message -->
-                            <TextBlock Text="{Binding StatusMessage}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                       VerticalAlignment="Center"/>
+            <!-- Status Bar -->
+            <Border Grid.Row="3" Background="{DynamicResource ThemeBackgroundBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+                    BorderThickness="0,1,0,0"
+                    BoxShadow="0 -1 4 0 #0A000000"
+                    Padding="16,6"
+                    IsVisible="{Binding !IsFocusMode}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <!-- Left side: Status message -->
+                    <TextBlock Text="{Binding StatusMessage}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                               VerticalAlignment="Center"/>
 
                             <!-- Center: Active Timer Indicator -->
                             <Border Grid.Column="1"
@@ -549,9 +548,7 @@
                                            VerticalAlignment="Center"/>
                             </StackPanel>
                         </Grid>
-                    </Border>
-                </Grid>
-            </Grid>
+            </Border>
         </Grid>
 
         <!-- AI Persona Speech Balloon (anchored bottom-right, above status bar near star icon) -->
