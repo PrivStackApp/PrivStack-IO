@@ -264,6 +264,12 @@ if [ "$WITH_PLUGINS" = true ]; then
 
     for plugin_csproj in "$PLUGINS_SRC_DIR"/PrivStack.Plugin.*/PrivStack.Plugin.*.csproj; do
         plugin_name=$(basename "${plugin_csproj%.csproj}")
+
+        # Skip test/runner projects — they are not runtime plugins
+        case "$plugin_name" in
+            *.Tests|*.TestRunner) continue ;;
+        esac
+
         plugin_dir=$(dirname "$plugin_csproj")
         plugin_out="$PLUGINS_OUTPUT_DIR/$plugin_name"
         plugin_dll="$plugin_out/$plugin_name.dll"
