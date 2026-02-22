@@ -851,6 +851,12 @@
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
 
+                            <TextBlock Text="{Binding AiLocalModelRecommendation}"
+                                       FontSize="{DynamicResource ThemeFontSizeXs}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,-8,0,0"/>
+
                             <!-- Download button and progress -->
                             <StackPanel Spacing="8" IsVisible="{Binding CanDownloadAiLocalModel}">
                                 <Button Content="{Binding AiLocalModelDownloadLabel}"

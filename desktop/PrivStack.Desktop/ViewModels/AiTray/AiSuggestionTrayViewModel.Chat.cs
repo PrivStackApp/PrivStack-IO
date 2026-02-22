@@ -243,8 +243,8 @@ public partial class AiSuggestionTrayViewModel
         try
         {
             var isCloud = !IsActiveProviderLocal();
-            var limit = isCloud ? 10 : 5;
-            var maxChunkChars = isCloud ? 500 : 200;
+            var limit = isCloud ? 10 : 6;
+            var maxChunkChars = isCloud ? 500 : 400;
 
             var results = await _ragSearchService.SearchAsync(query, limit);
 
