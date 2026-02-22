@@ -175,6 +175,7 @@ pub struct ViewConfig {
 #[serde(rename_all = "snake_case")]
 pub enum FilterOperator {
     Equals,
+    NotEquals,
     Contains,
     GreaterThan,
     LessThan,
