@@ -126,7 +126,7 @@
 
         <!-- ==================== OVERVIEW TAB ==================== -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                      Padding="24,0,24,24"
+                      Padding="24,0,24,32"
                       IsVisible="{Binding IsOverviewTab}">
             <StackPanel Spacing="20">
 
