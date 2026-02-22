@@ -435,6 +435,9 @@ public partial class App : Application
                 Services.GetRequiredService<ReminderSchedulerService>().Start();
                 Services.GetRequiredService<IIpcServer>().Start();
 
+                // Eagerly resolve RAG index service so its auto-init task runs on startup
+                _ = Services.GetRequiredService<Services.AI.RagIndexService>();
+
                 var bridgePath = FindBridgePath();
                 if (bridgePath != null)
                     NativeMessagingRegistrar.Register(bridgePath, appSettings);
