@@ -143,9 +143,7 @@ public partial class AiSuggestionTrayViewModel
 
             if (response.Success && !string.IsNullOrEmpty(response.Content))
             {
-                var content = isCloud
-                    ? response.Content
-                    : AiPersona.Sanitize(response.Content, tier);
+                var content = AiPersona.Sanitize(response.Content, tier);
 
                 assistantMsg.Content = content;
                 assistantMsg.State = ChatMessageState.Ready;

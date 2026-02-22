@@ -160,7 +160,7 @@ public static partial class AiPersona
 
     // ── Response sanitization ────────────────────────────────────────
 
-    [GeneratedRegex(@"<\|?/?(system|user|assistant|end|im_start|im_end|eot_id|start_header_id|end_header_id|begin_of_text|end_of_text|endoftext)\|?>", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"<\|?/?(system|user|assistant|end|im_start|im_end|eot_id|start_header_id|end_header_id|begin_of_text|end_of_text|endoftext|s)\|?>", RegexOptions.IgnoreCase)]
     private static partial Regex ChatTokenPattern();
 
     [GeneratedRegex(@"^\s*-?\s*(User|Assistant|Duncan|System|Note)\s*:.*$", RegexOptions.IgnoreCase | RegexOptions.Multiline)]
