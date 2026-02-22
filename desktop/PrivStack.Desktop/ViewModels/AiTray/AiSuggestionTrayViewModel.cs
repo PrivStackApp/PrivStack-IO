@@ -175,7 +175,20 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
             if (json == null)
                 json = await FetchEntityViaDataSourceProviderAsync(linkType, itemId);
 
-            if (json == null || _infoPanelService.ActiveItemId != itemId) return;
+            if (_infoPanelService.ActiveItemId != itemId) return;
+
+            if (json == null)
+            {
+                // Entity not fetchable via SDK or data source — use detail fields if available
+                var details = _infoPanelService.ActiveItemDetails;
+                if (details is { Count: > 0 })
+                {
+                    var detailLines = string.Join("\n", details.Select(d => $"  {d.Label}: {d.Value}"));
+                    _activeItemContextFull =
+                        $"The user is currently viewing: \"{title}\" ({displayName})\n{detailLines}";
+                }
+                return;
+            }
 
             const int maxContextChars = 8000;
             if (json.Length > maxContextChars)
