@@ -82,7 +82,7 @@ internal sealed class LocalLlamaProvider : IAiProvider
                 };
             }
 
-            var (prompt, antiPrompts) = FormatPrompt(modelName, request.SystemPrompt, request.UserPrompt);
+            var (prompt, antiPrompts) = FormatPrompt(modelName, request.SystemPrompt, request.UserPrompt, request.ConversationHistory);
 
             // Create a fresh context for this inference request to avoid stale state
             using var inferContext = _weights!.CreateContext(_context!.Params);
@@ -174,29 +174,91 @@ internal sealed class LocalLlamaProvider : IAiProvider
     }
 
     private static (string Prompt, List<string> AntiPrompts) FormatPrompt(
-        string modelName, string systemPrompt, string userPrompt)
+        string modelName, string systemPrompt, string userPrompt,
+        IReadOnlyList<AiChatMessage>? history = null)
     {
+        // Limit history to last 6 turns for local context budgets
+        var turns = history is { Count: > 0 }
+            ? history.TakeLast(6).ToList()
+            : null;
+
         if (modelName.StartsWith("llama", StringComparison.OrdinalIgnoreCase))
         {
-            // Llama 3.x Instruct chat template
-            // Note: StatelessExecutor auto-prepends BOS (<|begin_of_text|>), so we omit it here
-            var prompt = $"<|start_header_id|>system<|end_header_id|>\n\n{systemPrompt}<|eot_id|>" +
-                         $"<|start_header_id|>user<|end_header_id|>\n\n{userPrompt}<|eot_id|>" +
-                         "<|start_header_id|>assistant<|end_header_id|>\n\n";
-            return (prompt, ["<|eot_id|>", "<|end_of_text|>", "<|start_header_id|>"]);
+            var sb = new StringBuilder();
+            sb.Append($"<|start_header_id|>system<|end_header_id|>\n\n{systemPrompt}<|eot_id|>");
+
+            if (turns != null)
+            {
+                foreach (var msg in turns)
+                {
+                    var role = msg.Role == "assistant" ? "assistant" : "user";
+                    sb.Append($"<|start_header_id|>{role}<|end_header_id|>\n\n{msg.Content}<|eot_id|>");
+                }
+            }
+
+            sb.Append($"<|start_header_id|>user<|end_header_id|>\n\n{userPrompt}<|eot_id|>");
+            sb.Append("<|start_header_id|>assistant<|end_header_id|>\n\n");
+            return (sb.ToString(), ["<|eot_id|>", "<|end_of_text|>", "<|start_header_id|>"]);
         }
 
         if (modelName.StartsWith("mistral", StringComparison.OrdinalIgnoreCase))
         {
-            // Mistral Instruct v0.2 chat template
-            var prompt = $"[INST] {systemPrompt}\n\n{userPrompt} [/INST]";
-            return (prompt, ["</s>", "[INST]"]);
+            var sb = new StringBuilder();
+
+            if (turns != null)
+            {
+                // Multi-turn Mistral: [INST] system + first user [/INST] reply </s> [INST] next [/INST] ...
+                var firstUser = true;
+                foreach (var msg in turns)
+                {
+                    if (msg.Role == "user")
+                    {
+                        if (firstUser)
+                        {
+                            sb.Append($"[INST] {systemPrompt}\n\n{msg.Content} [/INST]");
+                            firstUser = false;
+                        }
+                        else
+                        {
+                            sb.Append($"[INST] {msg.Content} [/INST]");
+                        }
+                    }
+                    else
+                    {
+                        sb.Append($" {msg.Content} </s>");
+                    }
+                }
+
+                // Final user message
+                if (firstUser)
+                    sb.Append($"[INST] {systemPrompt}\n\n{userPrompt} [/INST]");
+                else
+                    sb.Append($"[INST] {userPrompt} [/INST]");
+            }
+            else
+            {
+                sb.Append($"[INST] {systemPrompt}\n\n{userPrompt} [/INST]");
+            }
+
+            return (sb.ToString(), ["</s>", "[INST]"]);
         }
 
         // Phi-3 chat template (default)
         {
-            var prompt = $"<|system|>\n{systemPrompt}<|end|>\n<|user|>\n{userPrompt}<|end|>\n<|assistant|>\n";
-            return (prompt, ["<|end|>", "<|user|>", "<|endoftext|>"]);
+            var sb = new StringBuilder();
+            sb.Append($"<|system|>\n{systemPrompt}<|end|>\n");
+
+            if (turns != null)
+            {
+                foreach (var msg in turns)
+                {
+                    var role = msg.Role == "assistant" ? "assistant" : "user";
+                    sb.Append($"<|{role}|>\n{msg.Content}<|end|>\n");
+                }
+            }
+
+            sb.Append($"<|user|>\n{userPrompt}<|end|>\n<|assistant|>\n");
+            return (sb.ToString(), ["<|end|>", "<|user|>", "<|endoftext|>"]);
         }
     }
 
