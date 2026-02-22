@@ -27,10 +27,10 @@ public static partial class AiPersona
     /// <summary>Token budget per tier (local models).</summary>
     public static int MaxTokensFor(ResponseTier tier) => tier switch
     {
-        ResponseTier.Short  => 60,
-        ResponseTier.Medium => 250,
+        ResponseTier.Short  => 80,
+        ResponseTier.Medium => 400,
         ResponseTier.Long   => 800,
-        _ => 150,
+        _ => 200,
     };
 
     /// <summary>Token budget per tier for cloud models (larger budgets).</summary>
@@ -45,10 +45,10 @@ public static partial class AiPersona
     /// <summary>Max sentences to keep per tier during post-processing truncation.</summary>
     private static int MaxSentences(ResponseTier tier) => tier switch
     {
-        ResponseTier.Short  => 2,
-        ResponseTier.Medium => 5,
+        ResponseTier.Short  => 3,
+        ResponseTier.Medium => 8,
         ResponseTier.Long   => 30,
-        _ => 3,
+        _ => 4,
     };
 
     // ── Keyword sets for classification ─────────────────────────────
