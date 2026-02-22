@@ -151,11 +151,16 @@ internal sealed class LocalLlamaProvider : IAiProvider
 
         _log.Information("Loading local LLM model from {Path}", modelPath);
 
+        var modelName = Path.GetFileNameWithoutExtension(modelPath);
+        var contextSize = modelName.StartsWith("mistral", StringComparison.OrdinalIgnoreCase)
+            ? (uint)8192
+            : (uint)4096;
+
         await Task.Run(() =>
         {
             var modelParams = new LLama.Common.ModelParams(modelPath)
             {
-                ContextSize = 4096,
+                ContextSize = contextSize,
                 GpuLayerCount = -1, // Offload all layers to GPU (Metal on macOS)
                 Threads = Math.Min(Environment.ProcessorCount, 4)
             };

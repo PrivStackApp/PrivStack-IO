@@ -160,6 +160,24 @@ public partial class SettingsViewModel
     public string AiLocalModelDownloadLabel =>
         SelectedAiLocalModel?.IsDownloaded == true ? "Downloaded" : "Download Model";
 
+    public string AiLocalModelRecommendation
+    {
+        get
+        {
+            var (_, reason) = Services.PlatformDetector.RecommendLocalModel();
+            return reason;
+        }
+    }
+
+    public string AiRecommendedModelId
+    {
+        get
+        {
+            var (modelId, _) = Services.PlatformDetector.RecommendLocalModel();
+            return modelId;
+        }
+    }
+
     public bool IsEmbeddingModelDownloaded
     {
         get
@@ -259,11 +277,15 @@ public partial class SettingsViewModel
         try
         {
             var modelManager = App.Services.GetRequiredService<AiModelManager>();
+            var (recommendedId, _) = Services.PlatformDetector.RecommendLocalModel();
             foreach (var modelName in modelManager.AvailableModels)
             {
+                var displayName = modelName == recommendedId
+                    ? $"{modelName} (Recommended)"
+                    : modelName;
                 AiLocalModels.Add(new AiLocalModelOption(
                     modelName,
-                    modelName,
+                    displayName,
                     modelManager.GetModelSizeDisplay(modelName),
                     modelManager.IsModelDownloaded(modelName)));
             }
