@@ -33,8 +33,8 @@ public sealed record AiRequest
     public string? FeatureId { get; init; }
 
     /// <summary>
-    /// Optional conversation history for multi-turn chat. When present, cloud providers
-    /// prepend these messages before the final UserPrompt. Ignored by local providers.
+    /// Optional conversation history for multi-turn chat. When present, providers
+    /// prepend these messages before the final UserPrompt for conversational continuity.
     /// </summary>
     public IReadOnlyList<AiChatMessage>? ConversationHistory { get; init; }
 }

@@ -135,7 +135,8 @@ public partial class AiSuggestionTrayViewModel
                     UserPrompt = text,
                     MaxTokens = AiPersona.MaxTokensFor(tier),
                     Temperature = 0.4,
-                    FeatureId = "tray.chat"
+                    FeatureId = "tray.chat",
+                    ConversationHistory = BuildConversationHistory()
                 };
             }
 
