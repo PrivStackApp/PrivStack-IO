@@ -149,7 +149,8 @@
                 <Grid Grid.Column="1" RowDefinitions="*,Auto" ClipToBounds="True">
                     <!-- Main Content Area + Info Panel overlay -->
                     <Panel Grid.Row="0" ClipToBounds="True">
-                        <ContentControl Content="{Binding CurrentViewModel}" ClipToBounds="True"/>
+                        <ContentControl Content="{Binding CurrentViewModel}" ClipToBounds="True"
+                                        Margin="0,0,0,4"/>
 
                         <!-- Info Panel: Collapsed side tab (visible when panel is closed and not on Graph/Nexus) -->
                         <!-- Hover region: wider hit-test area that fades in the tab button -->
