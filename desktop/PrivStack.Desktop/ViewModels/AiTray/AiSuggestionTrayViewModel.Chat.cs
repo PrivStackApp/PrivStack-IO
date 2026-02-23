@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PrivStack.Desktop.Services.AI;
+using PrivStack.Sdk.Capabilities;
 using PrivStack.Sdk.Services;
 using Serilog;
 
@@ -87,103 +88,110 @@ public partial class AiSuggestionTrayViewModel
 
         try
         {
+            // Capture UI-thread state before jumping to background
             var userName = _appSettings.Settings.UserDisplayName
                 ?? Environment.UserName ?? "there";
             var tier = AiPersona.Classify(text);
             var isCloud = !IsActiveProviderLocal();
+            var activePluginCtx = _activePluginContext;
+            var activeItemCtxFull = _activeItemContextFull;
+            var activeItemCtxShort = _activeItemContextShort;
+            var conversationHistory = BuildConversationHistory();
 
-            // Semantic search across all indexed content for relevant context
-            var ragContext = await BuildRagContextAsync(text);
-
-            AiRequest request;
-            if (isCloud)
+            // Run all heavy work (RAG search, prompt building, AI call) off the UI thread
+            var (response, request) = await Task.Run(async () =>
             {
-                var memoryContext = _memoryService.FormatForPrompt();
-                var systemPrompt = AiPersona.GetCloudSystemPrompt(tier, userName, memoryContext);
+                var ragContext = await BuildRagContextAsync(text);
 
-                // Inject active plugin context
-                if (!string.IsNullOrEmpty(_activePluginContext))
-                    systemPrompt += $"\n\n{_activePluginContext}";
-
-                // Inject RAG search results as knowledge context
-                if (!string.IsNullOrEmpty(ragContext))
-                    systemPrompt += $"\n\n{ragContext}";
-
-                // Inject full entity context for cloud models (they can handle it)
-                if (!string.IsNullOrEmpty(_activeItemContextFull))
-                    systemPrompt += $"\n\n{_activeItemContextFull}";
-
-                // Inject intent catalog so AI can invoke actions from chat
-                var allIntents = _intentEngine.GetAllAvailableIntents();
-                var intentCatalog = AiPersona.BuildIntentCatalog(allIntents);
-                if (!string.IsNullOrEmpty(intentCatalog))
+                AiRequest req;
+                if (isCloud)
                 {
-                    systemPrompt += $"\n\n{intentCatalog}";
-                    _log.Debug("Injected intent catalog with {IntentCount} actions into chat system prompt", allIntents.Count);
+                    var memoryContext = _memoryService.FormatForPrompt();
+                    var systemPrompt = AiPersona.GetCloudSystemPrompt(tier, userName, memoryContext);
+
+                    if (!string.IsNullOrEmpty(activePluginCtx))
+                        systemPrompt += $"\n\n{activePluginCtx}";
+
+                    if (!string.IsNullOrEmpty(ragContext))
+                        systemPrompt += $"\n\n{ragContext}";
+
+                    if (!string.IsNullOrEmpty(activeItemCtxFull))
+                        systemPrompt += $"\n\n{activeItemCtxFull}";
+
+                    // Inject intent catalog so AI can invoke actions from chat
+                    var allIntents = _intentEngine.GetAllAvailableIntents();
+                    var intentCatalog = AiPersona.BuildIntentCatalog(allIntents);
+                    if (!string.IsNullOrEmpty(intentCatalog))
+                    {
+                        systemPrompt += $"\n\n{intentCatalog}";
+                        _log.Debug("Injected intent catalog with {IntentCount} actions into chat system prompt", allIntents.Count);
+                    }
+                    else
+                    {
+                        _log.Debug("No intents available for chat intent catalog (providers: {Count})", allIntents.Count);
+                    }
+
+                    req = new AiRequest
+                    {
+                        SystemPrompt = systemPrompt,
+                        UserPrompt = text,
+                        MaxTokens = AiPersona.CloudMaxTokensFor(tier),
+                        Temperature = 0.4,
+                        FeatureId = "tray.chat",
+                        ConversationHistory = conversationHistory
+                    };
                 }
                 else
                 {
-                    _log.Debug("No intents available for chat intent catalog (providers: {Count})", allIntents.Count);
+                    var systemPrompt = AiPersona.GetSystemPrompt(tier, userName);
+
+                    if (!string.IsNullOrEmpty(activePluginCtx))
+                        systemPrompt += $"\n\n{activePluginCtx}";
+
+                    if (!string.IsNullOrEmpty(ragContext))
+                        systemPrompt += $"\n\n{ragContext}";
+
+                    if (!string.IsNullOrEmpty(activeItemCtxShort))
+                        systemPrompt += $"\n\n{activeItemCtxShort}";
+
+                    req = new AiRequest
+                    {
+                        SystemPrompt = systemPrompt,
+                        UserPrompt = text,
+                        MaxTokens = AiPersona.MaxTokensFor(tier),
+                        Temperature = 0.4,
+                        FeatureId = "tray.chat",
+                        ConversationHistory = conversationHistory
+                    };
                 }
 
-                request = new AiRequest
+                AiResponse resp;
+                if (!isCloud)
                 {
-                    SystemPrompt = systemPrompt,
-                    UserPrompt = text,
-                    MaxTokens = AiPersona.CloudMaxTokensFor(tier),
-                    Temperature = 0.4,
-                    FeatureId = "tray.chat",
-                    ConversationHistory = BuildConversationHistory()
-                };
-            }
-            else
-            {
-                var systemPrompt = AiPersona.GetSystemPrompt(tier, userName);
-
-                // Inject active plugin context
-                if (!string.IsNullOrEmpty(_activePluginContext))
-                    systemPrompt += $"\n\n{_activePluginContext}";
-
-                // Inject RAG search results (trimmed for local models)
-                if (!string.IsNullOrEmpty(ragContext))
-                    systemPrompt += $"\n\n{ragContext}";
-
-                // Inject short context for local models (limited context window)
-                if (!string.IsNullOrEmpty(_activeItemContextShort))
-                    systemPrompt += $"\n\n{_activeItemContextShort}";
-
-                request = new AiRequest
-                {
-                    SystemPrompt = systemPrompt,
-                    UserPrompt = text,
-                    MaxTokens = AiPersona.MaxTokensFor(tier),
-                    Temperature = 0.4,
-                    FeatureId = "tray.chat",
-                    ConversationHistory = BuildConversationHistory()
-                };
-            }
-
-            AiResponse response;
-
-            if (!isCloud)
-            {
-                // Stream tokens progressively for local models
-                assistantMsg.State = ChatMessageState.Streaming;
-                response = await _aiService.StreamCompleteAsync(request, partialContent =>
-                {
-                    _dispatcher.Post(() =>
+                    _dispatcher.Post(() => assistantMsg.State = ChatMessageState.Streaming);
+                    resp = await _aiService.StreamCompleteAsync(req, partialContent =>
                     {
-                        assistantMsg.Content = AiPersona.Sanitize(partialContent, tier);
+                        _dispatcher.Post(() =>
+                        {
+                            assistantMsg.Content = AiPersona.Sanitize(partialContent, tier);
+                        });
                     });
-                });
-            }
-            else
-            {
-                response = await _aiService.CompleteAsync(request);
-            }
+                }
+                else
+                {
+                    resp = await _aiService.CompleteAsync(req);
+                }
 
+                return (resp, req);
+            });
+
+            // Back on UI thread — process the response
             if (response.Success && !string.IsNullOrEmpty(response.Content))
             {
+                // Log raw response for debugging action block issues
+                _log.Debug("Raw AI response ({Length} chars): {Content}",
+                    response.Content.Length, response.Content);
+
                 // Parse action blocks before sanitization (sanitize strips them)
                 var (cleanContent, actions) = ParseActionBlocks(response.Content);
                 _log.Debug("Chat response: {ActionCount} action blocks parsed from response ({ResponseLength} chars)",
