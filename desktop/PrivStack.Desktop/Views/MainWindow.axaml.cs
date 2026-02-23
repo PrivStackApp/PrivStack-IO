@@ -372,7 +372,7 @@ public partial class MainWindow : Window
                     var starIcon = this.FindControl<PathIcon>("AiStarIcon");
                     if (balloon != null && starIcon != null)
                         PositionBalloonOverStar(balloon, starIcon);
-                }, Avalonia.Threading.DispatcherPriority.Layout);
+                }, Avalonia.Threading.DispatcherPriority.Render);
             }
         };
     }

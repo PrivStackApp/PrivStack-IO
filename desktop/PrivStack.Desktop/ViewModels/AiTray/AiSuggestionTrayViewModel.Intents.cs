@@ -1,6 +1,3 @@
-using System.Text.Json.Nodes;
-using PrivStack.Desktop.Services.AI;
-using PrivStack.Sdk;
 using PrivStack.Sdk.Capabilities;
 using PrivStack.Sdk.Messaging;
 using PrivStack.Sdk.Services;
@@ -27,64 +24,11 @@ public partial class AiSuggestionTrayViewModel
     {
         _dispatcher.Post(() =>
         {
-            _ = AddIntentAndCreateNoteAsync(suggestion);
-        });
-    }
-
-    private async Task AddIntentAndCreateNoteAsync(IntentSuggestion suggestion)
-    {
-        var assistantMsg = AddIntentAsAssistantMessage(suggestion);
-        UpdateCounts();
-        HasUnseenInsight = true;
-
-        // Auto-create a note from the insight
-        try
-        {
-            var pageId = Guid.NewGuid().ToString();
-            var title = $"Insight: {suggestion.MatchedIntent.DisplayName}";
-            var blocks = new List<JsonObject>
-            {
-                InsightPageBuilder.BuildHeadingBlock(2, suggestion.MatchedIntent.DisplayName),
-                InsightPageBuilder.BuildParagraphBlock(suggestion.Summary),
-                InsightPageBuilder.BuildDividerBlock(),
-            };
-
-            if (!string.IsNullOrEmpty(suggestion.SourceSignal.EntityTitle))
-                blocks.Add(InsightPageBuilder.BuildParagraphBlock($"Source: {suggestion.SourceSignal.EntityTitle}"));
-
-            var payload = InsightPageBuilder.BuildCreatePayload(pageId, title, null, blocks);
-            await _sdk.SendAsync(new SdkMessage
-            {
-                PluginId = "privstack.notes",
-                Action = SdkAction.Create,
-                EntityType = "page",
-                EntityId = pageId,
-                Payload = payload,
-            });
-
-            // Replace actions with "View Note" button
-            assistantMsg.Actions.Clear();
-            assistantMsg.Actions.Add(new SuggestionAction
-            {
-                ActionId = $"view_page:{pageId}",
-                DisplayName = "View Note",
-                IsPrimary = true
-            });
-
-            // Keep the execute intent action as secondary
-            assistantMsg.Actions.Add(new SuggestionAction
-            {
-                ActionId = "execute_intent",
-                DisplayName = suggestion.MatchedIntent.DisplayName,
-            });
-
-            ShowBalloon($"I noticed something and saved it: {suggestion.Summary}");
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to auto-create insight note");
+            AddIntentAsAssistantMessage(suggestion);
+            UpdateCounts();
+            HasUnseenInsight = true;
             ShowBalloon($"I noticed something: {suggestion.Summary}");
-        }
+        });
     }
 
     private void OnIntentSuggestionRemoved(object? sender, string suggestionId)
@@ -108,7 +52,7 @@ public partial class AiSuggestionTrayViewModel
         });
     }
 
-    private AiChatMessageViewModel AddIntentAsAssistantMessage(IntentSuggestion suggestion)
+    private void AddIntentAsAssistantMessage(IntentSuggestion suggestion)
     {
         var assistantMsg = new AiChatMessageViewModel(ChatMessageRole.Assistant)
         {
@@ -132,7 +76,6 @@ public partial class AiSuggestionTrayViewModel
 
         IntentMessages.Add(assistantMsg);
         RequestScrollToBottom();
-        return assistantMsg;
     }
 
     // ── Intent Action Execution ───────────────────────────────────────
@@ -146,11 +89,6 @@ public partial class AiSuggestionTrayViewModel
 
         if (message.ActionId == "execute_intent")
             _dispatcher.Post(() => _ = ExecuteIntentActionAsync(message.SuggestionId, rawId));
-        else if (message.ActionId.StartsWith("view_page:", StringComparison.Ordinal))
-        {
-            var pageId = message.ActionId[10..];
-            _dispatcher.Post(() => _ = NavigateToLinkedItemFunc?.Invoke("page", pageId));
-        }
     }
 
     private async Task ExecuteIntentActionAsync(string prefixedId, string rawSuggestionId)
