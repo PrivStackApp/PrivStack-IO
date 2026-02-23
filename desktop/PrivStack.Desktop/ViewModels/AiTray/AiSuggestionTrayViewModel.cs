@@ -152,21 +152,8 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
             return;
         }
 
-        var meta = plugin.Metadata;
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"The user is currently viewing the \"{meta.Name}\" plugin.");
-        if (!string.IsNullOrEmpty(meta.DetailedDescription))
-        {
-            sb.AppendLine(meta.DetailedDescription);
-        }
-        else
-        {
-            sb.AppendLine($"Description: {meta.Description}");
-            if (meta.Tags is { Count: > 0 })
-                sb.AppendLine($"Tags: {string.Join(", ", meta.Tags)}");
-            sb.AppendLine($"Category: {meta.Category}");
-        }
-        _activePluginContext = sb.ToString().TrimEnd();
+        // Minimal context line — full plugin details are in RAG index via IIndexableContentProvider
+        _activePluginContext = $"The user is currently viewing the \"{plugin.Metadata.Name}\" plugin ({plugin.Metadata.Description}).";
     }
 
     private void OnActiveItemChanged()
