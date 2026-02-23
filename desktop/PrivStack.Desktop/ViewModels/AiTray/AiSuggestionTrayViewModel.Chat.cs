@@ -1,4 +1,6 @@
 using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PrivStack.Desktop.Services.AI;
@@ -111,6 +113,11 @@ public partial class AiSuggestionTrayViewModel
                 if (!string.IsNullOrEmpty(_activeItemContextFull))
                     systemPrompt += $"\n\n{_activeItemContextFull}";
 
+                // Inject intent catalog so AI can invoke actions from chat
+                var intentCatalog = AiPersona.BuildIntentCatalog(_intentEngine.GetAllAvailableIntents());
+                if (!string.IsNullOrEmpty(intentCatalog))
+                    systemPrompt += $"\n\n{intentCatalog}";
+
                 request = new AiRequest
                 {
                     SystemPrompt = systemPrompt,
@@ -169,13 +176,45 @@ public partial class AiSuggestionTrayViewModel
 
             if (response.Success && !string.IsNullOrEmpty(response.Content))
             {
-                var content = AiPersona.Sanitize(response.Content, tier);
+                // Parse action blocks before sanitization (sanitize strips them)
+                var (cleanContent, actions) = ParseActionBlocks(response.Content);
+                var content = AiPersona.Sanitize(cleanContent, tier);
 
                 assistantMsg.Content = content;
                 assistantMsg.State = ChatMessageState.Ready;
 
                 // Persist assistant message
                 _conversationStore.AddMessage(ActiveSessionId!, "assistant", content);
+
+                // Execute parsed intent actions from the AI response
+                foreach (var action in actions)
+                {
+                    try
+                    {
+                        var result = await _intentEngine.ExecuteDirectAsync(
+                            action.IntentId, action.Slots);
+                        var confirmMsg = new AiChatMessageViewModel(ChatMessageRole.Assistant)
+                        {
+                            Content = result.Success
+                                ? $"\u2713 {result.Summary ?? "Done!"}"
+                                : $"\u2717 {result.ErrorMessage ?? "Action failed."}",
+                            State = result.Success
+                                ? ChatMessageState.Applied
+                                : ChatMessageState.Error,
+                        };
+                        ChatMessages.Add(confirmMsg);
+                        _conversationStore.AddMessage(ActiveSessionId!, "assistant", confirmMsg.Content!);
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.Warning(ex, "Failed to execute chat action: {IntentId}", action.IntentId);
+                        ChatMessages.Add(new AiChatMessageViewModel(ChatMessageRole.Assistant)
+                        {
+                            Content = $"\u2717 Failed to execute action: {ex.Message}",
+                            State = ChatMessageState.Error,
+                        });
+                    }
+                }
 
                 // Fire-and-forget memory extraction for cloud responses
                 if (isCloud)
@@ -309,4 +348,47 @@ public partial class AiSuggestionTrayViewModel
             return null;
         }
     }
+
+    // ── Action Block Parsing ────────────────────────────────────────
+
+    private static readonly Regex ActionBlockPattern = new(
+        @"\[ACTION\]\s*(\{.*?\})\s*\[/ACTION\]",
+        RegexOptions.Singleline | RegexOptions.Compiled);
+
+    private static (string CleanText, List<ParsedAction> Actions) ParseActionBlocks(string text)
+    {
+        var actions = new List<ParsedAction>();
+        var matches = ActionBlockPattern.Matches(text);
+
+        foreach (Match match in matches)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(match.Groups[1].Value);
+                var root = doc.RootElement;
+                var intentId = root.GetProperty("intent_id").GetString();
+                var slots = new Dictionary<string, string>();
+
+                if (root.TryGetProperty("slots", out var slotsEl))
+                {
+                    foreach (var prop in slotsEl.EnumerateObject())
+                        slots[prop.Name] = prop.Value.ValueKind == JsonValueKind.String
+                            ? prop.Value.GetString() ?? ""
+                            : prop.Value.GetRawText();
+                }
+
+                if (!string.IsNullOrEmpty(intentId))
+                    actions.Add(new ParsedAction(intentId, slots));
+            }
+            catch (Exception ex)
+            {
+                _log.Debug(ex, "Failed to parse action block: {Block}", match.Value);
+            }
+        }
+
+        var clean = ActionBlockPattern.Replace(text, "").Trim();
+        return (clean, actions);
+    }
+
+    private sealed record ParsedAction(string IntentId, Dictionary<string, string> Slots);
 }

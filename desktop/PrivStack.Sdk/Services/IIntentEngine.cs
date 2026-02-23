@@ -44,6 +44,15 @@ public interface IIntentEngine
     /// <summary>Clears all pending suggestions.</summary>
     void ClearAll();
 
+    /// <summary>
+    /// Executes an intent directly by ID with provided slots, bypassing the suggestion system.
+    /// Used for chat-initiated intent execution.
+    /// </summary>
+    Task<IntentResult> ExecuteDirectAsync(
+        string intentId,
+        IReadOnlyDictionary<string, string> slots,
+        CancellationToken ct = default);
+
     /// <summary>Returns all intent descriptors from all active providers.</summary>
     IReadOnlyList<IntentDescriptor> GetAllAvailableIntents();
 }
