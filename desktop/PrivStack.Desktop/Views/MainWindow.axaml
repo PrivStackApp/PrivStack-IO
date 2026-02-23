@@ -565,13 +565,13 @@
             </Grid>
         </DockPanel>
 
-        <!-- AI Persona Speech Balloon (anchored bottom-right, above status bar near star icon) -->
+        <!-- AI Persona Speech Balloon (dynamically positioned above AI star icon) -->
         <Border x:Name="AiBalloon"
                 HorizontalAlignment="Right" VerticalAlignment="Bottom"
                 Margin="0,0,120,48" ZIndex="998"
                 IsHitTestVisible="{Binding AiTrayVM.HasBalloonMessage}"
                 Classes.balloon-visible="{Binding AiTrayVM.HasBalloonMessage}">
-            <Button Command="{Binding AiTrayVM.DismissBalloonCommand}"
+            <Button Command="{Binding ToggleAiTrayCommand}"
                     Background="Transparent" BorderThickness="0" Padding="0"
                     Cursor="Hand" MinHeight="0" MinWidth="0">
                 <Button.Styles>
@@ -595,12 +595,12 @@
                                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                         </StackPanel>
                     </Border>
-                    <!-- Triangle tail pointing down toward star -->
-                    <Path Data="M0,0 L8,8 L16,0 Z"
+                    <!-- Triangle tail pointing down toward star (open path — no top-edge stroke) -->
+                    <Path Data="M0,0 L8,8 L16,0"
                           Fill="{DynamicResource ThemeSurfaceElevatedBrush}"
                           Stroke="{DynamicResource ThemePrimaryBrush}"
                           StrokeThickness="1.5"
-                          HorizontalAlignment="Right" Margin="0,-1,24,0"/>
+                          HorizontalAlignment="Right" Margin="0,-1.5,24,0"/>
                 </StackPanel>
             </Button>
         </Border>

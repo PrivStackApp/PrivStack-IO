@@ -148,7 +148,24 @@ public partial class AiSuggestionTrayViewModel
                 };
             }
 
-            var response = await _aiService.CompleteAsync(request);
+            AiResponse response;
+
+            if (!isCloud)
+            {
+                // Stream tokens progressively for local models
+                assistantMsg.State = ChatMessageState.Streaming;
+                response = await _aiService.StreamCompleteAsync(request, partialContent =>
+                {
+                    _dispatcher.Post(() =>
+                    {
+                        assistantMsg.Content = AiPersona.Sanitize(partialContent, tier);
+                    });
+                });
+            }
+            else
+            {
+                response = await _aiService.CompleteAsync(request);
+            }
 
             if (response.Success && !string.IsNullOrEmpty(response.Content))
             {
