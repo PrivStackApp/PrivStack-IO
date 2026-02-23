@@ -85,6 +85,48 @@ internal sealed class AiService : IAiService
         return response;
     }
 
+    public async Task<AiResponse> StreamCompleteAsync(AiRequest request, Action<string> onToken, CancellationToken ct = default)
+    {
+        if (!_appSettings.Settings.AiEnabled)
+            return AiResponse.Failure("AI is disabled in settings");
+
+        var provider = GetActiveProvider();
+        if (provider == null)
+            return AiResponse.Failure("No AI provider configured");
+
+        if (!provider.IsConfigured)
+        {
+            if (!provider.IsLocal)
+            {
+                var unlocked = await _sdk.RequestVaultUnlockAsync("ai-vault", ct);
+                if (!unlocked || !provider.IsConfigured)
+                    return AiResponse.Failure($"{provider.DisplayName} API key not configured. Check Settings > AI.");
+            }
+            else
+            {
+                return AiResponse.Failure("No local model downloaded. Check Settings > AI.");
+            }
+        }
+
+        var modelOverride = provider.IsLocal
+            ? _appSettings.Settings.AiLocalModel
+            : _appSettings.Settings.AiModel;
+
+        _log.Information("AI streaming request via {Provider} (feature: {Feature})",
+            provider.Id, request.FeatureId ?? "unknown");
+
+        var response = await provider.StreamCompleteAsync(request, modelOverride, onToken, ct);
+
+        if (response.Success)
+        {
+            _log.Information("AI streaming response: {Tokens} tokens in {Duration}ms via {Provider}/{Model}",
+                response.TokensUsed, response.Duration.TotalMilliseconds,
+                response.ProviderUsed, response.ModelUsed);
+        }
+
+        return response;
+    }
+
     public IReadOnlyList<AiProviderInfo> GetProviders()
     {
         EnsureProviders();

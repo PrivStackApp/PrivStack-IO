@@ -9,7 +9,7 @@ namespace PrivStack.Desktop.ViewModels.AiTray;
 
 public enum ChatMessageRole { User, Assistant }
 
-public enum ChatMessageState { Loading, Ready, Error, Applied }
+public enum ChatMessageState { Loading, Streaming, Ready, Error, Applied }
 
 /// <summary>
 /// Represents a single message bubble in the AI chat tray.
@@ -42,6 +42,7 @@ public partial class AiChatMessageViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsLoading))]
+    [NotifyPropertyChangedFor(nameof(IsStreaming))]
     [NotifyPropertyChangedFor(nameof(IsReady))]
     [NotifyPropertyChangedFor(nameof(IsError))]
     [NotifyPropertyChangedFor(nameof(IsApplied))]
@@ -58,6 +59,7 @@ public partial class AiChatMessageViewModel : ViewModelBase
     public bool IsUser => Role == ChatMessageRole.User;
     public bool IsAssistant => Role == ChatMessageRole.Assistant;
     public bool IsLoading => State == ChatMessageState.Loading;
+    public bool IsStreaming => State == ChatMessageState.Streaming;
     public bool IsReady => State == ChatMessageState.Ready;
     public bool IsError => State == ChatMessageState.Error;
     public bool IsApplied => State == ChatMessageState.Applied;

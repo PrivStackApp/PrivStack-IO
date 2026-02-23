@@ -60,6 +60,9 @@ public partial class MainWindow : Window
             aiTrayHandle.PointerCaptureLost += (_, _) => _isResizingAiTray = false;
         }
 
+        // Dynamically position the AI balloon over the star icon
+        SetupBalloonPositioning();
+
         // Apply saved window settings
         _settings.ApplyToWindow(this);
 
@@ -159,6 +162,8 @@ public partial class MainWindow : Window
             {
                 vm.SelectTabCommand.Execute(pluginRegistry.NavigationItems[0].Id);
             }
+
+            WireBalloonPositioning();
         }
 
         UpdateContentAreaWidth();
@@ -340,5 +345,65 @@ public partial class MainWindow : Window
     {
         // Prevent backdrop click-through when clicking inside the form
         e.Handled = true;
+    }
+
+    // ========================================================================
+    // AI Balloon Dynamic Positioning
+    // ========================================================================
+
+    private void SetupBalloonPositioning()
+    {
+        // Hook into the ViewModel to reposition when balloon message changes
+        this.DataContextChanged += (_, _) => WireBalloonPositioning();
+    }
+
+    private void WireBalloonPositioning()
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        vm.AiTrayVM.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.AiTrayVM.BalloonMessage) ||
+                e.PropertyName == nameof(vm.AiTrayVM.HasBalloonMessage))
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    var balloon = this.FindControl<Border>("AiBalloon");
+                    var starIcon = this.FindControl<PathIcon>("AiStarIcon");
+                    if (balloon != null && starIcon != null)
+                        PositionBalloonOverStar(balloon, starIcon);
+                }, Avalonia.Threading.DispatcherPriority.Layout);
+            }
+        };
+    }
+
+    private void PositionBalloonOverStar(Border balloon, PathIcon starIcon)
+    {
+        if (DataContext is not MainWindowViewModel vm || !vm.AiTrayVM.HasBalloonMessage)
+            return;
+
+        try
+        {
+            // Get star icon center position relative to this window
+            var starBounds = starIcon.Bounds;
+            var starCenter = starIcon.TranslatePoint(
+                new Point(starBounds.Width / 2, 0), this);
+
+            if (starCenter == null) return;
+
+            // The arrow tip is 32px from the balloon's right edge (24px arrow margin + 8px half-width)
+            const double arrowOffsetFromRight = 32;
+
+            // Calculate right margin so arrow tip aligns with star center
+            var rightMargin = Bounds.Width - starCenter.Value.X - arrowOffsetFromRight;
+            rightMargin = Math.Max(8, rightMargin); // floor at 8px
+
+            balloon.Margin = new Thickness(0, 0, rightMargin, 48);
+        }
+        catch
+        {
+            // Fallback to default position if measurement fails
+            balloon.Margin = new Thickness(0, 0, 120, 48);
+        }
     }
 }
