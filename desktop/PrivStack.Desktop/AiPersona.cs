@@ -37,8 +37,8 @@ public static partial class AiPersona
     public static int CloudMaxTokensFor(ResponseTier tier) => tier switch
     {
         ResponseTier.Short  => 200,
-        ResponseTier.Medium => 800,
-        ResponseTier.Long   => 2000,
+        ResponseTier.Medium => 1200,
+        ResponseTier.Long   => 2500,
         _ => 400,
     };
 
@@ -47,7 +47,7 @@ public static partial class AiPersona
     {
         ResponseTier.Short  => 3,
         ResponseTier.Medium => 8,
-        ResponseTier.Long   => 30,
+        ResponseTier.Long   => 40,
         _ => 4,
     };
 
@@ -156,6 +156,42 @@ public static partial class AiPersona
         return $"""
             You are {Name}, a concise offline assistant. The user is {userName}. {brevity} Never mention being an AI. No markdown. No lists. No notes or disclaimers. When data is provided below, always use it to answer accurately. Never guess or make up numbers.
             """;
+    }
+
+    // ── Intent catalog for chat-initiated actions ──────────────────
+
+    /// <summary>
+    /// Builds a dynamic intent catalog from all available intents for injection
+    /// into the cloud system prompt, enabling chat-initiated action execution.
+    /// </summary>
+    public static string? BuildIntentCatalog(IReadOnlyList<PrivStack.Sdk.Capabilities.IntentDescriptor> intents)
+    {
+        if (intents.Count == 0) return null;
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("""
+            You can perform actions in the user's workspace. When the user asks you to create, log, or draft something,
+            respond with your confirmation message AND include an action block at the end. Format:
+
+            [ACTION]
+            {"intent_id": "tasks.create_task", "slots": {"title": "Review the budget", "priority": "high"}}
+            [/ACTION]
+
+            Available actions:
+            """);
+
+        foreach (var intent in intents)
+        {
+            var slotList = string.Join(", ", intent.Slots.Select(s =>
+                s.Required ? $"{s.Name}*" : s.Name));
+            sb.AppendLine($"- {intent.IntentId}: {intent.DisplayName} (slots: {slotList})");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("Only use [ACTION] blocks when the user explicitly asks you to create/do something. For questions, just answer normally.");
+        sb.AppendLine("Slots marked with * are required. You may omit optional slots if not mentioned.");
+
+        return sb.ToString().TrimEnd();
     }
 
     // ── Response sanitization ────────────────────────────────────────

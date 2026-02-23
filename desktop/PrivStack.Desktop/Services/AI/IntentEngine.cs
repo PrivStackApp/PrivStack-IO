@@ -211,6 +211,36 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
         }
     }
 
+    public async Task<IntentResult> ExecuteDirectAsync(
+        string intentId,
+        IReadOnlyDictionary<string, string> slots,
+        CancellationToken ct = default)
+    {
+        var provider = _pluginRegistry
+            .GetCapabilityProviders<IIntentProvider>()
+            .FirstOrDefault(p => p.GetSupportedIntents()
+                .Any(i => i.IntentId == intentId));
+
+        if (provider == null)
+            return IntentResult.Failure($"No provider found for intent '{intentId}'.");
+
+        var request = new IntentRequest
+        {
+            IntentId = intentId,
+            Slots = slots,
+        };
+
+        try
+        {
+            return await provider.ExecuteIntentAsync(request, ct);
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "Direct intent execution failed: {IntentId}", intentId);
+            return IntentResult.Failure(ex.Message);
+        }
+    }
+
     public void Dismiss(string suggestionId) => RemoveSuggestion(suggestionId);
 
     public void ClearAll()

@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -19,23 +18,11 @@ public partial class AiSuggestionTray : UserControl
     private void OnDataContextChanged(object? sender, System.EventArgs e)
     {
         if (_currentVm != null)
-        {
             _currentVm.ScrollToBottomRequested -= OnScrollToBottomRequested;
-            _currentVm.PropertyChanged -= OnVmPropertyChanged;
-        }
 
         _currentVm = DataContext as AiSuggestionTrayViewModel;
         if (_currentVm != null)
-        {
             _currentVm.ScrollToBottomRequested += OnScrollToBottomRequested;
-            _currentVm.PropertyChanged += OnVmPropertyChanged;
-        }
-    }
-
-    private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(AiSuggestionTrayViewModel.SelectedTabIndex) && _currentVm != null)
-            ApplyTabVisibility(_currentVm.SelectedTabIndex);
     }
 
     private void OnScrollToBottomRequested(object? sender, System.EventArgs e)
@@ -58,18 +45,6 @@ public partial class AiSuggestionTray : UserControl
     {
         if (_currentVm != null)
             _currentVm.SelectedTabIndex = index;
-        ApplyTabVisibility(index);
-    }
-
-    private void ApplyTabVisibility(int index)
-    {
-        var chatPanel = this.FindControl<Panel>("ChatPanel");
-        var intentsPanel = this.FindControl<Panel>("IntentsPanel");
-        var historyPanel = this.FindControl<Panel>("HistoryPanel");
-
-        if (chatPanel != null) chatPanel.IsVisible = index == 0;
-        if (intentsPanel != null) intentsPanel.IsVisible = index == 1;
-        if (historyPanel != null) historyPanel.IsVisible = index == 2;
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
