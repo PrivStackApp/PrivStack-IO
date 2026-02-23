@@ -92,20 +92,84 @@ internal sealed class ShellContentProvider : IIndexableContentProvider
             AI Services in PrivStack (assistant name: Duncan):
             Duncan is PrivStack's built-in AI assistant, accessible via the AI tray (star icon in the top-right corner).
 
+            How to interact with Duncan:
+            - Click the star icon in the top-right corner of the app to open the AI tray
+            - Type a message in the "Ask Duncan..." text box and press Enter to chat
+            - Duncan can answer questions about your data, summarize pages, brainstorm ideas, and explain features
+            - Duncan has access to your workspace data via RAG (semantic search) — it searches your notes, tasks, journal entries, contacts, and other entities to provide contextual answers
+            - Duncan remembers context within a conversation. Start a new chat to reset context
+            - When Duncan has proactive insights or intent suggestions, a notification balloon appears on the star icon
+
             Features:
-            - Free-form chat: Ask Duncan questions about your data, get summaries, brainstorm ideas
-            - Intent recognition: Duncan monitors signals from plugins and suggests actions (e.g., "Create a task from this email", "Add a calendar event for this meeting")
-            - Content suggestions: Plugins can push rich content cards into the AI tray
-            - RAG search: Duncan searches your entire knowledge base using semantic embeddings to find relevant context
+            - Free-form chat: Ask questions, get summaries, brainstorm, draft content
+            - Intent suggestions: Duncan detects actionable signals and suggests plugin actions (see "Intent System" for details)
+            - Content suggestions: Plugins push rich suggestion cards (e.g., AI-rewritten task descriptions) into the tray
+            - RAG search: Duncan searches your entire knowledge base using 768-dimensional semantic embeddings to find relevant context before answering
+            - Conversation history: Past conversations are saved and can be resumed from the history panel
+            - AI memory: Duncan learns your preferences across conversations (e.g., preferred formats, common topics)
 
-            AI Provider Support:
-            - OpenAI (GPT-4, GPT-3.5)
-            - Anthropic (Claude)
-            - Google Gemini
-            - Local LLaMA models (runs on-device, fully offline with token streaming)
+            AI Provider Support (configure in Settings):
+            - OpenAI (GPT-4o, GPT-4, GPT-3.5-turbo) — requires API key
+            - Anthropic (Claude 3.5 Sonnet, Claude 3 Opus/Haiku) — requires API key
+            - Google Gemini (Gemini Pro, Gemini Flash) — requires API key
+            - Local LLaMA models — runs entirely on-device, fully offline, with token streaming. Download models from Settings. Best for privacy-sensitive use cases
 
-            Configuration: Go to Settings (gear icon) to configure API keys, select the active provider, or download a local model.
-            The AI tray shows a notification balloon when Duncan has insights. Click the star icon or the balloon to open the tray.
+            Configuration: Go to Settings (gear icon) > AI to configure API keys, select the active provider, adjust response length preferences, or download a local model.
+
+            Response length: Duncan automatically classifies your message as short/medium/long and adjusts response length accordingly. Short questions get 1-2 sentence answers, detailed requests get thorough multi-paragraph responses.
+            """));
+
+        // ── Intent System ──────────────────────────────────────────────────
+        chunks.Add(MakeChunk("shell-intents", "Intent System — AI-Powered Actions",
+            """
+            Intent System in PrivStack:
+            Intents are AI-powered actions that let Duncan create, query, and manage data across all plugins using natural language. Each plugin declares the intents it supports, and Duncan matches your requests to the right intent automatically.
+
+            How intents work:
+            1. You type a natural language request in the AI tray (e.g., "Create a task to review the budget report by Friday")
+            2. Duncan's Intent Engine classifies your message against all registered intents across all plugins
+            3. If a match is found, Duncan extracts the relevant parameters (called "slots") from your message
+            4. The intent is executed by the owning plugin, creating or querying the actual data
+            5. Duncan confirms the action and can provide a link to the created entity
+
+            Intent signals: Duncan also proactively monitors signals from plugins (e.g., you're reading an email about a meeting) and suggests relevant intents in the AI tray (e.g., "Create a calendar event for this meeting?"). These appear as suggestion cards you can approve or dismiss.
+
+            Available intents by plugin:
+
+            Notes: notes.create_note (create a new note page with title and content)
+
+            Tasks: tasks.create_task (create a task with title, description, priority, due date, tags)
+
+            Calendar: calendar.create_event (create an event with title, date, time, duration, location, description)
+
+            Contacts: contacts.create_contact (create a contact with name, email, phone, company, notes)
+
+            Journal: journal.create_entry (create a journal entry with title, content, mood, tags)
+
+            Finance: finance.create_transaction (create transaction with payee, amount, account, date, memo), finance.check_balance (check account balance), finance.check_budget (check category budget status), finance.transfer_between_categories (move budget money between categories), finance.get_monthly_summary (monthly income/expense summary), finance.get_spending_breakdown (spending by category for date range), finance.get_budget_health (budget health check), finance.get_financial_trends (trends over time), finance.get_account_overview (all account balances), finance.suggest_from_receipt (suggest transaction from receipt text)
+
+            Habits: habits.log_habit (log a habit completion), habits.create_habit (create a new habit), habits.create_goal (create a goal with milestones)
+
+            Email: email.draft_email (draft an email with to, subject, body)
+
+            Snippets: snippets.save_snippet (save a code snippet with title, language, code, collection)
+
+            RSS: rss.add_feed (subscribe to an RSS feed by URL)
+
+            Files: (navigate to files via deep links)
+
+            WebClips: (navigate to clips via deep links)
+
+            Examples of what you can ask Duncan:
+            - "Add a task to review the Q4 budget, due next Monday, high priority"
+            - "How much did I spend on groceries last month?"
+            - "Create a meeting event for Thursday at 2pm called Sprint Planning"
+            - "Draft an email to john@example.com about the project update"
+            - "What's my checking account balance?"
+            - "Log my meditation habit for today"
+            - "Save this Python snippet: def hello(): print('world')"
+            - "What's my budget health this month?"
+            - "Create a contact for Jane Smith at Acme Corp, jane@acme.com"
             """));
 
         // ── Info Panel & Backlinks ───────────────────────────────────────
