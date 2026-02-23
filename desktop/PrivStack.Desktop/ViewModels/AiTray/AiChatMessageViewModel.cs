@@ -48,6 +48,14 @@ public partial class AiChatMessageViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsApplied))]
     private ChatMessageState _state;
 
+    partial void OnStateChanged(ChatMessageState value)
+    {
+        if (value == ChatMessageState.Loading)
+            StartThinkingAnimation();
+        else
+            StopThinkingAnimation();
+    }
+
     [ObservableProperty]
     private string? _content;
 
@@ -141,4 +149,43 @@ public partial class AiChatMessageViewModel : ViewModelBase
         ContentSuggestionState.Applied => ChatMessageState.Applied,
         _ => ChatMessageState.Ready
     };
+
+    // ── Thinking Dots Animation ──────────────────────────────────────
+
+    private static readonly string[] ThinkingFrames = ["Thinking.", "Thinking..", "Thinking..."];
+    private CancellationTokenSource? _thinkingCts;
+
+    [ObservableProperty]
+    private string _thinkingText = ThinkingFrames[0];
+
+    private void StartThinkingAnimation()
+    {
+        StopThinkingAnimation();
+        _thinkingCts = new CancellationTokenSource();
+        var ct = _thinkingCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            var frame = 0;
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(400, ct).ConfigureAwait(false);
+                frame = (frame + 1) % ThinkingFrames.Length;
+                var text = ThinkingFrames[frame];
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (!ct.IsCancellationRequested)
+                        ThinkingText = text;
+                });
+            }
+        }, ct);
+    }
+
+    private void StopThinkingAnimation()
+    {
+        _thinkingCts?.Cancel();
+        _thinkingCts?.Dispose();
+        _thinkingCts = null;
+        ThinkingText = ThinkingFrames[0];
+    }
 }
