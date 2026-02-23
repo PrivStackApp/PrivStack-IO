@@ -141,6 +141,83 @@ internal sealed class LocalLlamaProvider : IAiProvider
         }
     }
 
+    public async Task<AiResponse> StreamCompleteAsync(
+        AiRequest request, string? modelOverride, Action<string> onToken, CancellationToken ct)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        await _inferLock.WaitAsync(ct);
+        try
+        {
+            var modelName = modelOverride ?? GetDefaultModelName();
+            if (modelName == null || !_modelManager.IsModelDownloaded(modelName))
+            {
+                return AiResponse.Failure("No local model downloaded") with
+                {
+                    ProviderUsed = Id, Duration = sw.Elapsed
+                };
+            }
+
+            var modelPath = _modelManager.GetModelPath(modelName);
+            await EnsureModelLoadedAsync(modelPath);
+
+            if (_context == null)
+            {
+                return AiResponse.Failure("Failed to load local model") with
+                {
+                    ProviderUsed = Id, Duration = sw.Elapsed
+                };
+            }
+
+            var (prompt, antiPrompts) = FormatPrompt(modelName, request.SystemPrompt, request.UserPrompt, request.ConversationHistory);
+            using var inferContext = _weights!.CreateContext(_context!.Params);
+            var executor = new LLama.InteractiveExecutor(inferContext);
+            var inferParams = new LLama.Common.InferenceParams
+            {
+                MaxTokens = request.MaxTokens,
+                AntiPrompts = antiPrompts,
+                SamplingPipeline = new LLama.Sampling.DefaultSamplingPipeline
+                {
+                    Temperature = (float)request.Temperature
+                }
+            };
+
+            var sb = new StringBuilder();
+            var tokenCount = 0;
+            await foreach (var token in executor.InferAsync(prompt, inferParams, ct))
+            {
+                sb.Append(token);
+                tokenCount++;
+                onToken(sb.ToString());
+            }
+
+            sw.Stop();
+            return new AiResponse
+            {
+                Success = true,
+                Content = sb.ToString().Trim(),
+                ProviderUsed = Id,
+                ModelUsed = modelName,
+                TokensUsed = tokenCount,
+                Duration = sw.Elapsed
+            };
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            _log.Error(ex, "Local streaming inference failed");
+            return AiResponse.Failure(ex.Message) with
+            {
+                ProviderUsed = Id, Duration = sw.Elapsed
+            };
+        }
+        finally
+        {
+            _inferLock.Release();
+        }
+    }
+
     private async Task EnsureModelLoadedAsync(string modelPath)
     {
         if (_loadedModelPath == modelPath && _context != null)
