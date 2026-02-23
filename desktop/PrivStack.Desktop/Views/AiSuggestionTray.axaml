@@ -144,18 +144,24 @@
                 Padding="8,4">
             <StackPanel Orientation="Horizontal" Spacing="4">
                 <Button Content="Chat"
+                        Classes="view-toggle"
+                        Classes.active="{Binding IsChatTab}"
                         Click="OnTabChat"
                         Padding="10,5"
                         FontSize="{DynamicResource ThemeFontSizeSm}"
                         CornerRadius="{DynamicResource ThemeRadiusSm}"
                         Name="TabChat"/>
                 <Button Content="Intents"
+                        Classes="view-toggle"
+                        Classes.active="{Binding IsIntentsTab}"
                         Click="OnTabIntents"
                         Padding="10,5"
                         FontSize="{DynamicResource ThemeFontSizeSm}"
                         CornerRadius="{DynamicResource ThemeRadiusSm}"
                         Name="TabIntents"/>
                 <Button Content="History"
+                        Classes="view-toggle"
+                        Classes.active="{Binding IsHistoryTab}"
                         Click="OnTabHistory"
                         Padding="10,5"
                         FontSize="{DynamicResource ThemeFontSizeSm}"
@@ -165,7 +171,7 @@
         </Border>
 
         <!-- ═══ Chat Tab ═══ -->
-        <Panel Grid.Row="1" Name="ChatPanel">
+        <Panel Grid.Row="1" Name="ChatPanel" IsVisible="{Binding IsChatTab}">
             <ScrollViewer Name="MessageScrollViewer" VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding ChatMessages}"
                               ItemTemplate="{StaticResource MessageBubbleTemplate}"
@@ -182,7 +188,7 @@
         </Panel>
 
         <!-- ═══ Intents Tab ═══ -->
-        <Panel Grid.Row="1" Name="IntentsPanel" IsVisible="False">
+        <Panel Grid.Row="1" Name="IntentsPanel" IsVisible="{Binding IsIntentsTab}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding IntentMessages}"
                               ItemTemplate="{StaticResource MessageBubbleTemplate}"
@@ -199,7 +205,7 @@
         </Panel>
 
         <!-- ═══ History Tab ═══ -->
-        <Panel Grid.Row="1" Name="HistoryPanel" IsVisible="False">
+        <Panel Grid.Row="1" Name="HistoryPanel" IsVisible="{Binding IsHistoryTab}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding ConversationHistory}" Margin="8">
                     <ItemsControl.ItemTemplate>

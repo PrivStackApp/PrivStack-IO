@@ -101,7 +101,14 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
     // ── Tab Selection ────────────────────────────────────────────────
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsChatTab))]
+    [NotifyPropertyChangedFor(nameof(IsIntentsTab))]
+    [NotifyPropertyChangedFor(nameof(IsHistoryTab))]
     private int _selectedTabIndex;
+
+    public bool IsChatTab => SelectedTabIndex == 0;
+    public bool IsIntentsTab => SelectedTabIndex == 1;
+    public bool IsHistoryTab => SelectedTabIndex == 2;
 
     // ── Properties ───────────────────────────────────────────────────
 
