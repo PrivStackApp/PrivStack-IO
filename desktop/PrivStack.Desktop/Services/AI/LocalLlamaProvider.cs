@@ -45,9 +45,13 @@ internal sealed class LocalLlamaProvider : IAiProvider
 
     private static int GetContextWindowForModel(string modelName)
     {
+        if (modelName.StartsWith("qwen", StringComparison.OrdinalIgnoreCase))
+            return 32_768;
         if (modelName.StartsWith("mistral", StringComparison.OrdinalIgnoreCase))
             return 32_768;
-        return 4_096; // phi-3-mini, llama-3.2 default
+        if (modelName.StartsWith("llama-3.2-3b", StringComparison.OrdinalIgnoreCase))
+            return 8_192;
+        return 4_096; // phi-3-mini, older llama defaults
     }
 
     public Task<bool> ValidateAsync(CancellationToken ct = default)
@@ -152,7 +156,8 @@ internal sealed class LocalLlamaProvider : IAiProvider
         _log.Information("Loading local LLM model from {Path}", modelPath);
 
         var modelName = Path.GetFileNameWithoutExtension(modelPath);
-        var contextSize = modelName.StartsWith("mistral", StringComparison.OrdinalIgnoreCase)
+        var contextSize = modelName.StartsWith("qwen", StringComparison.OrdinalIgnoreCase)
+            || modelName.StartsWith("mistral", StringComparison.OrdinalIgnoreCase)
             ? (uint)8192
             : (uint)4096;
 
@@ -181,6 +186,25 @@ internal sealed class LocalLlamaProvider : IAiProvider
         var turns = history is { Count: > 0 }
             ? history.TakeLast(6).ToList()
             : null;
+
+        if (modelName.StartsWith("qwen", StringComparison.OrdinalIgnoreCase))
+        {
+            var sb = new StringBuilder();
+            sb.Append($"<|im_start|>system\n{systemPrompt}<|im_end|>\n");
+
+            if (turns != null)
+            {
+                foreach (var msg in turns)
+                {
+                    var role = msg.Role == "assistant" ? "assistant" : "user";
+                    sb.Append($"<|im_start|>{role}\n{msg.Content}<|im_end|>\n");
+                }
+            }
+
+            sb.Append($"<|im_start|>user\n{userPrompt}<|im_end|>\n");
+            sb.Append("<|im_start|>assistant\n");
+            return (sb.ToString(), ["<|im_end|>", "<|im_start|>"]);
+        }
 
         if (modelName.StartsWith("llama", StringComparison.OrdinalIgnoreCase))
         {

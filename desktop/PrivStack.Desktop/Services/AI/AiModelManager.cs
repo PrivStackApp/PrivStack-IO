@@ -12,17 +12,20 @@ public sealed class AiModelManager : INotifyPropertyChanged
 {
     private static readonly ILogger _log = Log.ForContext<AiModelManager>();
 
-    private static readonly Dictionary<string, (string Url, long ApproxSizeBytes)> ModelInfo = new()
+    private static readonly Dictionary<string, (string Url, long ApproxSizeBytes, int ParamBillions)> ModelInfo = new()
     {
-        ["phi-3-mini-4k"] = (
-            "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf",
-            2_300_000_000),
-        ["llama-3.2-1b"] = (
-            "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
-            800_000_000),
-        ["mistral-7b"] = (
-            "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf",
-            4_100_000_000),
+        ["llama-3.2-3b"] = (
+            "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+            2_000_000_000, 3),
+        ["qwen-2.5-7b"] = (
+            "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf",
+            4_700_000_000, 7),
+        ["qwen-2.5-14b"] = (
+            "https://huggingface.co/Qwen/Qwen2.5-14B-Instruct-GGUF/resolve/main/qwen2.5-14b-instruct-q4_k_m.gguf",
+            9_000_000_000, 14),
+        ["qwen-2.5-32b"] = (
+            "https://huggingface.co/Qwen/Qwen2.5-32B-Instruct-GGUF/resolve/main/qwen2.5-32b-instruct-q4_k_m.gguf",
+            20_000_000_000, 32),
     };
 
     private string? _cachedModelsDirectory;
@@ -193,6 +196,9 @@ public sealed class AiModelManager : INotifyPropertyChanged
         }
         return total;
     }
+
+    public int GetModelParameterBillions(string modelName) =>
+        ModelInfo.TryGetValue(modelName, out var info) ? info.ParamBillions : 0;
 
     private void OnPropertyChanged(string propertyName) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
