@@ -125,6 +125,12 @@ public static class IconData
 
     public const string MoreHorizontal = "M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z M19 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z M5 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z";
 
+    // Lucide "target" — bullseye/crosshair icon (Habits plugin)
+    public const string Target = "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12z M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z";
+
+    // Lucide "circle-dollar-sign" — currency icon (Finance plugin)
+    public const string CurrencyDollar = "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M12 6v12 M15.5 9.5a2.5 2.5 0 0 0-2.5-2.5h-2a2.5 2.5 0 0 0 0 5h2a2.5 2.5 0 0 1 0 5h-2a2.5 2.5 0 0 1-2.5-2.5";
+
     // Lucide "link"
     public const string Link = "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71";
 
@@ -190,6 +196,8 @@ public static class IconData
             "Globe" => Globe,
             "Whiteboard" or "Canvas" => Whiteboard,
             "MoreHorizontal" => MoreHorizontal,
+            "Target" or "Habits" => Target,
+            "CurrencyDollar" or "Finance" or "Budget" => CurrencyDollar,
             _ => null
         };
     }
