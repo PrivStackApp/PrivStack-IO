@@ -31,6 +31,7 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
     private readonly IAppSettingsService _appSettings;
     private readonly IAiService _aiService;
     private readonly IPluginRegistry _pluginRegistry;
+    private readonly AiModelManager _modelManager;
     private readonly Channel<IntentSignalMessage> _signalChannel;
     private readonly List<IntentSuggestion> _suggestions = [];
     private readonly object _suggestionsLock = new();
@@ -44,11 +45,13 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
     public IntentEngine(
         IAppSettingsService appSettings,
         IAiService aiService,
-        IPluginRegistry pluginRegistry)
+        IPluginRegistry pluginRegistry,
+        AiModelManager modelManager)
     {
         _appSettings = appSettings;
         _aiService = aiService;
         _pluginRegistry = pluginRegistry;
+        _modelManager = modelManager;
         _suggestionsFilePath = Path.Combine(DataPaths.BaseDir, "intent-suggestions.json");
         _signalChannel = Channel.CreateBounded<IntentSignalMessage>(
             new BoundedChannelOptions(QueueCapacity)
@@ -91,21 +94,36 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
         var allIntents = GetAllAvailableIntents();
         if (allIntents.Count == 0) return;
 
-        // Filter intents to only signal-relevant ones so small models aren't overwhelmed
-        var intents = FilterIntentsForSignal(allIntents, signal);
+        var tier = DetermineModelTier();
+
+        // Small tier: filter intents so small models aren't overwhelmed
+        // Medium/Large: use all intents (model can handle it)
+        var intents = tier == ModelTier.Small
+            ? FilterIntentsForSignal(allIntents, signal)
+            : (signal.SignalType == IntentSignalType.UserRequest ? allIntents : FilterIntentsForSignal(allIntents, signal));
         if (intents.Count == 0) return;
+
+        var maxTokens = tier switch
+        {
+            ModelTier.Large => 1024,
+            ModelTier.Medium => 768,
+            _ => 384,
+        };
 
         try
         {
-            var systemPrompt = IntentPromptBuilder.BuildSystemPrompt(intents, DateTimeOffset.Now);
+            var systemPrompt = IntentPromptBuilder.BuildSystemPrompt(intents, DateTimeOffset.Now, tier);
             var userPrompt = IntentPromptBuilder.BuildUserPrompt(
                 signal.Content, signal.EntityType, signal.EntityTitle);
+
+            _log.Debug("Intent classification using {Tier} tier prompt, MaxTokens={MaxTokens}",
+                tier, maxTokens);
 
             var response = await _aiService.CompleteAsync(new AiRequest
             {
                 SystemPrompt = systemPrompt,
                 UserPrompt = userPrompt,
-                MaxTokens = 384,
+                MaxTokens = maxTokens,
                 Temperature = 0.2,
                 FeatureId = "intent.classify",
             }, ct);
@@ -290,6 +308,28 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
     {
         if (string.IsNullOrEmpty(entityType)) return null;
         return EntityTypeToLinkType.GetValueOrDefault(entityType);
+    }
+
+    // ── Model Tier Detection ────────────────────────────────────────
+
+    private ModelTier DetermineModelTier()
+    {
+        var providerId = _appSettings.Settings.AiProvider;
+
+        // Cloud providers get the full-detail Large tier
+        if (providerId != "local")
+            return ModelTier.Large;
+
+        // Local provider: check model parameter count
+        var modelName = _appSettings.Settings.AiLocalModel;
+        if (!string.IsNullOrEmpty(modelName))
+        {
+            var paramB = _modelManager.GetModelParameterBillions(modelName);
+            if (paramB >= 7)
+                return ModelTier.Medium;
+        }
+
+        return ModelTier.Small;
     }
 
     // ── Private Helpers ──────────────────────────────────────────────

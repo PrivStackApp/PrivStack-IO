@@ -84,12 +84,15 @@ public static class PlatformDetector
     {
         var ramGb = GetTotalPhysicalMemoryGb();
 
+        if (ramGb >= 32)
+            return ("qwen-2.5-32b", $"Your system has {ramGb} GB RAM — Qwen 2.5 32B provides the best local quality.");
+
         if (ramGb >= 16)
-            return ("mistral-7b", $"Your system has {ramGb} GB RAM — Mistral 7B provides the best quality responses.");
+            return ("qwen-2.5-14b", $"Your system has {ramGb} GB RAM — Qwen 2.5 14B offers high quality responses.");
 
-        if (ramGb >= 8)
-            return ("phi-3-mini-4k", $"Your system has {ramGb} GB RAM — Phi-3 Mini offers a good balance of quality and speed.");
+        if (ramGb >= 12)
+            return ("qwen-2.5-7b", $"Your system has {ramGb} GB RAM — Qwen 2.5 7B offers a good balance of quality and speed.");
 
-        return ("llama-3.2-1b", $"Your system has {ramGb} GB RAM — Llama 3.2 1B is lightweight and runs well on smaller systems.");
+        return ("llama-3.2-3b", $"Your system has {ramGb} GB RAM — Llama 3.2 3B is lightweight and runs well on smaller systems.");
     }
 }
