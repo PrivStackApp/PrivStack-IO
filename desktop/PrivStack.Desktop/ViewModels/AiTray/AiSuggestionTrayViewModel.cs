@@ -83,8 +83,9 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         WeakReferenceMessenger.Default.Register<ContentSuggestionDismissedMessage>(this);
         WeakReferenceMessenger.Default.Register<ContentSuggestionActionRequestedMessage>(this);
 
-        // Subscribe to active item changes for context injection
+        // Subscribe to active item and plugin changes for context injection
         _infoPanelService.ActiveItemChanged += OnActiveItemChanged;
+        _infoPanelService.ActivePluginChanged += OnActivePluginChanged;
 
         // Load existing intent suggestions
         foreach (var suggestion in _intentEngine.PendingSuggestions)
@@ -133,6 +134,40 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
 
     private string? _activeItemContextShort;
     private string? _activeItemContextFull;
+    private string? _activePluginContext;
+
+    private void OnActivePluginChanged()
+    {
+        var pluginId = _infoPanelService.ActivePluginId;
+        if (string.IsNullOrEmpty(pluginId))
+        {
+            _activePluginContext = null;
+            return;
+        }
+
+        var plugin = _pluginRegistry.ActivePlugins.FirstOrDefault(p => p.Metadata.Id == pluginId);
+        if (plugin == null)
+        {
+            _activePluginContext = null;
+            return;
+        }
+
+        var meta = plugin.Metadata;
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"The user is currently viewing the \"{meta.Name}\" plugin.");
+        if (!string.IsNullOrEmpty(meta.DetailedDescription))
+        {
+            sb.AppendLine(meta.DetailedDescription);
+        }
+        else
+        {
+            sb.AppendLine($"Description: {meta.Description}");
+            if (meta.Tags is { Count: > 0 })
+                sb.AppendLine($"Tags: {string.Join(", ", meta.Tags)}");
+            sb.AppendLine($"Category: {meta.Category}");
+        }
+        _activePluginContext = sb.ToString().TrimEnd();
+    }
 
     private void OnActiveItemChanged()
     {

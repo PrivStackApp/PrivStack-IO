@@ -26,6 +26,9 @@ public partial class MainWindow : Window
     private bool _isResizingInfoPanel;
     private double _infoPanelResizeStartX;
     private double _infoPanelResizeStartWidth;
+    private bool _isResizingAiTray;
+    private double _aiTrayResizeStartX;
+    private double _aiTrayResizeStartWidth;
 
     public MainWindow()
     {
@@ -45,6 +48,16 @@ public partial class MainWindow : Window
             dragHandle.PointerMoved += OnInfoPanelDragMove;
             dragHandle.PointerReleased += OnInfoPanelDragEnd;
             dragHandle.PointerCaptureLost += (_, _) => _isResizingInfoPanel = false;
+        }
+
+        // AI tray drag-to-resize
+        var aiTrayHandle = this.FindControl<Border>("AiTrayDragHandle");
+        if (aiTrayHandle != null)
+        {
+            aiTrayHandle.PointerPressed += OnAiTrayDragStart;
+            aiTrayHandle.PointerMoved += OnAiTrayDragMove;
+            aiTrayHandle.PointerReleased += OnAiTrayDragEnd;
+            aiTrayHandle.PointerCaptureLost += (_, _) => _isResizingAiTray = false;
         }
 
         // Apply saved window settings
@@ -253,13 +266,38 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void OnAiTrayBackdropPressed(object? sender, PointerPressedEventArgs e)
+    // AI tray no longer closes on click-away — only via close button or Escape key
+
+    private void OnAiTrayDragStart(object? sender, PointerPressedEventArgs e)
     {
-        if (DataContext is MainWindowViewModel vm && vm.IsAiTrayOpen)
-        {
-            vm.ToggleAiTrayCommand.Execute(null);
-            e.Handled = true;
-        }
+        if (DataContext is not MainWindowViewModel vm) return;
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        _isResizingAiTray = true;
+        _aiTrayResizeStartX = e.GetPosition(this).X;
+        _aiTrayResizeStartWidth = vm.AiTrayWidth;
+        e.Pointer.Capture((IInputElement)sender!);
+        e.Handled = true;
+    }
+
+    private void OnAiTrayDragMove(object? sender, PointerEventArgs e)
+    {
+        if (!_isResizingAiTray) return;
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        var currentX = e.GetPosition(this).X;
+        var delta = _aiTrayResizeStartX - currentX;
+        var newWidth = Math.Clamp(_aiTrayResizeStartWidth + delta, 320, 700);
+        vm.AiTrayWidth = newWidth;
+        e.Handled = true;
+    }
+
+    private void OnAiTrayDragEnd(object? sender, PointerReleasedEventArgs e)
+    {
+        if (!_isResizingAiTray) return;
+        _isResizingAiTray = false;
+        e.Pointer.Capture(null);
+        e.Handled = true;
     }
 
     private void OnInfoPanelBackdropPressed(object? sender, PointerPressedEventArgs e)
