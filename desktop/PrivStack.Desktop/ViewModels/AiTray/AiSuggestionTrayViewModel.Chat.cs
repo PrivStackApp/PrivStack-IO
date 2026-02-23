@@ -396,9 +396,13 @@ public partial class AiSuggestionTrayViewModel
     private const string ActionFormatHeader = """
         CRITICAL: You can perform REAL actions using [ACTION] blocks. Without an [ACTION] block, NOTHING happens.
         NEVER claim you created/did something unless you include the [ACTION] block below.
-        If the user asks for something you have no action for, say you can't do that yet.
         Place [ACTION] blocks at the END of your response, after your conversational message.
         You may include multiple [ACTION] blocks for multiple actions.
+        IMPORTANT: You MUST use the EXACT intent_id values shown in the ACTION descriptions above (e.g. "tasks.update_task", NOT "tasks.update").
+        Do NOT abbreviate, shorten, or invent intent IDs. Copy them exactly from the action descriptions.
+        You CAN use actions from ANY plugin, not just the one the user is currently viewing.
+        For example, if the user asks to create a note while viewing Finance, use the notes.create_note action.
+        If no relevant action exists in the descriptions above, say you can't do that yet.
         """;
 
     /// <summary>
