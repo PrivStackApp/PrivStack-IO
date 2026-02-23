@@ -58,7 +58,7 @@ System overview and plugin management center.
 - **Info Panel (Right Sidebar)**: Shows active entity details, backlinks, cross-plugin references
 - **Backlink Service**: Reverse-link index across all `ILinkableItemProvider` plugins
 - **Cloud Sync**: Bi-directional workspace synchronization with conflict resolution
-- **AI Services**: Intent recognition, RAG search, embedding-based similarity, content suggestions. Supports OpenAI, Anthropic, Gemini, and local LLaMA models
+- **AI Services (Duncan)**: See AI & Intent System section below for full details
 - **Reminders**: Aggregates from all `IReminderProvider` plugins into system notifications
 - **Theme Management**: Light/dark themes with custom color palette editor
 - **Speech/Audio**: Recording + Whisper STT for voice input
@@ -108,3 +108,68 @@ Each plugin implements a subset of SDK capability interfaces to participate in c
 | Canvas | privstack.canvas | Infinite canvas whiteboards with cross-plugin entity references |
 
 Each plugin has its own `PLUGIN_CONTEXT.md` with detailed feature documentation in its directory.
+
+## AI & Intent System (Duncan)
+
+Duncan is PrivStack's built-in AI assistant, accessible via the AI tray (star icon in the top-right corner).
+
+### Interacting with Duncan
+- Click the star icon to open the AI tray, type in the "Ask Duncan..." box
+- Duncan can answer questions about your data, summarize content, brainstorm, and explain features
+- Duncan has access to your workspace data via RAG (semantic search over embeddings)
+- Conversation history is preserved and can be resumed
+- Duncan learns preferences across conversations via AI memory
+
+### AI Providers
+Configure in Settings > AI:
+- **OpenAI** (GPT-4o, GPT-4, GPT-3.5-turbo) — requires API key
+- **Anthropic** (Claude 3.5 Sonnet, Claude 3 Opus/Haiku) — requires API key
+- **Google Gemini** (Gemini Pro, Gemini Flash) — requires API key
+- **Local LLaMA** — fully offline, on-device inference with token streaming
+
+### Intent System
+Intents are AI-powered actions that let Duncan create, query, and manage data across all plugins via natural language.
+
+**How intents work:**
+1. You type a natural language request (e.g., "Create a task to review the budget by Friday")
+2. The Intent Engine classifies your message against all registered intents
+3. Slots (parameters) are extracted from your message
+4. The owning plugin executes the intent
+5. Duncan confirms and links to the created entity
+
+**Intent signals:** Duncan proactively monitors plugin signals and suggests relevant actions as cards in the AI tray.
+
+### Available Intents
+
+| Plugin | Intent ID | Description |
+|---|---|---|
+| Notes | `notes.create_note` | Create a note page (title, content, tags) |
+| Tasks | `tasks.create_task` | Create a task (title, description, priority, due_date, tags) |
+| Calendar | `calendar.create_event` | Create event (title, date, time, duration, location, description) |
+| Contacts | `contacts.create_contact` | Create contact (name, email, phone, company, notes) |
+| Journal | `journal.create_entry` | Create journal entry (title, content, mood, tags) |
+| Finance | `finance.create_transaction` | Create transaction (payee, amount, account, date, memo) |
+| Finance | `finance.check_balance` | Check account balance |
+| Finance | `finance.check_budget` | Check category budget status |
+| Finance | `finance.transfer_between_categories` | Move budget money between categories |
+| Finance | `finance.get_monthly_summary` | Monthly income/expense summary |
+| Finance | `finance.get_spending_breakdown` | Spending by category for date range |
+| Finance | `finance.get_budget_health` | Budget health check |
+| Finance | `finance.get_financial_trends` | Trends over time |
+| Finance | `finance.get_account_overview` | All account balances |
+| Finance | `finance.suggest_from_receipt` | Suggest transaction from receipt text |
+| Habits | `habits.log_habit` | Log a habit completion |
+| Habits | `habits.create_habit` | Create a new habit |
+| Habits | `habits.create_goal` | Create a goal with milestones |
+| Email | `email.draft_email` | Draft email (to, subject, body) |
+| Snippets | `snippets.save_snippet` | Save code snippet (title, language, code) |
+| RSS | `rss.add_feed` | Subscribe to RSS feed (url, name, category) |
+
+### Content Suggestions
+Plugins can push AI-generated suggestion cards into Duncan's tray (e.g., rewritten task descriptions, email summaries). Cards appear alongside intent suggestions and can be acted on or dismissed.
+
+### RAG (Retrieval-Augmented Generation)
+- All plugins implementing `IIndexableContentProvider` contribute content chunks to the vector index
+- Chunks are embedded as 768-dimensional vectors stored in the Rust core
+- When you ask Duncan a question, relevant chunks are retrieved via semantic similarity and injected as context
+- This lets Duncan answer questions about your specific data without sending it to the cloud (when using local models)
