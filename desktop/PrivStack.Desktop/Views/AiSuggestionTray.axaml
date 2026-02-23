@@ -265,31 +265,33 @@
                        Foreground="{DynamicResource ThemeTextMutedBrush}"/>
         </Panel>
 
-        <!-- ═══ Token Warning Banner ═══ -->
-        <Border Grid.Row="2"
-                IsVisible="{Binding IsNearTokenLimit}"
-                Background="{DynamicResource ThemeWarningMutedBrush}"
-                Padding="10,6">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Text="{Binding TokenWarningText}"
-                           FontSize="{DynamicResource ThemeFontSizeXs}"
-                           Foreground="{DynamicResource ThemeWarningBrush}"
-                           VerticalAlignment="Center"
-                           TextWrapping="Wrap"/>
-                <Button Grid.Column="1"
-                        Content="New chat"
-                        Command="{Binding StartNewChatCommand}"
-                        Padding="8,3"
-                        FontSize="{DynamicResource ThemeFontSizeXs}"
-                        CornerRadius="{DynamicResource ThemeRadiusSm}"
-                        VerticalAlignment="Center"
-                        Margin="6,0,0,0"
-                        Cursor="Hand"/>
-            </Grid>
-        </Border>
+        <!-- ═══ Token Warning Banner (chat tab only, shown when near token limit) ═══ -->
+        <Panel Grid.Row="2">
+            <Border IsVisible="{Binding IsNearTokenLimit}"
+                    Background="{DynamicResource ThemeWarningMutedBrush}"
+                    Padding="10,6">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding TokenWarningText}"
+                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                               Foreground="{DynamicResource ThemeWarningBrush}"
+                               VerticalAlignment="Center"
+                               TextWrapping="Wrap"/>
+                    <Button Grid.Column="1"
+                            Content="New chat"
+                            Command="{Binding StartNewChatCommand}"
+                            Padding="8,3"
+                            FontSize="{DynamicResource ThemeFontSizeXs}"
+                            CornerRadius="{DynamicResource ThemeRadiusSm}"
+                            VerticalAlignment="Center"
+                            Margin="6,0,0,0"
+                            Cursor="Hand"/>
+                </Grid>
+            </Border>
+        </Panel>
 
-        <!-- ═══ Chat Input Bar ═══ -->
+        <!-- ═══ Chat Input Bar (chat tab only) ═══ -->
         <Border Grid.Row="3"
+                IsVisible="{Binding IsChatTab}"
                 Background="{DynamicResource ThemeSurfaceElevatedBrush}"
                 BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
                 BorderThickness="0,1,0,0"
