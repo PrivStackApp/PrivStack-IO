@@ -216,17 +216,39 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
         IReadOnlyDictionary<string, string> slots,
         CancellationToken ct = default)
     {
-        var provider = _pluginRegistry
-            .GetCapabilityProviders<IIntentProvider>()
+        var providers = _pluginRegistry.GetCapabilityProviders<IIntentProvider>();
+
+        // Exact match first
+        var provider = providers
             .FirstOrDefault(p => p.GetSupportedIntents()
                 .Any(i => i.IntentId == intentId));
+
+        var resolvedIntentId = intentId;
+
+        // Fuzzy fallback: AI sometimes shortens IDs (e.g. "tasks.update" instead of "tasks.update_task")
+        if (provider == null)
+        {
+            _log.Warning("No exact match for intent '{IntentId}', trying prefix match", intentId);
+            foreach (var p in providers)
+            {
+                var match = p.GetSupportedIntents()
+                    .FirstOrDefault(i => i.IntentId.StartsWith(intentId, StringComparison.OrdinalIgnoreCase));
+                if (match != null)
+                {
+                    provider = p;
+                    resolvedIntentId = match.IntentId;
+                    _log.Information("Fuzzy-resolved intent '{Original}' to '{Resolved}'", intentId, resolvedIntentId);
+                    break;
+                }
+            }
+        }
 
         if (provider == null)
             return IntentResult.Failure($"No provider found for intent '{intentId}'.");
 
         var request = new IntentRequest
         {
-            IntentId = intentId,
+            IntentId = resolvedIntentId,
             Slots = slots,
         };
 
@@ -236,7 +258,7 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
         }
         catch (Exception ex)
         {
-            _log.Error(ex, "Direct intent execution failed: {IntentId}", intentId);
+            _log.Error(ex, "Direct intent execution failed: {IntentId}", resolvedIntentId);
             return IntentResult.Failure(ex.Message);
         }
     }
