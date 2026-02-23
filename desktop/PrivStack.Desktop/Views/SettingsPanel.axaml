@@ -889,14 +889,12 @@
                                            Foreground="{DynamicResource ThemeTextMutedBrush}"
                                            TextWrapping="Wrap"/>
 
-                                <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !IsEmbeddingModelDownloading}">
-                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
-                                        <TextBlock FontSize="{DynamicResource ThemeFontSizeXs}">
-                                            <Run Text="nomic-embed-text-v1.5 "/>
-                                            <Run Text="{Binding EmbeddingModelSizeDisplay}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                                        </TextBlock>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                <StackPanel Spacing="8" IsVisible="{Binding !IsEmbeddingModelDownloading}">
+                                    <TextBlock FontSize="{DynamicResource ThemeFontSizeXs}">
+                                        <Run Text="nomic-embed-text-v1.5 "/>
+                                        <Run Text="{Binding EmbeddingModelSizeDisplay}" Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                    </TextBlock>
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
                                         <Button Content="{Binding EmbeddingModelDownloadLabel}"
                                                 Command="{Binding DownloadEmbeddingModelCommand}"
                                                 IsEnabled="{Binding CanDownloadEmbeddingModel}"
@@ -907,7 +905,7 @@
                                                 Classes="danger"
                                                 Padding="12,6"/>
                                     </StackPanel>
-                                </Grid>
+                                </StackPanel>
 
                                 <StackPanel Spacing="4" IsVisible="{Binding IsEmbeddingModelDownloading}">
                                     <ProgressBar Minimum="0" Maximum="100"
