@@ -99,6 +99,10 @@ public partial class AiSuggestionTrayViewModel
                 var memoryContext = _memoryService.FormatForPrompt();
                 var systemPrompt = AiPersona.GetCloudSystemPrompt(tier, userName, memoryContext);
 
+                // Inject active plugin context
+                if (!string.IsNullOrEmpty(_activePluginContext))
+                    systemPrompt += $"\n\n{_activePluginContext}";
+
                 // Inject RAG search results as knowledge context
                 if (!string.IsNullOrEmpty(ragContext))
                     systemPrompt += $"\n\n{ragContext}";
@@ -120,6 +124,10 @@ public partial class AiSuggestionTrayViewModel
             else
             {
                 var systemPrompt = AiPersona.GetSystemPrompt(tier, userName);
+
+                // Inject active plugin context
+                if (!string.IsNullOrEmpty(_activePluginContext))
+                    systemPrompt += $"\n\n{_activePluginContext}";
 
                 // Inject RAG search results (trimmed for local models)
                 if (!string.IsNullOrEmpty(ragContext))
