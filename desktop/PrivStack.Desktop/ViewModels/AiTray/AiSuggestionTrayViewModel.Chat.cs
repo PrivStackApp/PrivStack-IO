@@ -105,19 +105,40 @@ public partial class AiSuggestionTrayViewModel
             var activePluginCtx = _activePluginContext;
             var activeItemCtxFull = _activeItemContextFull;
             var activeItemCtxShort = _activeItemContextShort;
-            var conversationHistory = BuildConversationHistory();
-
-            // Resolve wiki-links from user message on UI thread (needs registry access)
-            var resolvedEntityContext = await ResolveWikiLinksAsync(text);
 
             // Capture conversational entity tracking state
             var lastEntityId = _lastActionEntityId;
             var lastEntityType = _lastActionEntityType;
 
-            // Run all heavy work (RAG search, prompt building, AI call) off the UI thread
+            // Snapshot chat messages on UI thread (ObservableCollection is not thread-safe)
+            var chatSnapshot = ChatMessages
+                .Where(m => m.SuggestionId == null
+                    && !(m.Role == ChatMessageRole.Assistant && m.State == ChatMessageState.Loading))
+                .TakeLast(MaxHistoryMessages)
+                .Select(m => new AiChatMessage
+                {
+                    Role = m.Role == ChatMessageRole.User ? "user" : "assistant",
+                    Content = m.Role == ChatMessageRole.User ? m.UserLabel ?? "" : m.Content ?? ""
+                })
+                .ToList();
+
+            // Run all heavy work (RAG, wiki-link resolution, prompt building, AI call) off the UI thread
             var (response, request) = await Task.Run(async () =>
             {
                 var (ragContext, hasIntentActions) = await BuildRagContextWithIntentsAsync(text);
+
+                // Resolve wiki-links in background (I/O bound — was blocking UI thread)
+                var resolvedEntityContext = await ResolveWikiLinksAsync(text);
+
+                // Build conversation history from snapshot (exclude last user message — it's the current prompt)
+                IReadOnlyList<AiChatMessage>? conversationHistory = null;
+                if (chatSnapshot.Count > 0)
+                {
+                    if (chatSnapshot[^1].Role == "user")
+                        chatSnapshot.RemoveAt(chatSnapshot.Count - 1);
+                    if (chatSnapshot.Count > 0)
+                        conversationHistory = chatSnapshot;
+                }
 
                 AiRequest req;
                 if (isCloud)
@@ -321,29 +342,6 @@ public partial class AiSuggestionTrayViewModel
         var providers = _aiService.GetProviders();
         var active = providers.FirstOrDefault(p => p.Id == providerId);
         return active?.IsLocal ?? true;
-    }
-
-    private IReadOnlyList<AiChatMessage>? BuildConversationHistory()
-    {
-        var chatMessages = ChatMessages
-            .Where(m => m.SuggestionId == null
-                && !(m.Role == ChatMessageRole.Assistant && m.State == ChatMessageState.Loading))
-            .TakeLast(MaxHistoryMessages)
-            .ToList();
-
-        if (chatMessages.Count == 0) return null;
-
-        // Exclude the last user message (it's the one being sent now as UserPrompt)
-        if (chatMessages.Count > 0 && chatMessages[^1].Role == ChatMessageRole.User)
-            chatMessages.RemoveAt(chatMessages.Count - 1);
-
-        if (chatMessages.Count == 0) return null;
-
-        return chatMessages.Select(m => new AiChatMessage
-        {
-            Role = m.Role == ChatMessageRole.User ? "user" : "assistant",
-            Content = m.Role == ChatMessageRole.User ? m.UserLabel ?? "" : m.Content ?? ""
-        }).ToList();
     }
 
     // ── Wiki-Link Resolution ────────────────────────────────────────
