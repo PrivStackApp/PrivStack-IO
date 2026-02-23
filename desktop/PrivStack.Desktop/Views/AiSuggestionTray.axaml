@@ -20,7 +20,7 @@
                         CornerRadius="12,12,4,12"
                         Padding="12,8">
                     <StackPanel Spacing="4">
-                        <TextBlock Text="{Binding UserLabel}"
+                        <SelectableTextBlock Text="{Binding UserLabel}"
                                    TextWrapping="Wrap"
                                    Foreground="{DynamicResource ThemeTextOnAccentBrush}"
                                    FontSize="{DynamicResource ThemeFontSizeSm}"/>
@@ -59,13 +59,13 @@
                                 Background="{DynamicResource ThemeDangerMutedBrush}"
                                 CornerRadius="{DynamicResource ThemeRadiusSm}"
                                 Padding="8,4">
-                            <TextBlock Text="{Binding ErrorMessage}"
+                            <SelectableTextBlock Text="{Binding ErrorMessage}"
                                        FontSize="{DynamicResource ThemeFontSizeXs}"
                                        Foreground="{DynamicResource ThemeDangerBrush}"
                                        TextWrapping="Wrap"/>
                         </Border>
 
-                        <TextBlock Text="{Binding Content}"
+                        <SelectableTextBlock Text="{Binding Content}"
                                    IsVisible="{Binding Content, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                    TextWrapping="Wrap"
                                    FontSize="{DynamicResource ThemeFontSizeSm}"
@@ -169,7 +169,7 @@
         </Border>
 
         <!-- ═══ Chat Tab ═══ -->
-        <Panel Grid.Row="1" Name="ChatPanel" IsVisible="{Binding IsChatTab}">
+        <Panel Grid.Row="1" Name="ChatPanel" IsVisible="{Binding IsChatTab}" ClipToBounds="True">
             <ScrollViewer Name="MessageScrollViewer" VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding ChatMessages}"
                               ItemTemplate="{StaticResource MessageBubbleTemplate}"
@@ -186,7 +186,7 @@
         </Panel>
 
         <!-- ═══ Intents Tab ═══ -->
-        <Panel Grid.Row="1" Name="IntentsPanel" IsVisible="{Binding IsIntentsTab}">
+        <Panel Grid.Row="1" Name="IntentsPanel" IsVisible="{Binding IsIntentsTab}" ClipToBounds="True">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding IntentMessages}"
                               ItemTemplate="{StaticResource MessageBubbleTemplate}"
@@ -203,7 +203,7 @@
         </Panel>
 
         <!-- ═══ History Tab ═══ -->
-        <Panel Grid.Row="1" Name="HistoryPanel" IsVisible="{Binding IsHistoryTab}">
+        <Panel Grid.Row="1" Name="HistoryPanel" IsVisible="{Binding IsHistoryTab}" ClipToBounds="True">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding ConversationHistory}" Margin="8">
                     <ItemsControl.ItemTemplate>
