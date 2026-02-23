@@ -73,6 +73,8 @@ public static partial class AiPersona
         "help me with", "can you help",
         "suggest", "recommend", "brainstorm", "ideas for",
         "rephrase", "reword", "shorten", "expand",
+        "create a", "create an", "add a", "add an", "make a", "make an",
+        "log a", "log my", "draft an email", "save a", "subscribe to",
     ];
 
     private static readonly string[] ShortKeywords =
@@ -170,12 +172,18 @@ public static partial class AiPersona
 
         var sb = new System.Text.StringBuilder();
         sb.AppendLine("""
-            You can perform actions in the user's workspace. When the user asks you to create, log, or draft something,
-            respond with your confirmation message AND include an action block at the end. Format:
+            CRITICAL — ACTION EXECUTION RULES:
+            You have the ability to perform real actions in the user's workspace using [ACTION] blocks.
+            When the user asks you to create, add, log, draft, or do something actionable, you MUST include an [ACTION] block.
+            WITHOUT an [ACTION] block, NOTHING happens — the action is NOT performed. NEVER say "I've created" or "Done" unless you include the [ACTION] block.
+            If the user asks for something you have no action for, say you can't do that yet. Do NOT pretend you did it.
 
+            Format — place this at the END of your response, after your conversational message:
             [ACTION]
             {"intent_id": "tasks.create_task", "slots": {"title": "Review the budget", "priority": "high"}}
             [/ACTION]
+
+            You may include multiple [ACTION] blocks if the user asks for multiple things.
 
             Available actions:
             """);
@@ -190,6 +198,7 @@ public static partial class AiPersona
         sb.AppendLine();
         sb.AppendLine("Only use [ACTION] blocks when the user explicitly asks you to create/do something. For questions, just answer normally.");
         sb.AppendLine("Slots marked with * are required. You may omit optional slots if not mentioned.");
+        sb.AppendLine("If an action is not in the list above, do NOT fabricate it. Tell the user it's not available.");
 
         return sb.ToString().TrimEnd();
     }
