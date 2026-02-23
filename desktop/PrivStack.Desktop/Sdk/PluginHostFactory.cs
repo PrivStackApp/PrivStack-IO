@@ -56,6 +56,9 @@ internal sealed class PluginHostFactory
         // Register dataset service for cross-plugin access
         var datasetService = App.Services.GetRequiredService<IDatasetService>();
         _capabilityBroker.Register<IDatasetService>(datasetService);
+
+        // Register shell-level RAG content provider (global features, shortcuts, etc.)
+        _capabilityBroker.Register<IIndexableContentProvider>(new ShellContentProvider());
     }
 
     public IPluginHost CreateHost(string pluginId)
