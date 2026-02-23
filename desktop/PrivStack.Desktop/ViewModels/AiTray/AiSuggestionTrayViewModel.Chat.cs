@@ -4,7 +4,6 @@ using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PrivStack.Desktop.Services.AI;
-using PrivStack.Sdk.Capabilities;
 using PrivStack.Sdk.Services;
 using Serilog;
 
@@ -101,7 +100,7 @@ public partial class AiSuggestionTrayViewModel
             // Run all heavy work (RAG search, prompt building, AI call) off the UI thread
             var (response, request) = await Task.Run(async () =>
             {
-                var ragContext = await BuildRagContextAsync(text);
+                var (ragContext, hasIntentActions) = await BuildRagContextWithIntentsAsync(text);
 
                 AiRequest req;
                 if (isCloud)
@@ -118,18 +117,9 @@ public partial class AiSuggestionTrayViewModel
                     if (!string.IsNullOrEmpty(activeItemCtxFull))
                         systemPrompt += $"\n\n{activeItemCtxFull}";
 
-                    // Inject intent catalog so AI can invoke actions from chat
-                    var allIntents = _intentEngine.GetAllAvailableIntents();
-                    var intentCatalog = AiPersona.BuildIntentCatalog(allIntents);
-                    if (!string.IsNullOrEmpty(intentCatalog))
-                    {
-                        systemPrompt += $"\n\n{intentCatalog}";
-                        _log.Debug("Injected intent catalog with {IntentCount} actions into chat system prompt", allIntents.Count);
-                    }
-                    else
-                    {
-                        _log.Debug("No intents available for chat intent catalog (providers: {Count})", allIntents.Count);
-                    }
+                    // If RAG found intent_action chunks, inject the ACTION format header
+                    if (hasIntentActions)
+                        systemPrompt += $"\n\n{ActionFormatHeader}";
 
                     req = new AiRequest
                     {
@@ -153,6 +143,10 @@ public partial class AiSuggestionTrayViewModel
 
                     if (!string.IsNullOrEmpty(activeItemCtxShort))
                         systemPrompt += $"\n\n{activeItemCtxShort}";
+
+                    // If RAG found intent_action chunks, inject the ACTION format header
+                    if (hasIntentActions)
+                        systemPrompt += $"\n\n{ActionFormatHeader}";
 
                     req = new AiRequest
                     {
@@ -316,14 +310,25 @@ public partial class AiSuggestionTrayViewModel
         }).ToList();
     }
 
+    // ── ACTION Format Header (injected only when RAG finds intent chunks) ──
+
+    private const string ActionFormatHeader = """
+        CRITICAL: You can perform REAL actions using [ACTION] blocks. Without an [ACTION] block, NOTHING happens.
+        NEVER claim you created/did something unless you include the [ACTION] block below.
+        If the user asks for something you have no action for, say you can't do that yet.
+        Place [ACTION] blocks at the END of your response, after your conversational message.
+        You may include multiple [ACTION] blocks for multiple actions.
+        """;
+
     /// <summary>
-    /// Runs semantic search against the RAG vector index and formats matching results
-    /// as context for the system prompt. Uses chunk text from the index for real content.
+    /// Runs semantic search against the RAG vector index and formats matching results.
+    /// Returns the formatted context string and whether any intent_action chunks were found
+    /// (which triggers ACTION format header injection in the system prompt).
     /// </summary>
-    private async Task<string?> BuildRagContextAsync(string query)
+    private async Task<(string? Context, bool HasIntentActions)> BuildRagContextWithIntentsAsync(string query)
     {
         if (!_ragSearchService.IsReady)
-            return null;
+            return (null, false);
 
         try
         {
@@ -334,11 +339,15 @@ public partial class AiSuggestionTrayViewModel
             var results = await _ragSearchService.SearchAsync(query, limit);
 
             if (results.Count == 0)
-                return null;
+                return (null, false);
 
             var relevant = results.Where(r => r.Score >= 0.3).ToList();
             if (relevant.Count == 0)
-                return null;
+                return (null, false);
+
+            var hasIntentActions = relevant.Any(r => r.EntityType == "intent_action");
+            _log.Debug("RAG context: {Count} results ({IntentCount} intent actions) injected into system prompt",
+                relevant.Count, relevant.Count(r => r.EntityType == "intent_action"));
 
             var sb = new StringBuilder();
             sb.AppendLine("Relevant information from the user's data:");
@@ -359,13 +368,12 @@ public partial class AiSuggestionTrayViewModel
                 sb.AppendLine();
             }
 
-            _log.Debug("RAG context: {Count} results injected into system prompt", relevant.Count);
-            return sb.ToString().TrimEnd();
+            return (sb.ToString().TrimEnd(), hasIntentActions);
         }
         catch (Exception ex)
         {
             _log.Warning(ex, "RAG search failed during chat, continuing without context");
-            return null;
+            return (null, false);
         }
     }
 

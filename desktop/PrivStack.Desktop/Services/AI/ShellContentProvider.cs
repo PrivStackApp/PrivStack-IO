@@ -1,22 +1,35 @@
 using System.Security.Cryptography;
 using System.Text;
 using PrivStack.Sdk.Capabilities;
+using PrivStack.Sdk.Services;
 
 namespace PrivStack.Desktop.Services.AI;
 
 /// <summary>
 /// Shell-level RAG content provider that indexes global features, shortcuts,
 /// and capabilities so the AI can answer questions about app-wide functionality.
+/// Also dynamically indexes intent descriptors so the AI can discover available
+/// actions via semantic search instead of requiring a full catalog in every prompt.
 /// Registered with the CapabilityBroker (not a plugin) so RagIndexService discovers it.
 /// </summary>
 internal sealed class ShellContentProvider : IIndexableContentProvider
 {
     private const string ShellPluginId = "privstack.desktop";
 
+    private readonly IIntentEngine _intentEngine;
+
+    public ShellContentProvider(IIntentEngine intentEngine)
+    {
+        _intentEngine = intentEngine;
+    }
+
     public Task<IndexableContentResult> GetIndexableContentAsync(
         IndexableContentRequest request, CancellationToken ct = default)
     {
         var chunks = new List<ContentChunk>();
+
+        // ── Intent Action Chunks (one per intent) ─────────────────────────
+        IndexIntentActions(chunks);
 
         // ── Global Keyboard Shortcuts ────────────────────────────────────
         chunks.Add(MakeChunk("shell-shortcuts", "Global Keyboard Shortcuts",
@@ -270,6 +283,48 @@ internal sealed class ShellContentProvider : IIndexableContentProvider
             """));
 
         return Task.FromResult(new IndexableContentResult { Chunks = chunks });
+    }
+
+    private void IndexIntentActions(List<ContentChunk> chunks)
+    {
+        var intents = _intentEngine.GetAllAvailableIntents();
+        foreach (var intent in intents)
+        {
+            var slotLines = string.Join("\n", intent.Slots.Select(s =>
+                $"  - {s.Name} ({s.Type}){(s.Required ? " [REQUIRED]" : "")}: {s.Description}"));
+
+            var requiredSlotExample = string.Join(", ",
+                intent.Slots.Where(s => s.Required).Select(s => $"\"{s.Name}\": \"value\""));
+            var actionExample = "{\"intent_id\": \"" + intent.IntentId + "\", \"slots\": {" + requiredSlotExample + "}}";
+
+            var text = $"""
+                ACTION: {intent.DisplayName}
+                Intent ID: {intent.IntentId}
+                Plugin: {intent.PluginId}
+                Description: {intent.Description}
+
+                Slots:
+                {slotLines}
+
+                To execute this action, include an [ACTION] block in your response:
+                [ACTION]
+                {actionExample}
+                [/ACTION]
+                """.Trim();
+
+            chunks.Add(new ContentChunk
+            {
+                EntityId = $"intent-{intent.IntentId}",
+                EntityType = "intent_action",
+                PluginId = ShellPluginId,
+                ChunkPath = "content",
+                Text = text,
+                ContentHash = ComputeHash(text),
+                Title = $"Action: {intent.DisplayName}",
+                LinkType = "intent_action",
+                ModifiedAt = DateTimeOffset.UtcNow,
+            });
+        }
     }
 
     private static ContentChunk MakeChunk(string id, string title, string text)
