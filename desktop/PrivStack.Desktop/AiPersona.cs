@@ -205,8 +205,14 @@ public static partial class AiPersona
 
     // ── Response sanitization ────────────────────────────────────────
 
-    [GeneratedRegex(@"<\|?/?(system|user|assistant|end|im_start|im_end|eot_id|start_header_id|end_header_id|begin_of_text|end_of_text|endoftext|s)\|?>", RegexOptions.IgnoreCase)]
+    // Matches LLM chat tokens like <|im_end|>, <|end|>, <|endoftext|>, etc.
+    // Also captures Ċ (U+010A) or similar control chars that Qwen/other models prepend to stop tokens.
+    [GeneratedRegex(@"[\u010A\u0120]?<\|?/?(system|user|assistant|end|im_start|im_end|eot_id|start_header_id|end_header_id|begin_of_text|end_of_text|endoftext|s)\|?>", RegexOptions.IgnoreCase)]
     private static partial Regex ChatTokenPattern();
+
+    // Catches any remaining Ċ (U+010A) or Ġ (U+0120) characters that appear standalone at end of output
+    [GeneratedRegex(@"[\u010A\u0120]+\s*$")]
+    private static partial Regex TrailingModelArtifacts();
 
     [GeneratedRegex(@"^\s*-?\s*(User|Assistant|Duncan|System|Note)\s*:.*$", RegexOptions.IgnoreCase | RegexOptions.Multiline)]
     private static partial Regex RolePrefixLinePattern();
@@ -231,8 +237,9 @@ public static partial class AiPersona
     {
         if (string.IsNullOrEmpty(response)) return response;
 
-        // Strip raw chat tokens
+        // Strip raw chat tokens and model-specific artifacts (Ċ, Ġ before stop tokens)
         var cleaned = ChatTokenPattern().Replace(response, "");
+        cleaned = TrailingModelArtifacts().Replace(cleaned, "");
 
         // Strip entire lines that are role prefixes or "**Note:**" disclaimers
         cleaned = RolePrefixLinePattern().Replace(cleaned, "");
