@@ -207,6 +207,9 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isAiTrayOpen;
 
+    [ObservableProperty]
+    private double _aiTrayWidth = 400;
+
     /// <summary>
     /// Opens the unified emoji picker with the given selection callback.
     /// All consumers should use this instead of creating their own instances.

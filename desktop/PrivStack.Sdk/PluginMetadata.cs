@@ -18,6 +18,13 @@ public sealed record PluginMetadata
     public required string Id { get; init; }
     public required string Name { get; init; }
     public required string Description { get; init; }
+
+    /// <summary>
+    /// Extended description of the plugin's features and capabilities.
+    /// Injected into the AI assistant's context when the user is viewing this plugin.
+    /// </summary>
+    public string? DetailedDescription { get; init; }
+
     public required Version Version { get; init; }
     public string Author { get; init; } = "PrivStack";
     public string? Icon { get; init; }

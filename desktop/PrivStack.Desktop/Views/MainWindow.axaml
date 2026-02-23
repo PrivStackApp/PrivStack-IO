@@ -429,15 +429,7 @@
                         </Button>
                         </Border>
 
-                        <!-- Click-outside backdrop: closes AI Tray when clicking outside -->
-                        <Border x:Name="AiTrayBackdrop"
-                                Background="Transparent"
-                                HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch"
-                                ZIndex="11"
-                                IsVisible="{Binding IsAiTrayOpen}"
-                                IsHitTestVisible="{Binding IsAiTrayOpen}"
-                                PointerPressed="OnAiTrayBackdropPressed"/>
+                        <!-- AI Tray stays open until explicitly closed (close button or Escape) -->
 
                         <!-- AI Suggestion Tray: Slide Drawer (right-side panel) -->
                         <StackPanel x:Name="AiTrayDrawer"
@@ -448,12 +440,34 @@
                                     ZIndex="12"
                                     IsVisible="{Binding AiTrayVM.IsEnabled}"
                                     Classes.open="{Binding IsAiTrayOpen}">
+
+                            <!-- Drag handle (grip indicator) -->
+                            <Border x:Name="AiTrayDragHandle"
+                                    Width="10"
+                                    Cursor="SizeWestEast"
+                                    Background="Transparent"
+                                    Margin="-3,0,-3,0"
+                                    ZIndex="5">
+                                <Border Width="4" Height="40"
+                                        CornerRadius="2"
+                                        Background="{DynamicResource ThemeBorderBrush}"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Opacity="0.5">
+                                    <Border.Styles>
+                                        <Style Selector="Border:pointerover">
+                                            <Setter Property="Opacity" Value="0.9"/>
+                                        </Style>
+                                    </Border.Styles>
+                                </Border>
+                            </Border>
+
                             <Border CornerRadius="8,0,0,8"
                                     Background="{DynamicResource ThemeSurfaceBrush}"
                                     BorderBrush="{DynamicResource ThemeBorderBrush}"
                                     BorderThickness="1,1,0,1"
                                     BoxShadow="-4 0 20 0 #40000000"
-                                    Width="400"
+                                    Width="{Binding AiTrayWidth}"
                                     ClipToBounds="True">
                                 <Grid RowDefinitions="Auto,*">
                                     <!-- Header -->
