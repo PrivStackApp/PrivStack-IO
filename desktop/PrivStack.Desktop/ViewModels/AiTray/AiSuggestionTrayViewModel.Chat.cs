@@ -4,6 +4,8 @@ using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PrivStack.Desktop.Services.AI;
+using PrivStack.Sdk.Capabilities;
+using PrivStack.Sdk.Helpers;
 using PrivStack.Sdk.Services;
 using Serilog;
 
@@ -16,6 +18,7 @@ public partial class AiSuggestionTrayViewModel
 {
     private const int MaxHistoryMessages = 20;
     private const double TokenWarningThreshold = 0.8;
+    private const int MaxWikiLinkResolutions = 5;
 
     public string ChatWatermark { get; } = $"Ask {AiPersona.Name}...";
 
@@ -40,6 +43,11 @@ public partial class AiSuggestionTrayViewModel
 
     public string TokenWarningText => "Context is getting long. Start a new chat for best results.";
 
+    // ── Conversational Entity Tracking ──────────────────────────────
+
+    private string? _lastActionEntityId;
+    private string? _lastActionEntityType;
+
     [RelayCommand]
     private void StartNewChat()
     {
@@ -47,6 +55,8 @@ public partial class AiSuggestionTrayViewModel
         ActiveSessionId = null;
         EstimatedTokensUsed = 0;
         IsNearTokenLimit = false;
+        _lastActionEntityId = null;
+        _lastActionEntityType = null;
         ChatMessages.Clear();
         UpdateCounts();
         RefreshConversationHistory();
@@ -97,6 +107,13 @@ public partial class AiSuggestionTrayViewModel
             var activeItemCtxShort = _activeItemContextShort;
             var conversationHistory = BuildConversationHistory();
 
+            // Resolve wiki-links from user message on UI thread (needs registry access)
+            var resolvedEntityContext = await ResolveWikiLinksAsync(text);
+
+            // Capture conversational entity tracking state
+            var lastEntityId = _lastActionEntityId;
+            var lastEntityType = _lastActionEntityType;
+
             // Run all heavy work (RAG search, prompt building, AI call) off the UI thread
             var (response, request) = await Task.Run(async () =>
             {
@@ -116,6 +133,12 @@ public partial class AiSuggestionTrayViewModel
 
                     if (!string.IsNullOrEmpty(activeItemCtxFull))
                         systemPrompt += $"\n\n{activeItemCtxFull}";
+
+                    if (!string.IsNullOrEmpty(resolvedEntityContext))
+                        systemPrompt += $"\n\n{resolvedEntityContext}";
+
+                    if (!string.IsNullOrEmpty(lastEntityId))
+                        systemPrompt += $"\n\nIn this conversation, you most recently acted on: {lastEntityType} ID \"{lastEntityId}\". If the user says \"that task\", \"it\", or similar, use this ID as task_id.";
 
                     // If RAG found intent_action chunks, inject the ACTION format header
                     if (hasIntentActions)
@@ -143,6 +166,12 @@ public partial class AiSuggestionTrayViewModel
 
                     if (!string.IsNullOrEmpty(activeItemCtxShort))
                         systemPrompt += $"\n\n{activeItemCtxShort}";
+
+                    if (!string.IsNullOrEmpty(resolvedEntityContext))
+                        systemPrompt += $"\n\n{resolvedEntityContext}";
+
+                    if (!string.IsNullOrEmpty(lastEntityId))
+                        systemPrompt += $"\n\nIn this conversation, you most recently acted on: {lastEntityType} ID \"{lastEntityId}\". If the user says \"that task\", \"it\", or similar, use this ID as task_id.";
 
                     // If RAG found intent_action chunks, inject the ACTION format header
                     if (hasIntentActions)
@@ -218,6 +247,13 @@ public partial class AiSuggestionTrayViewModel
                         };
                         ChatMessages.Add(confirmMsg);
                         _conversationStore.AddMessage(ActiveSessionId!, "assistant", confirmMsg.Content!);
+
+                        // Track the last successfully acted-on entity for conversational context
+                        if (result.Success && !string.IsNullOrEmpty(result.CreatedEntityId))
+                        {
+                            _lastActionEntityId = result.CreatedEntityId;
+                            _lastActionEntityType = result.CreatedEntityType;
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -308,6 +344,51 @@ public partial class AiSuggestionTrayViewModel
             Role = m.Role == ChatMessageRole.User ? "user" : "assistant",
             Content = m.Role == ChatMessageRole.User ? m.UserLabel ?? "" : m.Content ?? ""
         }).ToList();
+    }
+
+    // ── Wiki-Link Resolution ────────────────────────────────────────
+
+    /// <summary>
+    /// Extracts wiki-links from the user message and resolves them to entity metadata
+    /// via ILinkableItemProvider. Returns a context string for system prompt injection.
+    /// </summary>
+    private async Task<string?> ResolveWikiLinksAsync(string text)
+    {
+        try
+        {
+            var links = WikiLinkParser.ParseLinks(text);
+            if (links.Count == 0) return null;
+
+            var providers = _pluginRegistry.GetCapabilityProviders<ILinkableItemProvider>();
+            if (providers.Count == 0) return null;
+
+            var sb = new StringBuilder();
+            sb.AppendLine("The user referenced the following entities (use their IDs in ACTION blocks):");
+
+            var resolved = 0;
+            foreach (var link in links)
+            {
+                if (resolved >= MaxWikiLinkResolutions) break;
+
+                var provider = providers.FirstOrDefault(p =>
+                    p.LinkType.Equals(link.LinkType, StringComparison.OrdinalIgnoreCase));
+                if (provider is null) continue;
+
+                var item = await provider.GetItemByIdAsync(link.EntityId);
+                if (item is null) continue;
+
+                sb.AppendLine($"- [[{item.LinkType}:{item.Id}|{item.Title}]] — Type: {item.LinkType}, ID: {item.Id}, Title: {item.Title}" +
+                    (item.Subtitle is not null ? $", Details: {item.Subtitle}" : ""));
+                resolved++;
+            }
+
+            return resolved > 0 ? sb.ToString().TrimEnd() : null;
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Failed to resolve wiki-links in chat message");
+            return null;
+        }
     }
 
     // ── ACTION Format Header (injected only when RAG finds intent chunks) ──
