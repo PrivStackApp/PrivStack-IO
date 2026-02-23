@@ -114,9 +114,17 @@ public partial class AiSuggestionTrayViewModel
                     systemPrompt += $"\n\n{_activeItemContextFull}";
 
                 // Inject intent catalog so AI can invoke actions from chat
-                var intentCatalog = AiPersona.BuildIntentCatalog(_intentEngine.GetAllAvailableIntents());
+                var allIntents = _intentEngine.GetAllAvailableIntents();
+                var intentCatalog = AiPersona.BuildIntentCatalog(allIntents);
                 if (!string.IsNullOrEmpty(intentCatalog))
+                {
                     systemPrompt += $"\n\n{intentCatalog}";
+                    _log.Debug("Injected intent catalog with {IntentCount} actions into chat system prompt", allIntents.Count);
+                }
+                else
+                {
+                    _log.Debug("No intents available for chat intent catalog (providers: {Count})", allIntents.Count);
+                }
 
                 request = new AiRequest
                 {
@@ -178,6 +186,10 @@ public partial class AiSuggestionTrayViewModel
             {
                 // Parse action blocks before sanitization (sanitize strips them)
                 var (cleanContent, actions) = ParseActionBlocks(response.Content);
+                _log.Debug("Chat response: {ActionCount} action blocks parsed from response ({ResponseLength} chars)",
+                    actions.Count, response.Content.Length);
+                if (actions.Count == 0 && response.Content.Contains("[ACTION]", StringComparison.OrdinalIgnoreCase))
+                    _log.Warning("Response contained [ACTION] text but parsing found 0 blocks — possible format issue");
                 var content = AiPersona.Sanitize(cleanContent, tier);
 
                 assistantMsg.Content = content;
