@@ -46,7 +46,7 @@ public partial class AiChatMessageViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsReady))]
     [NotifyPropertyChangedFor(nameof(IsError))]
     [NotifyPropertyChangedFor(nameof(IsApplied))]
-    private ChatMessageState _state;
+    private ChatMessageState _state = ChatMessageState.Ready; // Default to Ready so Loading triggers OnStateChanged
 
     partial void OnStateChanged(ChatMessageState value)
     {
