@@ -33,13 +33,17 @@ public static partial class AiPersona
         _ => 200,
     };
 
-    /// <summary>Token budget per tier for cloud models (larger budgets).</summary>
+    /// <summary>
+    /// Token budget per tier for cloud models. Cloud providers handle their own limits
+    /// and bill per token, so we use generous ceilings to avoid truncation errors.
+    /// The system prompt's length guidance still controls actual verbosity.
+    /// </summary>
     public static int CloudMaxTokensFor(ResponseTier tier) => tier switch
     {
-        ResponseTier.Short  => 200,
-        ResponseTier.Medium => 1200,
-        ResponseTier.Long   => 2500,
-        _ => 400,
+        ResponseTier.Short  => 1024,
+        ResponseTier.Medium => 4096,
+        ResponseTier.Long   => 8192,
+        _ => 4096,
     };
 
     /// <summary>Max sentences to keep per tier during post-processing truncation.</summary>
