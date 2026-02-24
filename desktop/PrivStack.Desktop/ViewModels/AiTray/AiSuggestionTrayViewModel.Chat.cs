@@ -452,15 +452,24 @@ public partial class AiSuggestionTrayViewModel
             var intentLimit = isCloud ? 5 : 3;
             var maxChunkChars = isCloud ? 500 : 800;
 
+            // Fetch more candidates than needed so we can apply plugin diversity.
+            // This ensures cross-plugin queries (e.g. asking about Notes from Tasks)
+            // still surface relevant results from other plugins.
+            var fetchLimit = dataLimit * 3;
+
             // Two parallel searches: general data + intent actions specifically
-            var dataTask = _ragSearchService.SearchAsync(query, dataLimit);
+            var dataTask = _ragSearchService.SearchAsync(query, fetchLimit);
             var intentTask = _ragSearchService.SearchAsync(
                 query, intentLimit, ["intent_action"]);
 
             await Task.WhenAll(dataTask, intentTask);
 
-            var dataResults = dataTask.Result.Where(r => r.Score >= 0.3).ToList();
+            var scoredResults = dataTask.Result.Where(r => r.Score >= 0.3).ToList();
             var intentResults = intentTask.Result.Where(r => r.Score >= 0.25).ToList();
+
+            // Apply plugin diversity: ensure results from multiple plugins are
+            // represented. If the query mentions a specific plugin, boost it.
+            var dataResults = ApplyPluginDiversity(scoredResults, dataLimit, query);
 
             // Deduplicate: remove intent_action results already in general results
             var dataEntityIds = new HashSet<string>(dataResults.Select(r => r.EntityId));
@@ -505,6 +514,113 @@ public partial class AiSuggestionTrayViewModel
             _log.Warning(ex, "RAG search failed during chat, continuing without context");
             return (null, false);
         }
+    }
+
+    // ── Plugin Diversity ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Maps user-facing plugin names/keywords to plugin IDs for query-based boosting.
+    /// </summary>
+    private static readonly Dictionary<string, string> PluginKeywords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["note"] = "notes", ["notes"] = "notes", ["page"] = "notes", ["pages"] = "notes", ["sticky"] = "notes",
+        ["task"] = "tasks", ["tasks"] = "tasks", ["todo"] = "tasks", ["kanban"] = "tasks",
+        ["calendar"] = "calendar", ["event"] = "calendar", ["events"] = "calendar", ["schedule"] = "calendar",
+        ["contact"] = "contacts", ["contacts"] = "contacts", ["people"] = "contacts", ["person"] = "contacts",
+        ["journal"] = "journal", ["diary"] = "journal",
+        ["finance"] = "finance", ["budget"] = "finance", ["transaction"] = "finance", ["account"] = "finance",
+        ["file"] = "files", ["files"] = "files",
+        ["snippet"] = "snippets", ["snippets"] = "snippets", ["code"] = "snippets",
+        ["rss"] = "rss", ["feed"] = "rss", ["feeds"] = "rss",
+        ["email"] = "email", ["mail"] = "email",
+        ["habit"] = "habits", ["habits"] = "habits",
+        ["clip"] = "webclips", ["webclip"] = "webclips",
+    };
+
+    /// <summary>
+    /// Ensures RAG results from multiple plugins are represented in the final set.
+    /// If the query mentions a specific plugin by name, results from that plugin
+    /// are prioritized (half the slots reserved). Otherwise, round-robin interleaves
+    /// by plugin so no single one dominates.
+    /// </summary>
+    private static List<RagSearchResult> ApplyPluginDiversity(
+        List<RagSearchResult> candidates, int limit, string query)
+    {
+        if (candidates.Count <= limit)
+            return candidates;
+
+        // Detect if the user is asking about a specific plugin
+        string? boostedPluginId = null;
+        var queryWords = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var word in queryWords)
+        {
+            // Strip punctuation for matching
+            var clean = word.TrimEnd('?', '.', ',', '!', ':', ';');
+            if (PluginKeywords.TryGetValue(clean, out var pluginId))
+            {
+                boostedPluginId = pluginId;
+                break;
+            }
+        }
+
+        var result = new List<RagSearchResult>(limit);
+
+        if (boostedPluginId != null)
+        {
+            // Reserve half the slots for the mentioned plugin
+            var boostedSlots = limit / 2;
+            var otherSlots = limit - boostedSlots;
+
+            var boosted = candidates
+                .Where(r => r.PluginId.Equals(boostedPluginId, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(r => r.Score)
+                .Take(boostedSlots)
+                .ToList();
+
+            var others = candidates
+                .Where(r => !r.PluginId.Equals(boostedPluginId, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(r => r.Score)
+                .Take(otherSlots)
+                .ToList();
+
+            result.AddRange(boosted);
+            result.AddRange(others);
+
+            // If boosted didn't fill its slots, backfill from others
+            if (result.Count < limit)
+            {
+                var existing = new HashSet<string>(result.Select(r => r.EntityId));
+                var backfill = candidates
+                    .Where(r => !existing.Contains(r.EntityId))
+                    .OrderByDescending(r => r.Score)
+                    .Take(limit - result.Count);
+                result.AddRange(backfill);
+            }
+        }
+        else
+        {
+            // No specific plugin mentioned — round-robin interleave
+            var groups = candidates
+                .GroupBy(r => r.PluginId)
+                .Select(g => new Queue<RagSearchResult>(g.OrderByDescending(r => r.Score)))
+                .OrderByDescending(q => q.Peek().Score)
+                .ToList();
+
+            while (result.Count < limit && groups.Count > 0)
+            {
+                for (var i = groups.Count - 1; i >= 0; i--)
+                {
+                    if (result.Count >= limit) break;
+                    result.Add(groups[i].Dequeue());
+                    if (groups[i].Count == 0)
+                        groups.RemoveAt(i);
+                }
+            }
+        }
+
+        // Re-sort by score so highest relevance appears first in the prompt
+        result.Sort((a, b) => b.Score.CompareTo(a.Score));
+        return result;
     }
 
     // ── Action Block Parsing ────────────────────────────────────────
