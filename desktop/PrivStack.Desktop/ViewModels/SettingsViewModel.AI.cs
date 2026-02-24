@@ -455,13 +455,43 @@ public partial class SettingsViewModel
             var modelManager = App.Services.GetRequiredService<AiModelManager>();
             modelManager.PropertyChanged += OnAiModelManagerPropertyChanged;
 
-            await modelManager.DownloadModelAsync(SelectedAiLocalModel.Id);
+            var modelId = SelectedAiLocalModel.Id;
+            await modelManager.DownloadModelAsync(modelId);
 
-            AiLocalModelDownloadStatus = "Download complete";
+            AiLocalModelDownloadStatus = "Download complete — loading model...";
+            AiLocalModelDownloadProgress = 100;
             RefreshAiLocalModels();
 
             // Re-select the model
-            SelectedAiLocalModel = AiLocalModels.FirstOrDefault(m => m.Id == SelectedAiLocalModel?.Id);
+            SelectedAiLocalModel = AiLocalModels.FirstOrDefault(m => m.Id == modelId);
+
+            // Auto-select this model in settings if no local model was selected
+            if (string.IsNullOrEmpty(_settingsService.Settings.AiLocalModel))
+            {
+                _settingsService.Settings.AiLocalModel = modelId;
+                _settingsService.SaveDebounced();
+            }
+
+            // Pre-load the model into memory so it's ready for immediate use
+            try
+            {
+                var aiService = App.Services.GetRequiredService<AiService>();
+                if (aiService.GetProvider("local") is LocalLlamaProvider localProvider)
+                {
+                    await localProvider.PreloadModelAsync(
+                        _settingsService.Settings.AiLocalModel ?? modelId);
+                    AiLocalModelDownloadStatus = "Ready — model loaded";
+                }
+                else
+                {
+                    AiLocalModelDownloadStatus = "Download complete";
+                }
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "Failed to pre-load model after download");
+                AiLocalModelDownloadStatus = "Downloaded — will load on first use";
+            }
         }
         catch (OperationCanceledException)
         {

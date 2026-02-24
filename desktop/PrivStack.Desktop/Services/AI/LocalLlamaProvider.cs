@@ -369,6 +369,28 @@ internal sealed class LocalLlamaProvider : IAiProvider
             .FirstOrDefault(m => _modelManager.IsModelDownloaded(m));
     }
 
+    /// <summary>
+    /// Pre-loads a model into memory so the first inference request doesn't pay the load cost.
+    /// Called by settings after a model download completes.
+    /// </summary>
+    public async Task PreloadModelAsync(string modelName, CancellationToken ct = default)
+    {
+        if (!_modelManager.IsModelDownloaded(modelName))
+            return;
+
+        await _inferLock.WaitAsync(ct);
+        try
+        {
+            var modelPath = _modelManager.GetModelPath(modelName);
+            await EnsureModelLoadedAsync(modelPath);
+            _log.Information("Local LLM model pre-loaded: {Model}", modelName);
+        }
+        finally
+        {
+            _inferLock.Release();
+        }
+    }
+
     public void Dispose()
     {
         _context?.Dispose();
