@@ -1,6 +1,18 @@
 namespace PrivStack.Sdk.Services;
 
 /// <summary>
+/// Privacy classification for AI providers.
+/// </summary>
+public enum PrivacyTier
+{
+    /// <summary>Zero data retention, EU-based, or on-device — strongest privacy guarantees.</summary>
+    HighPrivacy,
+
+    /// <summary>API-level no-training policies — standard cloud provider terms.</summary>
+    StandardApi
+}
+
+/// <summary>
 /// A single message in a conversation history (role + content).
 /// </summary>
 public sealed record AiChatMessage
@@ -68,6 +80,7 @@ public sealed record AiProviderInfo
     public required string DisplayName { get; init; }
     public bool IsConfigured { get; init; }
     public bool IsLocal { get; init; }
+    public PrivacyTier? PrivacyTier { get; init; }
     public IReadOnlyList<AiModelInfo> AvailableModels { get; init; } = [];
 }
 
