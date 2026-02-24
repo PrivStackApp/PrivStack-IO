@@ -392,15 +392,16 @@ public partial class AiSuggestionTrayViewModel
     // ── ACTION Format Header (injected only when RAG finds intent chunks) ──
 
     private const string ActionFormatHeader = """
-        CRITICAL: You can perform REAL actions using [ACTION] blocks. Without an [ACTION] block, NOTHING happens.
-        NEVER claim you created/did something unless you include the [ACTION] block below.
-        Place [ACTION] blocks at the END of your response, after your conversational message.
-        You may include multiple [ACTION] blocks for multiple actions.
+        CRITICAL: You can perform REAL actions using [ACTION] blocks. Without an [ACTION] block, NOTHING happens — the system ignores your words completely.
+        ABSOLUTE RULE: NEVER write "✓ Created", "Done", "I've created", or ANY claim of completion UNLESS you include the corresponding [ACTION] block. Writing checkmarks or success messages without [ACTION] blocks is LYING to the user — nothing actually happened.
+        If the user asks you to do 6 things, you MUST include 6 separate [ACTION] blocks — one per action. There are no shortcuts.
+        Place ALL [ACTION] blocks at the END of your response, after your conversational message.
+        Format: [ACTION]{"intent_id": "exact.id", "slots": {...}}[/ACTION]
         IMPORTANT: You MUST use the EXACT intent_id values shown in the ACTION descriptions above (e.g. "tasks.update_task", NOT "tasks.update").
         Do NOT abbreviate, shorten, or invent intent IDs. Copy them exactly from the action descriptions.
         You CAN use actions from ANY plugin, not just the one the user is currently viewing.
         For example, if the user asks to create a note while viewing Finance, use the notes.create_note action.
-        If no relevant action exists in the descriptions above, say you can't do that yet.
+        If no relevant action exists in the descriptions above, say you can't do that yet — do NOT pretend you did it.
         Slot values must be strings or arrays of strings. For list-type slots like add_checklist or tags, you may use a JSON array: "add_checklist": ["item 1", "item 2"].
         Use the slot name "add_checklist" (not "checklist") when adding checklist items to a task.
         """;
