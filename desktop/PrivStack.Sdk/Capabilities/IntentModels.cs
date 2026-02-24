@@ -100,6 +100,12 @@ public sealed record IntentResult
     public string? ErrorMessage { get; init; }
     public string? Summary { get; init; }
 
+    /// <summary>
+    /// Non-fatal warnings (e.g. unknown slot names that were stripped before execution).
+    /// Displayed to the user and injected into conversation history so the AI can self-correct.
+    /// </summary>
+    public IReadOnlyList<string>? Warnings { get; init; }
+
     public static IntentResult Failure(string error) => new()
         { Success = false, ErrorMessage = error };
 }
