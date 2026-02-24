@@ -424,7 +424,7 @@ public partial class AiSuggestionTrayViewModel
         IMPORTANT: You MUST use the EXACT intent_id values shown in the ACTION descriptions above (e.g. "tasks.update_task", NOT "tasks.update").
         Do NOT abbreviate, shorten, or invent intent IDs. Copy them exactly from the action descriptions.
         SLOT NAMES: You MUST ONLY use slot names that are explicitly listed in the action descriptions above. NEVER invent slot names like "parent_task_id", "parent_id", "subtask", or any name not in the description. Unknown slots are silently stripped and will have NO effect. If a capability doesn't exist (e.g. nesting tasks), say so — do not guess at slot names.
-        To LINK existing entities, use the tasks.add_link intent with source_task_id, target_entity_id, target_link_type, and relationship. Do NOT re-create entities when linking.
+        To LINK existing entities, use the tasks.add_link intent with task_id, target_id, target_link_type, and relationship. Do NOT re-create entities when linking.
         You CAN use actions from ANY plugin, not just the one the user is currently viewing.
         For example, if the user asks to create a note while viewing Finance, use the notes.create_note action.
         If no relevant action exists in the descriptions above, say you can't do that yet — do NOT pretend you did it.
@@ -435,6 +435,8 @@ public partial class AiSuggestionTrayViewModel
 
     /// <summary>
     /// Runs semantic search against the RAG vector index and formats matching results.
+    /// Performs TWO searches: one for general content, one specifically for intent_action
+    /// chunks (which tend to get crowded out by entity data in the general search).
     /// Returns the formatted context string and whether any intent_action chunks were found
     /// (which triggers ACTION format header injection in the system prompt).
     /// </summary>
@@ -446,27 +448,42 @@ public partial class AiSuggestionTrayViewModel
         try
         {
             var isCloud = !IsActiveProviderLocal();
-            var limit = isCloud ? 10 : 8;
+            var dataLimit = isCloud ? 8 : 6;
+            var intentLimit = isCloud ? 5 : 3;
             var maxChunkChars = isCloud ? 500 : 800;
 
-            var results = await _ragSearchService.SearchAsync(query, limit);
+            // Two parallel searches: general data + intent actions specifically
+            var dataTask = _ragSearchService.SearchAsync(query, dataLimit);
+            var intentTask = _ragSearchService.SearchAsync(
+                query, intentLimit, ["intent_action"]);
 
-            if (results.Count == 0)
+            await Task.WhenAll(dataTask, intentTask);
+
+            var dataResults = dataTask.Result.Where(r => r.Score >= 0.3).ToList();
+            var intentResults = intentTask.Result.Where(r => r.Score >= 0.25).ToList();
+
+            // Deduplicate: remove intent_action results already in general results
+            var dataEntityIds = new HashSet<string>(dataResults.Select(r => r.EntityId));
+            var uniqueIntentResults = intentResults
+                .Where(r => !dataEntityIds.Contains(r.EntityId))
+                .ToList();
+
+            // Merge: data results first, then additional intent results
+            var allResults = dataResults.Concat(uniqueIntentResults).ToList();
+
+            if (allResults.Count == 0)
                 return (null, false);
 
-            var relevant = results.Where(r => r.Score >= 0.3).ToList();
-            if (relevant.Count == 0)
-                return (null, false);
-
-            var hasIntentActions = relevant.Any(r => r.EntityType == "intent_action");
-            _log.Debug("RAG context: {Count} results ({IntentCount} intent actions) injected into system prompt",
-                relevant.Count, relevant.Count(r => r.EntityType == "intent_action"));
+            var hasIntentActions = allResults.Any(r => r.EntityType == "intent_action");
+            _log.Debug("RAG context: {DataCount} data + {IntentCount} intent action results ({TotalIntents} intent actions total) injected into system prompt",
+                dataResults.Count, uniqueIntentResults.Count,
+                allResults.Count(r => r.EntityType == "intent_action"));
 
             var sb = new StringBuilder();
             sb.AppendLine("Relevant information from the user's data:");
             sb.AppendLine();
 
-            foreach (var result in relevant)
+            foreach (var result in allResults)
             {
                 sb.AppendLine($"[{result.EntityType}] {result.Title} (score: {result.Score:F2})");
 
