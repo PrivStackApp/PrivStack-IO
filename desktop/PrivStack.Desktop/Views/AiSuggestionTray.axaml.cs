@@ -14,6 +14,15 @@ public partial class AiSuggestionTray : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+
+        // Attach TextInput on the ChatInputBox via tunnel routing so we see the event
+        // BEFORE the TextBox swallows it. The override OnTextInput never fires because
+        // TextBox marks TextInput as handled, preventing bubble propagation.
+        Loaded += (_, _) =>
+        {
+            var chatInput = this.FindControl<TextBox>("ChatInputBox");
+            chatInput?.AddHandler(TextInputEvent, OnChatInputTextInput, RoutingStrategies.Tunnel);
+        };
     }
 
     private void OnDataContextChanged(object? sender, System.EventArgs e)
@@ -93,39 +102,44 @@ public partial class AiSuggestionTray : UserControl
         }
     }
 
-    protected override void OnTextInput(TextInputEventArgs e)
+    /// <summary>
+    /// Tunnel handler on the ChatInputBox. Because TextBox handles TextInput (marks it
+    /// handled), the bubble-phase override OnTextInput on this UserControl never fires.
+    /// Tunnel routing lets us intercept BEFORE the TextBox processes the keystroke.
+    /// At tunnel time, e.Text is the incoming character but it hasn't been inserted yet —
+    /// so we check text[caretIndex - 1] for the first '[' (already in the text).
+    /// </summary>
+    private void OnChatInputTextInput(object? sender, TextInputEventArgs e)
     {
-        base.OnTextInput(e);
+        if (e.Text != "[" || _currentVm == null) return;
 
-        // Detect [[ trigger for link picker
-        if (e.Text == "[" && _currentVm != null)
+        var input = sender as TextBox;
+        if (input == null) return;
+
+        var text = input.Text;
+        var caretIndex = input.CaretIndex;
+
+        // At tunnel time the second [ hasn't been inserted yet.
+        // The first [ is at caretIndex - 1 (already committed from the previous keystroke).
+        if (caretIndex >= 1 && text != null && text[caretIndex - 1] == '[')
         {
-            var input = this.FindControl<TextBox>("ChatInputBox");
-            if (input?.IsFocused != true) return;
+            // Remove the first [ that's already in the text
+            var newText = text[..(caretIndex - 1)] + text[caretIndex..];
+            _currentVm.ChatInputText = newText;
+            input.CaretIndex = Math.Max(0, caretIndex - 1);
 
-            var text = input.Text;
-            var caretIndex = input.CaretIndex;
+            // Open the link picker
+            _currentVm.OpenLinkPicker();
 
-            // Check if the character before the caret is also [
-            if (caretIndex >= 2 && text != null && text[caretIndex - 2] == '[')
+            // Focus the search box
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                // Remove the [[ from the text
-                var newText = text[..(caretIndex - 2)] + text[caretIndex..];
-                _currentVm.ChatInputText = newText;
-                input.CaretIndex = caretIndex - 2;
+                var searchBox = this.FindControl<TextBox>("LinkPickerSearchBox");
+                searchBox?.Focus();
+            }, Avalonia.Threading.DispatcherPriority.Render);
 
-                // Open the link picker
-                _currentVm.OpenLinkPicker();
-
-                // Focus the search box
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    var searchBox = this.FindControl<TextBox>("LinkPickerSearchBox");
-                    searchBox?.Focus();
-                }, Avalonia.Threading.DispatcherPriority.Render);
-
-                e.Handled = true;
-            }
+            // Prevent the second [ from being inserted into the TextBox
+            e.Handled = true;
         }
     }
 
