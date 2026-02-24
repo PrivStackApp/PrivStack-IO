@@ -851,6 +851,48 @@
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
 
+                            <!-- Hardware Report Card -->
+                            <Border Classes="card" Padding="12,10" Margin="0,-4,0,0"
+                                    IsVisible="{Binding HardwareReport, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <StackPanel Spacing="6">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Hardware Assessment"
+                                                   FontSize="{DynamicResource ThemeFontSizeXsSm}" FontWeight="Medium"/>
+                                        <Border CornerRadius="4" Padding="6,1"
+                                                Background="{Binding FitnessTierColor}">
+                                            <TextBlock Text="{Binding FitnessTierLabel}"
+                                                       FontSize="9" Foreground="White" FontWeight="Bold"/>
+                                        </Border>
+                                        <TextBlock FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   VerticalAlignment="Center">
+                                            <Run Text="{Binding HardwareReport.FitnessScore}"/>
+                                            <Run Text="/100"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding HardwareReport.Memory.Description}"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                    <TextBlock Text="{Binding HardwareReport.Gpu.Description}"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                    <TextBlock Text="{Binding HardwareReport.Cpu.Description}"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Cloud recommended banner (Yellow/Red tier) -->
+                            <Border CornerRadius="6" Padding="12,8" Margin="0,-4,0,0"
+                                    Background="#1AFFC107"
+                                    BorderBrush="#33FFC107" BorderThickness="1"
+                                    IsVisible="{Binding ShowCloudRecommendedBanner}">
+                                <TextBlock Text="{Binding AiRecommendation.Summary}"
+                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           TextWrapping="Wrap"/>
+                            </Border>
+
                             <TextBlock Text="{Binding AiLocalModelRecommendation}"
                                        FontSize="{DynamicResource ThemeFontSizeXs}"
                                        Foreground="{DynamicResource ThemeTextMutedBrush}"

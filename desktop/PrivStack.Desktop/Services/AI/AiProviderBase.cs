@@ -33,6 +33,7 @@ internal abstract class AiProviderBase : IAiProvider
     public abstract string DisplayName { get; }
     public abstract bool IsConfigured { get; }
     public virtual bool IsLocal => false;
+    public abstract PrivacyTier PrivacyTier { get; }
     public abstract IReadOnlyList<AiModelInfo> AvailableModels { get; }
     public abstract Task<bool> ValidateAsync(CancellationToken ct = default);
 

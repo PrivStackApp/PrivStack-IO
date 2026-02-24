@@ -12,6 +12,7 @@ internal interface IAiProvider
     string DisplayName { get; }
     bool IsConfigured { get; }
     bool IsLocal { get; }
+    PrivacyTier PrivacyTier { get; }
     IReadOnlyList<AiModelInfo> AvailableModels { get; }
 
     Task<AiResponse> CompleteAsync(AiRequest request, string? modelOverride, CancellationToken ct);

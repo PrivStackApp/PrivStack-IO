@@ -32,6 +32,7 @@ internal sealed class OpenAiProvider : AiProviderBase
     public override string Id => "openai";
     public override string DisplayName => "OpenAI";
     public override bool IsConfigured => GetApiKeySync() != null;
+    public override PrivacyTier PrivacyTier => PrivacyTier.StandardApi;
     public override IReadOnlyList<AiModelInfo> AvailableModels => Models;
 
     public override async Task<bool> ValidateAsync(CancellationToken ct)

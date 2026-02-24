@@ -19,7 +19,7 @@ public sealed record IntentSettingsChangedMessage;
 /// <summary>
 /// Represents an AI provider option for the settings dropdown.
 /// </summary>
-public record AiProviderOption(string Id, string DisplayName);
+public record AiProviderOption(string Id, string DisplayName, PrivacyTier? PrivacyTier = null);
 
 /// <summary>
 /// Represents a local AI model option for the settings dropdown.
@@ -128,6 +128,15 @@ public partial class SettingsViewModel
     private bool _aiIntentAutoAnalyze = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowCloudRecommendedBanner))]
+    [NotifyPropertyChangedFor(nameof(FitnessTierColor))]
+    [NotifyPropertyChangedFor(nameof(FitnessTierLabel))]
+    private HardwareReport? _hardwareReport;
+
+    [ObservableProperty]
+    private AiRecommendation? _aiRecommendation;
+
+    [ObservableProperty]
     private int _personalMemoryCount;
 
     [ObservableProperty]
@@ -146,10 +155,29 @@ public partial class SettingsViewModel
     // ── Computed Properties ────────────────────────────────────────────
 
     public bool ShowAiApiKeyInput =>
-        AiEnabled && SelectedAiProvider is { Id: "openai" or "anthropic" or "gemini" };
+        AiEnabled && SelectedAiProvider is { Id: "openai" or "anthropic" or "gemini" or "mistral" or "groq" };
 
     public bool ShowAiCloudModelSelect =>
-        AiEnabled && SelectedAiProvider is { Id: "openai" or "anthropic" or "gemini" };
+        AiEnabled && SelectedAiProvider is { Id: "openai" or "anthropic" or "gemini" or "mistral" or "groq" };
+
+    public bool ShowCloudRecommendedBanner =>
+        HardwareReport is { FitnessTier: FitnessTier.Yellow or FitnessTier.Red };
+
+    public string FitnessTierColor => HardwareReport?.FitnessTier switch
+    {
+        FitnessTier.Green => "#4CAF50",
+        FitnessTier.Yellow => "#FFC107",
+        FitnessTier.Red => "#F44336",
+        _ => "#888888"
+    };
+
+    public string FitnessTierLabel => HardwareReport?.FitnessTier switch
+    {
+        FitnessTier.Green => "Good",
+        FitnessTier.Yellow => "Fair",
+        FitnessTier.Red => "Limited",
+        _ => "Unknown"
+    };
 
     public bool ShowAiLocalModelSection =>
         AiEnabled && SelectedAiProvider is { Id: "local" };
@@ -214,10 +242,12 @@ public partial class SettingsViewModel
             // Populate provider options
             AiProviderOptions.Clear();
             AiProviderOptions.Add(new AiProviderOption("none", "None (Disabled)"));
-            AiProviderOptions.Add(new AiProviderOption("openai", "OpenAI"));
-            AiProviderOptions.Add(new AiProviderOption("anthropic", "Anthropic"));
-            AiProviderOptions.Add(new AiProviderOption("gemini", "Google Gemini"));
-            AiProviderOptions.Add(new AiProviderOption("local", "Local (LLamaSharp)"));
+            AiProviderOptions.Add(new AiProviderOption("openai", "OpenAI", PrivacyTier.StandardApi));
+            AiProviderOptions.Add(new AiProviderOption("anthropic", "Anthropic — Privacy-First", PrivacyTier.HighPrivacy));
+            AiProviderOptions.Add(new AiProviderOption("gemini", "Google Gemini", PrivacyTier.StandardApi));
+            AiProviderOptions.Add(new AiProviderOption("mistral", "Mistral AI — Privacy-First", PrivacyTier.HighPrivacy));
+            AiProviderOptions.Add(new AiProviderOption("groq", "Groq", PrivacyTier.StandardApi));
+            AiProviderOptions.Add(new AiProviderOption("local", "Local — Privacy-First", PrivacyTier.HighPrivacy));
 
             SelectedAiProvider = AiProviderOptions.FirstOrDefault(p => p.Id == settings.AiProvider)
                                  ?? AiProviderOptions[0];
@@ -243,6 +273,7 @@ public partial class SettingsViewModel
             AiIntentEnabled = settings.AiIntentEnabled;
             AiIntentAutoAnalyze = settings.AiIntentAutoAnalyze;
 
+            RefreshHardwareAssessment();
             RefreshMemoryCounts();
             LoadSavedApiKeys();
         }
@@ -250,6 +281,16 @@ public partial class SettingsViewModel
         {
             _isLoadingAiSettings = false;
         }
+    }
+
+    private void RefreshHardwareAssessment()
+    {
+        try
+        {
+            AiRecommendation = Services.PlatformDetector.GetFullRecommendation();
+            HardwareReport = AiRecommendation.Hardware;
+        }
+        catch { /* detection may fail on unusual platforms */ }
     }
 
     private void RefreshAiCloudModels()
@@ -298,6 +339,8 @@ public partial class SettingsViewModel
         ["openai"] = ("OpenAI", "openai-api-key"),
         ["anthropic"] = ("Anthropic", "anthropic-api-key"),
         ["gemini"] = ("Google Gemini", "gemini-api-key"),
+        ["mistral"] = ("Mistral AI", "mistral-api-key"),
+        ["groq"] = ("Groq", "groq-api-key"),
     };
 
     private void LoadSavedApiKeys()
@@ -391,15 +434,8 @@ public partial class SettingsViewModel
         if (string.IsNullOrWhiteSpace(AiApiKey) || SelectedAiProvider == null)
             return;
 
-        var blobId = SelectedAiProvider.Id switch
-        {
-            "openai" => "openai-api-key",
-            "anthropic" => "anthropic-api-key",
-            "gemini" => "gemini-api-key",
-            _ => null
-        };
-
-        if (blobId == null) return;
+        if (!ProviderKeyMap.TryGetValue(SelectedAiProvider.Id, out var keyInfo)) return;
+        var blobId = keyInfo.BlobId;
 
         try
         {
@@ -431,13 +467,23 @@ public partial class SettingsViewModel
 
             // Clear cached key in provider
             var aiService = App.Services.GetRequiredService<AiService>();
-            if (aiService.GetProvider(SelectedAiProvider.Id) is OpenAiProvider oai) oai.ClearCachedKey();
-            if (aiService.GetProvider(SelectedAiProvider.Id) is AnthropicProvider ant) ant.ClearCachedKey();
-            if (aiService.GetProvider(SelectedAiProvider.Id) is GeminiProvider gem) gem.ClearCachedKey();
+            var provider = aiService.GetProvider(SelectedAiProvider.Id);
+            ClearProviderCachedKey(provider);
         }
         catch (Exception ex)
         {
             AiApiKeyStatus = $"Failed to save: {ex.Message}";
+        }
+    }
+
+    private static void ClearProviderCachedKey(IAiProvider? provider)
+    {
+        switch (provider)
+        {
+            case OpenAiProvider oai: oai.ClearCachedKey(); break;
+            case AnthropicProvider ant: ant.ClearCachedKey(); break;
+            case GeminiProvider gem: gem.ClearCachedKey(); break;
+            case OpenAiCompatibleProviderBase compat: compat.ClearCachedKey(); break;
         }
     }
 
@@ -536,10 +582,7 @@ public partial class SettingsViewModel
 
             // Clear cached key in the provider
             var aiService = App.Services.GetRequiredService<AiService>();
-            var provider = aiService.GetProvider(entry.ProviderId);
-            if (provider is OpenAiProvider oai) oai.ClearCachedKey();
-            if (provider is AnthropicProvider ant) ant.ClearCachedKey();
-            if (provider is GeminiProvider gem) gem.ClearCachedKey();
+            ClearProviderCachedKey(aiService.GetProvider(entry.ProviderId));
 
             AiApiKeyStatus = $"{entry.ProviderDisplayName} API key deleted";
         }

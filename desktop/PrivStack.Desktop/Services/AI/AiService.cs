@@ -136,6 +136,7 @@ internal sealed class AiService : IAiService
             DisplayName = p.DisplayName,
             IsConfigured = p.IsConfigured,
             IsLocal = p.IsLocal,
+            PrivacyTier = p.PrivacyTier,
             AvailableModels = p.AvailableModels
         }).ToList();
     }
@@ -183,6 +184,8 @@ internal sealed class AiService : IAiService
             ["openai"] = new OpenAiProvider(_sdk),
             ["anthropic"] = new AnthropicProvider(_sdk),
             ["gemini"] = new GeminiProvider(_sdk),
+            ["mistral"] = new MistralProvider(_sdk),
+            ["groq"] = new GroqProvider(_sdk),
             ["local"] = new LocalLlamaProvider(_modelManager),
         };
     }

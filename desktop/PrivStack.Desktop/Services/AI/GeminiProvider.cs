@@ -30,6 +30,7 @@ internal sealed class GeminiProvider : AiProviderBase
     public override string Id => "gemini";
     public override string DisplayName => "Google Gemini";
     public override bool IsConfigured => GetApiKeySync() != null;
+    public override PrivacyTier PrivacyTier => PrivacyTier.StandardApi;
     public override IReadOnlyList<AiModelInfo> AvailableModels => Models;
 
     public override async Task<bool> ValidateAsync(CancellationToken ct)

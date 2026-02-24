@@ -32,6 +32,7 @@ internal sealed class AnthropicProvider : AiProviderBase
     public override string Id => "anthropic";
     public override string DisplayName => "Anthropic";
     public override bool IsConfigured => GetApiKeySync() != null;
+    public override PrivacyTier PrivacyTier => PrivacyTier.HighPrivacy;
     public override IReadOnlyList<AiModelInfo> AvailableModels => Models;
 
     public override async Task<bool> ValidateAsync(CancellationToken ct)

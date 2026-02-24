@@ -1,4 +1,5 @@
 using System.Text;
+using PrivStack.Desktop.Services;
 using PrivStack.Sdk.Services;
 using Serilog;
 
@@ -23,6 +24,7 @@ internal sealed class LocalLlamaProvider : IAiProvider
     public string Id => "local";
     public string DisplayName => "Local (LLamaSharp)";
     public bool IsLocal => true;
+    public PrivacyTier PrivacyTier => PrivacyTier.HighPrivacy;
 
     public bool IsConfigured
     {
@@ -240,10 +242,11 @@ internal sealed class LocalLlamaProvider : IAiProvider
 
         await Task.Run(() =>
         {
+            var gpu = PlatformDetector.DetectGpu();
             var modelParams = new LLama.Common.ModelParams(modelPath)
             {
                 ContextSize = contextSize,
-                GpuLayerCount = -1, // Offload all layers to GPU (Metal on macOS)
+                GpuLayerCount = gpu.IsAccelerated ? -1 : 0,
                 Threads = Math.Min(Environment.ProcessorCount, 4)
             };
 
