@@ -58,7 +58,7 @@ internal sealed class PluginHostFactory
         _capabilityBroker.Register<IDatasetService>(datasetService);
 
         // Register shell-level RAG content provider (global features, shortcuts, intents, etc.)
-        _capabilityBroker.Register<IIndexableContentProvider>(new ShellContentProvider(_intentEngine));
+        _capabilityBroker.Register<IIndexableContentProvider>(new ShellContentProvider(_intentEngine, _pluginRegistry));
     }
 
     public IPluginHost CreateHost(string pluginId)

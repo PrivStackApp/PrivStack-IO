@@ -1,26 +1,31 @@
 using System.Security.Cryptography;
 using System.Text;
+using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Sdk.Capabilities;
 using PrivStack.Sdk.Services;
+using Serilog;
 
 namespace PrivStack.Desktop.Services.AI;
 
 /// <summary>
 /// Shell-level RAG content provider that indexes global features, shortcuts,
 /// and capabilities so the AI can answer questions about app-wide functionality.
-/// Also dynamically indexes intent descriptors so the AI can discover available
-/// actions via semantic search instead of requiring a full catalog in every prompt.
+/// Also dynamically indexes intent descriptors and quick actions so the AI can
+/// discover available actions and shortcuts via semantic search.
 /// Registered with the CapabilityBroker (not a plugin) so RagIndexService discovers it.
 /// </summary>
 internal sealed class ShellContentProvider : IIndexableContentProvider
 {
+    private static readonly ILogger _log = Log.ForContext<ShellContentProvider>();
     private const string ShellPluginId = "privstack.desktop";
 
     private readonly IIntentEngine _intentEngine;
+    private readonly IPluginRegistry _pluginRegistry;
 
-    public ShellContentProvider(IIntentEngine intentEngine)
+    public ShellContentProvider(IIntentEngine intentEngine, IPluginRegistry pluginRegistry)
     {
         _intentEngine = intentEngine;
+        _pluginRegistry = pluginRegistry;
     }
 
     public Task<IndexableContentResult> GetIndexableContentAsync(
@@ -31,23 +36,12 @@ internal sealed class ShellContentProvider : IIndexableContentProvider
         // ── Intent Action Chunks (one per intent) ─────────────────────────
         IndexIntentActions(chunks);
 
+        // ── Quick Action Chunks (one per quick action from plugins) ──────
+        IndexQuickActions(chunks);
+
         // ── Global Keyboard Shortcuts ────────────────────────────────────
         chunks.Add(MakeChunk("shell-shortcuts", "Global Keyboard Shortcuts",
-            """
-            PrivStack global keyboard shortcuts and navigation:
-            - Cmd+K / Ctrl+K: Open Universal Search (search across all plugins, navigate anywhere)
-            - Cmd+I / Ctrl+I: Toggle the Info Panel (right sidebar showing entity details and backlinks)
-            - Cmd+M / Ctrl+M: Toggle Speech Recording (Whisper speech-to-text, inserts at cursor)
-            - Cmd+\ / Ctrl+\: Toggle sidebar collapsed/expanded
-            - Cmd+1 through Cmd+9 / Ctrl+1-9: Switch to plugin tab by position (1=first plugin, 2=second, etc.)
-            - Escape: Close active overlay, panel, or modal (AI tray, info panel, quick action, search dropdown)
-            - Cmd+T / Ctrl+T: Quick Task (creates a new task via overlay)
-            - Cmd+N / Ctrl+N: Quick Sticky Note (creates a new sticky note via overlay)
-            - Cmd+E / Ctrl+E: Quick Event (creates a new calendar event via overlay)
-            - Cmd+H / Ctrl+H: Quick Log Habit (log a habit entry via overlay)
-            - Cmd+B / Ctrl+B: Quick Transaction (add a financial transaction via overlay)
-            Plugin-specific shortcuts are declared by plugins via QuickActionDescriptor and resolved generically by the shell.
-            """));
+            BuildShortcutsChunkText()));
 
         // ── Universal Search & Command Palette ───────────────────────────
         chunks.Add(MakeChunk("shell-search", "Universal Search & Command Palette",
@@ -325,6 +319,96 @@ internal sealed class ShellContentProvider : IIndexableContentProvider
                 ModifiedAt = DateTimeOffset.UtcNow,
             });
         }
+    }
+
+    private void IndexQuickActions(List<ContentChunk> chunks)
+    {
+        var providers = _pluginRegistry.GetCapabilityProviders<IQuickActionProvider>();
+        foreach (var provider in providers)
+        {
+            IReadOnlyList<QuickActionDescriptor> actions;
+            try { actions = provider.GetQuickActions(); }
+            catch (Exception ex)
+            {
+                _log.Warning(ex, "Failed to get quick actions from provider");
+                continue;
+            }
+
+            foreach (var action in actions)
+            {
+                var shortcutLine = !string.IsNullOrEmpty(action.DefaultShortcutHint)
+                    ? $"\nKeyboard Shortcut: {action.DefaultShortcutHint}"
+                    : "";
+
+                var text = $"""
+                    Quick Action: {action.DisplayName}
+                    Plugin: {action.PluginId}
+                    Description: {action.Description ?? action.DisplayName}{shortcutLine}
+                    Category: {action.Category}
+                    Has UI overlay: {(action.HasUI ? "Yes (opens a modal form)" : "No (executes immediately)")}
+
+                    To use this quick action, press {action.DefaultShortcutHint ?? "the keyboard shortcut shown in the command palette (Cmd+K)"}, or open the Command Palette (Cmd+K) and search for "{action.DisplayName}".
+                    """.Trim();
+
+                chunks.Add(new ContentChunk
+                {
+                    EntityId = $"quick-action-{action.ActionId}",
+                    EntityType = "shell_context",
+                    PluginId = ShellPluginId,
+                    ChunkPath = "content",
+                    Text = text,
+                    ContentHash = ComputeHash(text),
+                    Title = $"Quick Action: {action.DisplayName}",
+                    LinkType = "shell_context",
+                    ModifiedAt = DateTimeOffset.UtcNow,
+                });
+            }
+        }
+    }
+
+    /// <summary>
+    /// Builds the keyboard shortcuts chunk text with shell-level shortcuts (hardcoded)
+    /// and plugin quick action shortcuts (dynamically discovered).
+    /// </summary>
+    private string BuildShortcutsChunkText()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("PrivStack keyboard shortcuts and navigation:");
+        sb.AppendLine();
+        sb.AppendLine("Shell-level shortcuts (always available):");
+        sb.AppendLine("- Cmd+K / Ctrl+K: Open Universal Search (search across all plugins, navigate anywhere)");
+        sb.AppendLine("- Cmd+I / Ctrl+I: Toggle the Info Panel (right sidebar showing entity details and backlinks)");
+        sb.AppendLine("- Cmd+M / Ctrl+M: Toggle Speech Recording (Whisper speech-to-text, inserts at cursor)");
+        sb.AppendLine("- Cmd+\\ / Ctrl+\\: Toggle sidebar collapsed/expanded");
+        sb.AppendLine("- Cmd+1 through Cmd+9 / Ctrl+1-9: Switch to plugin tab by position (1=first plugin, 2=second, etc.)");
+        sb.AppendLine("- Escape: Close active overlay, panel, or modal (AI tray, info panel, quick action, search dropdown)");
+        sb.AppendLine("- Cmd+Shift+N: New Page from Template (Notes)");
+
+        // Dynamically append plugin quick action shortcuts
+        var providers = _pluginRegistry.GetCapabilityProviders<IQuickActionProvider>();
+        var quickActions = new List<(string Shortcut, string Name, string Plugin)>();
+        foreach (var provider in providers)
+        {
+            try
+            {
+                foreach (var action in provider.GetQuickActions())
+                {
+                    if (!string.IsNullOrEmpty(action.DefaultShortcutHint))
+                        quickActions.Add((action.DefaultShortcutHint, action.DisplayName, action.PluginId));
+                }
+            }
+            catch { /* provider failed, skip */ }
+        }
+
+        if (quickActions.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Plugin quick action shortcuts:");
+            foreach (var (shortcut, name, plugin) in quickActions)
+                sb.AppendLine($"- {shortcut}: {name} ({plugin})");
+        }
+
+        return sb.ToString().TrimEnd();
     }
 
     private static ContentChunk MakeChunk(string id, string title, string text)
