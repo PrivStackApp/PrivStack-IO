@@ -464,14 +464,29 @@ public partial class AiSuggestionTrayViewModel
 
     // ── Action Block Parsing ────────────────────────────────────────
 
-    private static readonly Regex ActionBlockPattern = new(
+    // Matches [ACTION]{...}[/ACTION] (properly closed)
+    private static readonly Regex ClosedActionPattern = new(
         @"\[ACTION\]\s*(\{.*?\})\s*\[/ACTION\]",
         RegexOptions.Singleline | RegexOptions.Compiled);
+
+    // Matches [ACTION]{...} without closing tag (terminated by next [ACTION], end of string, or [/ACTION])
+    private static readonly Regex UnclosedActionPattern = new(
+        @"\[ACTION\]\s*(\{[^[]*?\})(?=\s*(?:\[ACTION\]|\[/ACTION\]|$))",
+        RegexOptions.Singleline | RegexOptions.Compiled);
+
+    // Strips any remaining [ACTION] or [/ACTION] tags after extraction
+    private static readonly Regex StrayActionTags = new(
+        @"\[/?ACTION\]",
+        RegexOptions.Compiled);
 
     private static (string CleanText, List<ParsedAction> Actions) ParseActionBlocks(string text)
     {
         var actions = new List<ParsedAction>();
-        var matches = ActionBlockPattern.Matches(text);
+
+        // Try closed blocks first, then fall back to unclosed
+        var matches = ClosedActionPattern.Matches(text);
+        if (matches.Count == 0)
+            matches = UnclosedActionPattern.Matches(text);
 
         foreach (Match match in matches)
         {
@@ -499,7 +514,11 @@ public partial class AiSuggestionTrayViewModel
             }
         }
 
-        var clean = ActionBlockPattern.Replace(text, "").Trim();
+        // Strip all matched blocks and any stray tags from the clean text
+        var clean = ClosedActionPattern.Replace(text, "");
+        clean = UnclosedActionPattern.Replace(clean, "");
+        clean = StrayActionTags.Replace(clean, "");
+        clean = clean.Trim();
         return (clean, actions);
     }
 
