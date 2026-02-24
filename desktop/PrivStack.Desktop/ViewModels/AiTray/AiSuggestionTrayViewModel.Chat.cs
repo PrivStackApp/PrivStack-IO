@@ -401,6 +401,8 @@ public partial class AiSuggestionTrayViewModel
         You CAN use actions from ANY plugin, not just the one the user is currently viewing.
         For example, if the user asks to create a note while viewing Finance, use the notes.create_note action.
         If no relevant action exists in the descriptions above, say you can't do that yet.
+        Slot values must be strings or arrays of strings. For list-type slots like add_checklist or tags, you may use a JSON array: "add_checklist": ["item 1", "item 2"].
+        Use the slot name "add_checklist" (not "checklist") when adding checklist items to a task.
         """;
 
     /// <summary>
@@ -462,35 +464,68 @@ public partial class AiSuggestionTrayViewModel
 
     // ── Action Block Parsing ────────────────────────────────────────
 
-    // Matches [ACTION]{...}[/ACTION] (properly closed)
-    private static readonly Regex ClosedActionPattern = new(
-        @"\[ACTION\]\s*(\{.*?\})\s*\[/ACTION\]",
-        RegexOptions.Singleline | RegexOptions.Compiled);
-
-    // Matches [ACTION]{...} without closing tag (terminated by next [ACTION], end of string, or [/ACTION])
-    private static readonly Regex UnclosedActionPattern = new(
-        @"\[ACTION\]\s*(\{[^[]*?\})(?=\s*(?:\[ACTION\]|\[/ACTION\]|$))",
-        RegexOptions.Singleline | RegexOptions.Compiled);
-
     // Strips any remaining [ACTION] or [/ACTION] tags after extraction
     private static readonly Regex StrayActionTags = new(
         @"\[/?ACTION\]",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Extracts balanced JSON objects following [ACTION] tags. Uses brace-depth counting
+    /// instead of regex to handle nested arrays/objects in slot values (e.g. checklist arrays).
+    /// </summary>
     private static (string CleanText, List<ParsedAction> Actions) ParseActionBlocks(string text)
     {
         var actions = new List<ParsedAction>();
+        var spans = new List<(int Start, int End)>(); // regions to strip
 
-        // Try closed blocks first, then fall back to unclosed
-        var matches = ClosedActionPattern.Matches(text);
-        if (matches.Count == 0)
-            matches = UnclosedActionPattern.Matches(text);
-
-        foreach (Match match in matches)
+        var searchFrom = 0;
+        while (searchFrom < text.Length)
         {
+            var tagIdx = text.IndexOf("[ACTION]", searchFrom, StringComparison.OrdinalIgnoreCase);
+            if (tagIdx < 0) break;
+
+            var afterTag = tagIdx + "[ACTION]".Length;
+
+            // Find the opening brace
+            var braceStart = -1;
+            for (var i = afterTag; i < text.Length; i++)
+            {
+                if (text[i] == '{') { braceStart = i; break; }
+                if (!char.IsWhiteSpace(text[i])) break; // non-whitespace before { means malformed
+            }
+
+            if (braceStart < 0) { searchFrom = afterTag; continue; }
+
+            // Walk forward counting brace depth to find the matching close
+            var depth = 0;
+            var braceEnd = -1;
+            var inString = false;
+            var escaped = false;
+            for (var i = braceStart; i < text.Length; i++)
+            {
+                var c = text[i];
+                if (escaped) { escaped = false; continue; }
+                if (c == '\\' && inString) { escaped = true; continue; }
+                if (c == '"') { inString = !inString; continue; }
+                if (inString) continue;
+                if (c == '{') depth++;
+                else if (c == '}') { depth--; if (depth == 0) { braceEnd = i; break; } }
+            }
+
+            if (braceEnd < 0) { searchFrom = afterTag; continue; }
+
+            var json = text[(braceStart)..(braceEnd + 1)];
+
+            // Find the end of the region to strip (include optional [/ACTION] tag)
+            var regionEnd = braceEnd + 1;
+            var remaining = text.AsSpan(regionEnd);
+            var trimmed = remaining.TrimStart();
+            if (trimmed.StartsWith("[/ACTION]", StringComparison.OrdinalIgnoreCase))
+                regionEnd = text.Length - trimmed.Length + "[/ACTION]".Length;
+
             try
             {
-                using var doc = JsonDocument.Parse(match.Groups[1].Value);
+                using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
                 var intentId = root.GetProperty("intent_id").GetString();
                 var slots = new Dictionary<string, string>();
@@ -498,26 +533,48 @@ public partial class AiSuggestionTrayViewModel
                 if (root.TryGetProperty("slots", out var slotsEl))
                 {
                     foreach (var prop in slotsEl.EnumerateObject())
-                        slots[prop.Name] = prop.Value.ValueKind == JsonValueKind.String
-                            ? prop.Value.GetString() ?? ""
-                            : prop.Value.GetRawText();
+                        slots[prop.Name] = FlattenSlotValue(prop.Value);
                 }
 
                 if (!string.IsNullOrEmpty(intentId))
+                {
                     actions.Add(new ParsedAction(intentId, slots));
+                    spans.Add((tagIdx, regionEnd));
+                }
             }
             catch (Exception ex)
             {
-                _log.Debug(ex, "Failed to parse action block: {Block}", match.Value);
+                _log.Debug(ex, "Failed to parse action block JSON: {Json}", json);
             }
+
+            searchFrom = braceEnd + 1;
         }
 
-        // Strip all matched blocks and any stray tags from the clean text
-        var clean = ClosedActionPattern.Replace(text, "");
-        clean = UnclosedActionPattern.Replace(clean, "");
+        // Strip matched regions in reverse order to preserve indices
+        var clean = text;
+        for (var i = spans.Count - 1; i >= 0; i--)
+            clean = clean.Remove(spans[i].Start, spans[i].End - spans[i].Start);
         clean = StrayActionTags.Replace(clean, "");
         clean = clean.Trim();
         return (clean, actions);
+    }
+
+    /// <summary>
+    /// Converts a JSON slot value to a flat string. Arrays are joined with newlines
+    /// (supports checklist items, tags, etc. sent as JSON arrays by the AI).
+    /// </summary>
+    private static string FlattenSlotValue(JsonElement value)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString() ?? "",
+            JsonValueKind.Array => string.Join("\n", value.EnumerateArray()
+                .Select(e => e.ValueKind == JsonValueKind.String ? e.GetString() ?? "" : e.GetRawText())),
+            JsonValueKind.Number => value.GetRawText(),
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            _ => value.GetRawText(),
+        };
     }
 
     private sealed record ParsedAction(string IntentId, Dictionary<string, string> Slots);
