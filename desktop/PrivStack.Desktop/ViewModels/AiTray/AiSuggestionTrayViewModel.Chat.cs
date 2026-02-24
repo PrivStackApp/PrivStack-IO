@@ -250,24 +250,37 @@ public partial class AiSuggestionTrayViewModel
                 // Persist assistant message
                 _conversationStore.AddMessage(ActiveSessionId!, "assistant", content);
 
-                // Execute parsed intent actions from the AI response
+                // Execute parsed intent actions and collect results for conversation feedback
+                var actionResults = new List<string>();
                 foreach (var action in actions)
                 {
                     try
                     {
                         var result = await _intentEngine.ExecuteDirectAsync(
                             action.IntentId, action.Slots);
+
+                        // Build display text including warnings
+                        var displayText = result.Success
+                            ? $"\u2713 {result.Summary ?? "Done!"}"
+                            : $"\u2717 {result.ErrorMessage ?? "Action failed."}";
+
+                        if (result.Warnings is { Count: > 0 })
+                        {
+                            var warningText = string.Join("; ", result.Warnings);
+                            displayText += $"\n\u26a0 {warningText}";
+                        }
+
                         var confirmMsg = new AiChatMessageViewModel(ChatMessageRole.Assistant)
                         {
-                            Content = result.Success
-                                ? $"\u2713 {result.Summary ?? "Done!"}"
-                                : $"\u2717 {result.ErrorMessage ?? "Action failed."}",
+                            Content = displayText,
                             State = result.Success
                                 ? ChatMessageState.Applied
                                 : ChatMessageState.Error,
                         };
                         ChatMessages.Add(confirmMsg);
-                        _conversationStore.AddMessage(ActiveSessionId!, "assistant", confirmMsg.Content!);
+
+                        // Collect for conversation history injection
+                        actionResults.Add(displayText);
 
                         // Track the last successfully acted-on entity for conversational context
                         if (result.Success && !string.IsNullOrEmpty(result.CreatedEntityId))
@@ -279,12 +292,23 @@ public partial class AiSuggestionTrayViewModel
                     catch (Exception ex)
                     {
                         _log.Warning(ex, "Failed to execute chat action: {IntentId}", action.IntentId);
+                        var errorText = $"\u2717 Failed to execute action: {ex.Message}";
                         ChatMessages.Add(new AiChatMessageViewModel(ChatMessageRole.Assistant)
                         {
-                            Content = $"\u2717 Failed to execute action: {ex.Message}",
+                            Content = errorText,
                             State = ChatMessageState.Error,
                         });
+                        actionResults.Add(errorText);
                     }
+                }
+
+                // Inject action results into conversation history so the AI
+                // knows what succeeded/failed on the next turn
+                if (actionResults.Count > 0)
+                {
+                    var resultsSummary = "[Action Results]\n" +
+                        string.Join("\n", actionResults);
+                    _conversationStore.AddMessage(ActiveSessionId!, "assistant", resultsSummary);
                 }
 
                 // Fire-and-forget memory extraction for cloud responses
@@ -399,11 +423,14 @@ public partial class AiSuggestionTrayViewModel
         Format: [ACTION]{"intent_id": "exact.id", "slots": {...}}[/ACTION]
         IMPORTANT: You MUST use the EXACT intent_id values shown in the ACTION descriptions above (e.g. "tasks.update_task", NOT "tasks.update").
         Do NOT abbreviate, shorten, or invent intent IDs. Copy them exactly from the action descriptions.
+        SLOT NAMES: You MUST ONLY use slot names that are explicitly listed in the action descriptions above. NEVER invent slot names like "parent_task_id", "parent_id", "subtask", or any name not in the description. Unknown slots are silently stripped and will have NO effect. If a capability doesn't exist (e.g. nesting tasks), say so — do not guess at slot names.
+        To LINK existing entities, use the tasks.add_link intent with source_task_id, target_entity_id, target_link_type, and relationship. Do NOT re-create entities when linking.
         You CAN use actions from ANY plugin, not just the one the user is currently viewing.
         For example, if the user asks to create a note while viewing Finance, use the notes.create_note action.
         If no relevant action exists in the descriptions above, say you can't do that yet — do NOT pretend you did it.
         Slot values must be strings or arrays of strings. For list-type slots like add_checklist or tags, you may use a JSON array: "add_checklist": ["item 1", "item 2"].
         Use the slot name "add_checklist" (not "checklist") when adding checklist items to a task.
+        After executing actions, you will see [Action Results] showing what succeeded or failed. Use this feedback to correct errors on subsequent turns.
         """;
 
     /// <summary>
