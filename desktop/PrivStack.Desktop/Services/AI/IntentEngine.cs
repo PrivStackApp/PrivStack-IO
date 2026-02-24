@@ -219,9 +219,20 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
         var providers = _pluginRegistry.GetCapabilityProviders<IIntentProvider>();
 
         // Exact match first
-        var provider = providers
-            .FirstOrDefault(p => p.GetSupportedIntents()
-                .Any(i => i.IntentId == intentId));
+        IIntentProvider? provider = null;
+        IntentDescriptor? descriptor = null;
+
+        foreach (var p in providers)
+        {
+            var match = p.GetSupportedIntents()
+                .FirstOrDefault(i => i.IntentId == intentId);
+            if (match != null)
+            {
+                provider = p;
+                descriptor = match;
+                break;
+            }
+        }
 
         var resolvedIntentId = intentId;
 
@@ -236,6 +247,7 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
                 if (match != null)
                 {
                     provider = p;
+                    descriptor = match;
                     resolvedIntentId = match.IntentId;
                     _log.Information("Fuzzy-resolved intent '{Original}' to '{Resolved}'", intentId, resolvedIntentId);
                     break;
@@ -246,21 +258,74 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
         if (provider == null)
             return IntentResult.Failure($"No provider found for intent '{intentId}'.");
 
+        // Validate slot names against the intent descriptor and strip unknown ones
+        var warnings = new List<string>();
+        var validatedSlots = ValidateSlots(slots, descriptor!, warnings);
+
         var request = new IntentRequest
         {
             IntentId = resolvedIntentId,
-            Slots = slots,
+            Slots = validatedSlots,
         };
 
         try
         {
-            return await provider.ExecuteIntentAsync(request, ct);
+            var result = await provider.ExecuteIntentAsync(request, ct);
+
+            // Attach slot validation warnings to the result
+            if (warnings.Count > 0)
+            {
+                var allWarnings = result.Warnings != null
+                    ? [..result.Warnings, ..warnings]
+                    : warnings.AsReadOnly() as IReadOnlyList<string>;
+                result = result with { Warnings = allWarnings };
+            }
+
+            return result;
         }
         catch (Exception ex)
         {
             _log.Error(ex, "Direct intent execution failed: {IntentId}", resolvedIntentId);
             return IntentResult.Failure(ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Validates slot names against the intent descriptor. Unknown slots are stripped
+    /// and warnings are added. Returns the filtered slot dictionary.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> ValidateSlots(
+        IReadOnlyDictionary<string, string> slots,
+        IntentDescriptor descriptor,
+        List<string> warnings)
+    {
+        if (descriptor.Slots.Count == 0 || slots.Count == 0)
+            return slots;
+
+        var knownSlotNames = new HashSet<string>(
+            descriptor.Slots.Select(s => s.Name),
+            StringComparer.OrdinalIgnoreCase);
+
+        var unknownSlots = slots.Keys
+            .Where(k => !knownSlotNames.Contains(k))
+            .ToList();
+
+        if (unknownSlots.Count == 0)
+            return slots;
+
+        // Build helpful warning with the valid slot names
+        var validNames = string.Join(", ", descriptor.Slots.Select(s => s.Name));
+        foreach (var unknown in unknownSlots)
+        {
+            _log.Warning("Intent '{IntentId}' received unknown slot '{Slot}' — stripping. Valid slots: {ValidSlots}",
+                descriptor.IntentId, unknown, validNames);
+            warnings.Add($"Unknown slot \"{unknown}\" was ignored for {descriptor.IntentId}. Valid slots: {validNames}");
+        }
+
+        // Return only known slots
+        return slots
+            .Where(kvp => knownSlotNames.Contains(kvp.Key))
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
     }
 
     public void Dismiss(string suggestionId) => RemoveSuggestion(suggestionId);
