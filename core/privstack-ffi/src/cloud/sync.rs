@@ -202,6 +202,13 @@ pub unsafe extern "C" fn privstack_cloudsync_get_status(
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
+    let (synced_entity_count, total_entity_count) = handle
+        .cloud_sync_handle
+        .as_ref()
+        .map(|h| handle.runtime.block_on(h.sync_progress()))
+        .map(|p| (p.synced_count, p.total_count))
+        .unwrap_or((0, 0));
+
     let status = CloudSyncStatus {
         is_syncing,
         is_authenticated,
@@ -211,6 +218,8 @@ pub unsafe extern "C" fn privstack_cloudsync_get_status(
         connected_devices: 0,
         is_rate_limited,
         rate_limit_remaining_secs,
+        synced_entity_count,
+        total_entity_count,
     };
 
     write_json_out(out_json, &status)

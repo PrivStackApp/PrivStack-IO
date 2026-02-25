@@ -70,6 +70,17 @@ public partial class StorageStatePillViewModel : ViewModelBase
             {
                 try
                 {
+                    var status = _cloudSync.GetStatus();
+
+                    // Show entity progress when there are pending entities to sync
+                    if (status.TotalEntityCount > status.SyncedEntityCount)
+                    {
+                        PillText = $"Cloud \u00b7 {status.SyncedEntityCount}/{status.TotalEntityCount}";
+                        PillColor = ResolveBrush("ThemeSuccessBrush");
+                        return;
+                    }
+
+                    // All synced — show storage percentage
                     var quota = _cloudSync.GetQuota(activeWorkspace.CloudWorkspaceId!);
                     var pct = (int)Math.Round(quota.UsagePercent);
                     PillText = $"Cloud Sync ({pct}%)";

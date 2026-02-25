@@ -7,6 +7,7 @@
 //! - **Empty buffers**: Never flushed ($0.00 cost when idle)
 
 use privstack_types::Event;
+use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
 /// Flush mode determined by collaboration context.
@@ -105,6 +106,14 @@ impl Outbox {
     /// Returns true if the buffer is empty.
     pub fn is_empty(&self) -> bool {
         self.pending_events.is_empty()
+    }
+
+    /// Returns the set of distinct entity IDs in the pending buffer.
+    pub fn distinct_entity_ids(&self) -> HashSet<String> {
+        self.pending_events
+            .iter()
+            .map(|e| e.entity_id.to_string())
+            .collect()
     }
 
     /// Returns the current flush mode.

@@ -50,6 +50,8 @@ pub struct CloudSyncEngine {
     entity_store: Arc<EntityStore>,
     /// Server-provided throttling configuration (queried on startup).
     rate_limits: RateLimitConfig,
+    /// Shared entity-level sync progress for the UI.
+    sync_progress: Arc<RwLock<SyncProgress>>,
 }
 
 /// Handle for sending commands to the sync engine.
@@ -57,6 +59,7 @@ pub struct CloudSyncEngine {
 pub struct CloudSyncHandle {
     command_tx: mpsc::Sender<CloudCommand>,
     last_sync_at: Arc<RwLock<Option<DateTime<Utc>>>>,
+    sync_progress: Arc<RwLock<SyncProgress>>,
 }
 
 impl CloudSyncHandle {
@@ -76,6 +79,10 @@ impl CloudSyncHandle {
 
     pub async fn last_sync_at(&self) -> Option<DateTime<Utc>> {
         *self.last_sync_at.read().await
+    }
+
+    pub async fn sync_progress(&self) -> SyncProgress {
+        self.sync_progress.read().await.clone()
     }
 
     pub async fn share_entity(
@@ -147,9 +154,16 @@ pub fn create_cloud_sync_engine(
 
     let last_sync_at = Arc::new(RwLock::new(restored_sync_at));
 
+    let initial_progress = SyncProgress {
+        synced_count: cursors.len(),
+        total_count: cursors.len(),
+    };
+    let sync_progress = Arc::new(RwLock::new(initial_progress));
+
     let handle = CloudSyncHandle {
         command_tx,
         last_sync_at: last_sync_at.clone(),
+        sync_progress: sync_progress.clone(),
     };
 
     let engine = CloudSyncEngine {
@@ -169,6 +183,7 @@ pub fn create_cloud_sync_engine(
         last_sync_at,
         entity_store,
         rate_limits: RateLimitConfig::default(),
+        sync_progress,
     };
 
     (handle, inbound_tx, engine)
@@ -229,6 +244,7 @@ impl CloudSyncEngine {
         loop {
             tokio::select! {
                 _ = flush_interval.tick() => {
+                    self.update_sync_progress().await;
                     if self.api.is_rate_limited().await {
                         if let Some(remaining) = self.api.rate_limit_remaining().await {
                             debug!("flush skipped: rate limited for {remaining:?}");
@@ -241,6 +257,7 @@ impl CloudSyncEngine {
                                 error!("outbox flush failed: {e}");
                             }
                         }
+                        self.update_sync_progress().await;
                     }
                 }
                 _ = poll_interval.tick() => {
@@ -252,6 +269,7 @@ impl CloudSyncEngine {
                             warn!("poll failed: {e}");
                         }
                     }
+                    self.update_sync_progress().await;
                 }
                 _ = cred_check_interval.tick() => {
                     if self.api.is_rate_limited().await {
@@ -302,6 +320,20 @@ impl CloudSyncEngine {
         }
 
         info!("cloud sync engine stopped");
+    }
+
+    /// Recalculates entity-level sync progress from cursors + outbox.
+    async fn update_sync_progress(&self) {
+        let synced = self.cursors.len();
+        let outbox_ids = self.outbox.distinct_entity_ids();
+        let new_entities = outbox_ids
+            .iter()
+            .filter(|id| !self.cursors.contains_key(*id))
+            .count();
+        *self.sync_progress.write().await = SyncProgress {
+            synced_count: synced,
+            total_count: synced + new_entities,
+        };
     }
 
     /// Adds a local event to the outbox.

@@ -277,6 +277,13 @@ pub struct RegisterBlobRequest {
     pub content_hash: Option<String>,
 }
 
+/// Entity-level sync progress for the UI progress indicator.
+#[derive(Clone, Debug, Default)]
+pub struct SyncProgress {
+    pub synced_count: usize,
+    pub total_count: usize,
+}
+
 /// Cloud sync status reported to the UI.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CloudSyncStatus {
@@ -292,6 +299,12 @@ pub struct CloudSyncStatus {
     /// Seconds remaining until the rate-limit pause expires (0 if not limited).
     #[serde(default)]
     pub rate_limit_remaining_secs: u64,
+    /// Number of entities that have been synced (have cursors).
+    #[serde(default)]
+    pub synced_entity_count: usize,
+    /// Total entities (synced + distinct new entities in outbox).
+    #[serde(default)]
+    pub total_entity_count: usize,
 }
 
 /// Commands sent to the cloud sync engine.

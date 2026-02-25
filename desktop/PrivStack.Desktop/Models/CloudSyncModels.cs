@@ -49,6 +49,14 @@ public record CloudSyncStatus
     /// <summary>Seconds remaining until the rate-limit pause expires (0 if not limited).</summary>
     [JsonPropertyName("rate_limit_remaining_secs")]
     public long RateLimitRemainingSecs { get; init; }
+
+    /// <summary>Number of entities that have been synced (have cursors).</summary>
+    [JsonPropertyName("synced_entity_count")]
+    public int SyncedEntityCount { get; init; }
+
+    /// <summary>Total entities (synced + distinct new entities in outbox).</summary>
+    [JsonPropertyName("total_entity_count")]
+    public int TotalEntityCount { get; init; }
 }
 
 /// <summary>
