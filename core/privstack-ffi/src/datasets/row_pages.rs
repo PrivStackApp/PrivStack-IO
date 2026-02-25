@@ -44,7 +44,7 @@ pub unsafe extern "C" fn privstack_dataset_link_row_page(
         match store.link_row_to_page(&dataset_id, row_key, page_id) {
             Ok(()) => PrivStackError::Ok,
             Err(e) => {
-                eprintln!("[FFI DATASET] link_row_page failed: {e:?}");
+                ffi_error!("[FFI DATASET] link_row_page failed: {e:?}");
                 PrivStackError::StorageError
             }
         }
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn privstack_dataset_get_page_for_row(
                 Ok(Some(page_id)) => to_c_string(&format!(r#""{}""#, page_id)),
                 Ok(None) => to_c_string("null"),
                 Err(e) => {
-                    eprintln!("[FFI DATASET] get_page_for_row failed: {e:?}");
+                    ffi_error!("[FFI DATASET] get_page_for_row failed: {e:?}");
                     to_c_string("null")
                 }
             }
@@ -94,7 +94,7 @@ pub unsafe extern "C" fn privstack_dataset_get_row_for_page(
                 }
                 Ok(None) => to_c_string("null"),
                 Err(e) => {
-                    eprintln!("[FFI DATASET] get_row_for_page failed: {e:?}");
+                    ffi_error!("[FFI DATASET] get_row_for_page failed: {e:?}");
                     to_c_string("null")
                 }
             }
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn privstack_dataset_unlink_row_page(
         match store.unlink_row_page(&dataset_id, row_key) {
             Ok(()) => PrivStackError::Ok,
             Err(e) => {
-                eprintln!("[FFI DATASET] unlink_row_page failed: {e:?}");
+                ffi_error!("[FFI DATASET] unlink_row_page failed: {e:?}");
                 PrivStackError::StorageError
             }
         }

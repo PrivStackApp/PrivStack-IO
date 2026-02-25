@@ -22,7 +22,7 @@ pub unsafe extern "C" fn privstack_dataset_import_csv(
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] import_csv failed: {e:?}");
+                    ffi_error!("[FFI DATASET] import_csv failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -40,7 +40,7 @@ pub extern "C" fn privstack_dataset_list() -> *mut c_char {
                 to_c_string(&json)
             }
             Err(e) => {
-                eprintln!("[FFI DATASET] list failed: {e:?}");
+                ffi_error!("[FFI DATASET] list failed: {e:?}");
                 to_c_string("[]")
             }
         }
@@ -65,7 +65,7 @@ pub unsafe extern "C" fn privstack_dataset_get(dataset_id: *const c_char) -> *mu
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] get failed: {e:?}");
+                    ffi_error!("[FFI DATASET] get failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -106,7 +106,7 @@ pub unsafe extern "C" fn privstack_dataset_delete(dataset_id: *const c_char) -> 
             Ok(()) => PrivStackError::Ok,
             Err(privstack_datasets::DatasetError::NotFound(_)) => PrivStackError::NotFound,
             Err(e) => {
-                eprintln!("[FFI DATASET] delete failed: {e:?}");
+                ffi_error!("[FFI DATASET] delete failed: {e:?}");
                 PrivStackError::StorageError
             }
         }
@@ -153,7 +153,7 @@ pub unsafe extern "C" fn privstack_dataset_rename(
             Ok(()) => PrivStackError::Ok,
             Err(privstack_datasets::DatasetError::NotFound(_)) => PrivStackError::NotFound,
             Err(e) => {
-                eprintln!("[FFI DATASET] rename failed: {e:?}");
+                ffi_error!("[FFI DATASET] rename failed: {e:?}");
                 PrivStackError::StorageError
             }
         }
@@ -198,7 +198,7 @@ unsafe fn privstack_dataset_query_inner(query_json: *const c_char) -> *mut c_cha
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] query failed: {e:?}");
+                    ffi_error!("[FFI DATASET] query failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -226,7 +226,7 @@ pub unsafe extern "C" fn privstack_dataset_get_columns(
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] get_columns failed: {e:?}");
+                    ffi_error!("[FFI DATASET] get_columns failed: {e:?}");
                     to_c_string("[]")
                 }
             }

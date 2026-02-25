@@ -52,7 +52,17 @@ pub(crate) fn android_log(level: &str, msg: &str) {
         unsafe { __android_log_write(prio, tag.as_ptr(), text.as_ptr()); }
     }
     #[cfg(not(target_os = "android"))]
-    eprintln!("[{level}] {msg}");
+    {
+        let numeric = match level {
+            "ERROR" => crate::FFI_LEVEL_ERROR,
+            "WARN" => crate::FFI_LEVEL_WARN,
+            "INFO" => crate::FFI_LEVEL_INFO,
+            _ => crate::FFI_LEVEL_DEBUG,
+        };
+        if crate::FFI_LOG_LEVEL.load(std::sync::atomic::Ordering::Relaxed) >= numeric {
+            eprintln!("[{level}] {msg}");
+        }
+    }
 }
 
 /// Converts a `CloudError` to the appropriate FFI error code.

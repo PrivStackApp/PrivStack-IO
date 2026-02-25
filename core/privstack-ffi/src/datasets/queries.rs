@@ -19,7 +19,7 @@ pub unsafe extern "C" fn privstack_dataset_aggregate(
             let dataset_id = match uuid::Uuid::parse_str(&req.dataset_id) {
                 Ok(u) => privstack_datasets::DatasetId(u),
                 Err(e) => {
-                    eprintln!("[FFI DATASET] aggregate: invalid dataset id '{}': {e}", req.dataset_id);
+                    ffi_error!("[FFI DATASET] aggregate: invalid dataset id '{}': {e}", req.dataset_id);
                     return to_c_string(&super::error_json(&format!(
                         "invalid dataset id '{}': {e}", req.dataset_id
                     )));
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn privstack_dataset_aggregate(
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] aggregate failed: {e:?}");
+                    ffi_error!("[FFI DATASET] aggregate failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn privstack_dataset_aggregate_grouped(
             let dataset_id = match uuid::Uuid::parse_str(&req.dataset_id) {
                 Ok(u) => privstack_datasets::DatasetId(u),
                 Err(e) => {
-                    eprintln!("[FFI DATASET] aggregate_grouped: invalid dataset id '{}': {e}", req.dataset_id);
+                    ffi_error!("[FFI DATASET] aggregate_grouped: invalid dataset id '{}': {e}", req.dataset_id);
                     return to_c_string(&super::error_json(&format!(
                         "invalid dataset id '{}': {e}", req.dataset_id
                     )));
@@ -146,7 +146,7 @@ pub unsafe extern "C" fn privstack_dataset_aggregate_grouped(
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] aggregate_grouped failed: {e:?}");
+                    ffi_error!("[FFI DATASET] aggregate_grouped failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -177,11 +177,11 @@ pub unsafe extern "C" fn privstack_dataset_execute_sql(
                     to_c_string(&json)
                 }
                 Ok(Err(e)) => {
-                    eprintln!("[FFI DATASET] execute_sql failed: {e:?}");
+                    ffi_error!("[FFI DATASET] execute_sql failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
                 Err(_) => {
-                    eprintln!("[FFI DATASET] execute_sql panicked (caught)");
+                    ffi_error!("[FFI DATASET] execute_sql panicked (caught)");
                     to_c_string(r#"{"error":"internal error: query execution panicked"}"#)
                 }
             }
@@ -218,11 +218,11 @@ pub unsafe extern "C" fn privstack_dataset_execute_sql_v2(
                     to_c_string(&json)
                 }
                 Ok(Err(e)) => {
-                    eprintln!("[FFI DATASET] execute_sql_v2 failed: {e:?}");
+                    ffi_error!("[FFI DATASET] execute_sql_v2 failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
                 Err(_) => {
-                    eprintln!("[FFI DATASET] execute_sql_v2 panicked (caught)");
+                    ffi_error!("[FFI DATASET] execute_sql_v2 panicked (caught)");
                     to_c_string(r#"{"error":"internal error: query execution panicked"}"#)
                 }
             }
@@ -248,7 +248,7 @@ pub unsafe extern "C" fn privstack_dataset_create_saved_query(
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] create_saved_query failed: {e:?}");
+                    ffi_error!("[FFI DATASET] create_saved_query failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -294,7 +294,7 @@ pub unsafe extern "C" fn privstack_dataset_update_saved_query(
         {
             Ok(()) => PrivStackError::Ok,
             Err(e) => {
-                eprintln!("[FFI DATASET] update_saved_query failed: {e:?}");
+                ffi_error!("[FFI DATASET] update_saved_query failed: {e:?}");
                 PrivStackError::StorageError
             }
         }
@@ -330,7 +330,7 @@ pub unsafe extern "C" fn privstack_dataset_delete_saved_query(
         match store.delete_saved_query(id_str) {
             Ok(()) => PrivStackError::Ok,
             Err(e) => {
-                eprintln!("[FFI DATASET] delete_saved_query failed: {e:?}");
+                ffi_error!("[FFI DATASET] delete_saved_query failed: {e:?}");
                 PrivStackError::StorageError
             }
         }
@@ -347,7 +347,7 @@ pub extern "C" fn privstack_dataset_list_saved_queries() -> *mut c_char {
                 to_c_string(&json)
             }
             Err(e) => {
-                eprintln!("[FFI DATASET] list_saved_queries failed: {e:?}");
+                ffi_error!("[FFI DATASET] list_saved_queries failed: {e:?}");
                 to_c_string("[]")
             }
         }

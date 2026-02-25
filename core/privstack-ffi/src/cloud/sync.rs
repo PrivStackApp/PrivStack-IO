@@ -373,7 +373,7 @@ pub unsafe extern "C" fn privstack_cloudsync_push_all_entities(
     }
 
     unsafe { *out_count = pushed };
-    eprintln!("[cloud sync] initial sync: pushed {pushed}/{} entities", ids.len());
+    ffi_info!("[cloud sync] initial sync: pushed {pushed}/{} entities", ids.len());
     PrivStackError::Ok
 }
 
@@ -453,15 +453,15 @@ async fn consume_inbound_events(
         match result {
             Ok(Ok(())) => {}
             Ok(Err(e)) => {
-                eprintln!("[cloud sync] failed to apply inbound event: {e}");
+                ffi_error!("[cloud sync] failed to apply inbound event: {e}");
             }
             Err(e) => {
-                eprintln!("[cloud sync] inbound event task panicked: {e}");
+                ffi_error!("[cloud sync] inbound event task panicked: {e}");
             }
         }
     }
 
-    eprintln!("[cloud sync] inbound event consumer stopped");
+    ffi_info!("[cloud sync] inbound event consumer stopped");
 }
 
 /// Apply a single inbound event to the local entity store.
@@ -513,7 +513,7 @@ fn apply_inbound_event(
                     .map_err(|e| format!("save_entity_raw: {e}"))?;
             }
 
-            eprintln!(
+            ffi_debug!(
                 "[cloud sync] applied inbound {} entity {}",
                 entity_type, event.entity_id
             );
@@ -526,7 +526,7 @@ fn apply_inbound_event(
                     obj.insert("is_trashed".to_string(), serde_json::Value::Bool(true));
                 }
                 let _ = store.save_entity_raw(&existing);
-                eprintln!(
+                ffi_debug!(
                     "[cloud sync] trashed inbound {} entity {}",
                     entity_type, event.entity_id
                 );

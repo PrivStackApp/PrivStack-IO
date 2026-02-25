@@ -25,7 +25,7 @@ pub unsafe extern "C" fn privstack_dataset_create_view(
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] create_view failed: {e:?}");
+                    ffi_error!("[FFI DATASET] create_view failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -48,7 +48,7 @@ pub unsafe extern "C" fn privstack_dataset_update_view(
         let req: UpdateViewRequest = match serde_json::from_str(json_str) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("[FFI DATASET] update_view parse failed: {e:?}");
+                ffi_error!("[FFI DATASET] update_view parse failed: {e:?}");
                 return PrivStackError::JsonError;
             }
         };
@@ -69,7 +69,7 @@ pub unsafe extern "C" fn privstack_dataset_update_view(
         match store.update_view(&req.view_id, &req.config) {
             Ok(()) => PrivStackError::Ok,
             Err(e) => {
-                eprintln!("[FFI DATASET] update_view failed: {e:?}");
+                ffi_error!("[FFI DATASET] update_view failed: {e:?}");
                 PrivStackError::StorageError
             }
         }
@@ -105,7 +105,7 @@ pub unsafe extern "C" fn privstack_dataset_delete_view(
         match store.delete_view(id_str) {
             Ok(()) => PrivStackError::Ok,
             Err(e) => {
-                eprintln!("[FFI DATASET] delete_view failed: {e:?}");
+                ffi_error!("[FFI DATASET] delete_view failed: {e:?}");
                 PrivStackError::StorageError
             }
         }
@@ -132,7 +132,7 @@ pub unsafe extern "C" fn privstack_dataset_list_views(
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] list_views failed: {e:?}");
+                    ffi_error!("[FFI DATASET] list_views failed: {e:?}");
                     to_c_string("[]")
                 }
             }

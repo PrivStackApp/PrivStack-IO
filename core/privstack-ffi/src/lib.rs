@@ -8,6 +8,50 @@
 //! All functions use C-compatible types and handle errors via return codes.
 //! Zero domain logic — plugins consume generic vault, blob, and entity APIs.
 
+use std::sync::atomic::{AtomicU8, Ordering};
+
+/// FFI log level constants (lower = more severe).
+pub(crate) const FFI_LEVEL_ERROR: u8 = 0;
+pub(crate) const FFI_LEVEL_WARN: u8 = 1;
+pub(crate) const FFI_LEVEL_INFO: u8 = 2;
+pub(crate) const FFI_LEVEL_DEBUG: u8 = 3;
+
+/// Global FFI log level. Default = INFO (2).
+/// Set from `PRIVSTACK_LOG_LEVEL` env var in `privstack_init()`.
+pub(crate) static FFI_LOG_LEVEL: AtomicU8 = AtomicU8::new(FFI_LEVEL_INFO);
+
+macro_rules! ffi_error {
+    ($($arg:tt)*) => {
+        if $crate::FFI_LOG_LEVEL.load(std::sync::atomic::Ordering::Relaxed) >= $crate::FFI_LEVEL_ERROR {
+            eprintln!($($arg)*);
+        }
+    };
+}
+
+macro_rules! ffi_warn {
+    ($($arg:tt)*) => {
+        if $crate::FFI_LOG_LEVEL.load(std::sync::atomic::Ordering::Relaxed) >= $crate::FFI_LEVEL_WARN {
+            eprintln!($($arg)*);
+        }
+    };
+}
+
+macro_rules! ffi_info {
+    ($($arg:tt)*) => {
+        if $crate::FFI_LOG_LEVEL.load(std::sync::atomic::Ordering::Relaxed) >= $crate::FFI_LEVEL_INFO {
+            eprintln!($($arg)*);
+        }
+    };
+}
+
+macro_rules! ffi_debug {
+    ($($arg:tt)*) => {
+        if $crate::FFI_LOG_LEVEL.load(std::sync::atomic::Ordering::Relaxed) >= $crate::FFI_LEVEL_DEBUG {
+            eprintln!($($arg)*);
+        }
+    };
+}
+
 mod cloud;
 mod datasets;
 mod rag;
@@ -331,7 +375,7 @@ static HANDLE: Mutex<Option<PrivStackHandle>> = Mutex::new(None);
 /// `catch_unwind` caught a DuckDB panic while the lock was held.
 pub(crate) fn lock_handle() -> std::sync::MutexGuard<'static, Option<PrivStackHandle>> {
     HANDLE.lock().unwrap_or_else(|poisoned| {
-        eprintln!("[FFI] recovering from poisoned HANDLE mutex");
+        ffi_warn!("[FFI] recovering from poisoned HANDLE mutex");
         poisoned.into_inner()
     })
 }
@@ -346,10 +390,24 @@ pub(crate) fn lock_handle() -> std::sync::MutexGuard<'static, Option<PrivStackHa
 /// - `db_path` must be a valid null-terminated UTF-8 string.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn privstack_init(db_path: *const c_char) -> PrivStackError { unsafe {
+    // Read PRIVSTACK_LOG_LEVEL env var and configure both FFI macros and tracing.
+    let (ffi_level, tracing_filter) = match std::env::var("PRIVSTACK_LOG_LEVEL")
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "error" | "err" => (FFI_LEVEL_ERROR, "error"),
+        "warn" | "warning" => (FFI_LEVEL_WARN, "warn"),
+        "debug" | "dbg" => (FFI_LEVEL_DEBUG, "debug"),
+        "trace" => (FFI_LEVEL_DEBUG, "trace"),
+        _ => (FFI_LEVEL_INFO, "info"), // default
+    };
+    FFI_LOG_LEVEL.store(ffi_level, Ordering::Relaxed);
+
     let _ = tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(tracing_filter)),
         )
         .with_writer(std::io::stderr)
         .try_init();
@@ -383,18 +441,18 @@ fn load_or_create_peer_id(db_path: &str) -> PeerId {
     if let Ok(contents) = std::fs::read_to_string(&peer_id_path) {
         let trimmed = contents.trim();
         if let Ok(uuid) = Uuid::parse_str(trimmed) {
-            eprintln!("[FFI] Loaded existing peer ID: {uuid}");
+            ffi_debug!("[FFI] Loaded existing peer ID: {uuid}");
             return PeerId::from_uuid(uuid);
         }
-        eprintln!("[FFI] Corrupt peer_id file at {}, generating new one", peer_id_path.display());
+        ffi_warn!("[FFI] Corrupt peer_id file at {}, generating new one", peer_id_path.display());
     }
 
     // Generate new peer ID and persist it
     let peer_id = PeerId::new();
     if let Err(e) = std::fs::write(&peer_id_path, peer_id.to_string()) {
-        eprintln!("[FFI] Failed to persist peer ID to {}: {e}", peer_id_path.display());
+        ffi_warn!("[FFI] Failed to persist peer ID to {}: {e}", peer_id_path.display());
     } else {
-        eprintln!("[FFI] Generated and saved new peer ID: {peer_id}");
+        ffi_debug!("[FFI] Generated and saved new peer ID: {peer_id}");
     }
     peer_id
 }
@@ -412,10 +470,10 @@ fn load_or_create_keypair(db_path: &str) -> Keypair {
     // Try to read existing keypair
     if let Ok(bytes) = std::fs::read(&keypair_path) {
         if let Ok(kp) = Keypair::from_protobuf_encoding(&bytes) {
-            eprintln!("[FFI] Loaded existing libp2p keypair from {}", keypair_path.display());
+            ffi_debug!("[FFI] Loaded existing libp2p keypair from {}", keypair_path.display());
             return kp;
         }
-        eprintln!("[FFI] Corrupt keypair file at {}, generating new one", keypair_path.display());
+        ffi_warn!("[FFI] Corrupt keypair file at {}, generating new one", keypair_path.display());
     }
 
     // Generate new keypair and persist it
@@ -423,13 +481,13 @@ fn load_or_create_keypair(db_path: &str) -> Keypair {
     match keypair.to_protobuf_encoding() {
         Ok(bytes) => {
             if let Err(e) = std::fs::write(&keypair_path, &bytes) {
-                eprintln!("[FFI] Failed to persist keypair to {}: {e}", keypair_path.display());
+                ffi_warn!("[FFI] Failed to persist keypair to {}: {e}", keypair_path.display());
             } else {
-                eprintln!("[FFI] Generated and saved new libp2p keypair to {}", keypair_path.display());
+                ffi_debug!("[FFI] Generated and saved new libp2p keypair to {}", keypair_path.display());
             }
         }
         Err(e) => {
-            eprintln!("[FFI] Failed to encode keypair: {e}");
+            ffi_warn!("[FFI] Failed to encode keypair: {e}");
         }
     }
     keypair
@@ -447,14 +505,14 @@ fn init_core(path: &str) -> PrivStackError {
     } else {
         Path::new(path).with_extension("vault.duckdb")
     };
-    eprintln!("[FFI] Opening vault DB: {}", vault_db_path.display());
+    ffi_debug!("[FFI] Opening vault DB: {}", vault_db_path.display());
     let vault_manager = match VaultManager::open(&vault_db_path) {
         Ok(vm) => {
-            eprintln!("[FFI] Vault DB opened OK");
+            ffi_debug!("[FFI] Vault DB opened OK");
             Arc::new(vm)
         }
         Err(e) => {
-            eprintln!("[FFI] FAILED to open vault DB: {e:?}");
+            ffi_error!("[FFI] FAILED to open vault DB: {e:?}");
             return PrivStackError::StorageError;
         }
     };
@@ -465,17 +523,17 @@ fn init_core(path: &str) -> PrivStackError {
     } else {
         Path::new(path).with_extension("blobs.duckdb")
     };
-    eprintln!("[FFI] Opening blob store: {}", blob_db_path.display());
+    ffi_debug!("[FFI] Opening blob store: {}", blob_db_path.display());
     let blob_store = match BlobStore::open_with_encryptor(
         &blob_db_path,
         vault_manager.clone() as Arc<dyn privstack_crypto::DataEncryptor>,
     ) {
         Ok(bs) => {
-            eprintln!("[FFI] Blob store opened OK");
+            ffi_debug!("[FFI] Blob store opened OK");
             bs
         }
         Err(e) => {
-            eprintln!("[FFI] FAILED to open blob store: {e:?}");
+            ffi_error!("[FFI] FAILED to open blob store: {e:?}");
             return PrivStackError::StorageError;
         }
     };
@@ -486,17 +544,17 @@ fn init_core(path: &str) -> PrivStackError {
     } else {
         Path::new(path).with_extension("entities.duckdb")
     };
-    eprintln!("[FFI] Opening entity store: {}", entity_path.display());
+    ffi_debug!("[FFI] Opening entity store: {}", entity_path.display());
     let entity_store = match EntityStore::open_with_encryptor(
         &entity_path,
         vault_manager.clone() as Arc<dyn privstack_crypto::DataEncryptor>,
     ) {
         Ok(s) => {
-            eprintln!("[FFI] Entity store opened OK");
+            ffi_debug!("[FFI] Entity store opened OK");
             s
         }
         Err(e) => {
-            eprintln!("[FFI] FAILED to open entity store: {e:?}");
+            ffi_error!("[FFI] FAILED to open entity store: {e:?}");
             return PrivStackError::StorageError;
         }
     };
@@ -507,14 +565,14 @@ fn init_core(path: &str) -> PrivStackError {
     } else {
         Path::new(path).with_extension("events.duckdb")
     };
-    eprintln!("[FFI] Opening event store: {}", events_path.display());
+    ffi_debug!("[FFI] Opening event store: {}", events_path.display());
     let event_store = match EventStore::open(&events_path) {
         Ok(s) => {
-            eprintln!("[FFI] Event store opened OK");
+            ffi_debug!("[FFI] Event store opened OK");
             s
         }
         Err(e) => {
-            eprintln!("[FFI] FAILED to open event store: {e:?}");
+            ffi_error!("[FFI] FAILED to open event store: {e:?}");
             return PrivStackError::StorageError;
         }
     };
@@ -547,14 +605,14 @@ fn init_core(path: &str) -> PrivStackError {
         };
         match ds_path {
             Some(p) => {
-                eprintln!("[FFI] Opening dataset store: {}", p.display());
+                ffi_debug!("[FFI] Opening dataset store: {}", p.display());
                 match privstack_datasets::DatasetStore::open(&p) {
                     Ok(ds) => {
-                        eprintln!("[FFI] Dataset store opened OK");
+                        ffi_debug!("[FFI] Dataset store opened OK");
                         Some(ds)
                     }
                     Err(e) => {
-                        eprintln!("[FFI] WARN: Failed to open dataset store: {e:?}");
+                        ffi_warn!("[FFI] WARN: Failed to open dataset store: {e:?}");
                         None
                     }
                 }
@@ -617,14 +675,14 @@ where
     } else {
         Path::new(path).with_extension("vault.duckdb")
     };
-    eprintln!("[FFI] Opening vault DB: {}", vault_db_path.display());
+    ffi_debug!("[FFI] Opening vault DB: {}", vault_db_path.display());
     let vault_manager = match VaultManager::open(&vault_db_path) {
         Ok(vm) => {
-            eprintln!("[FFI] Vault DB opened OK");
+            ffi_debug!("[FFI] Vault DB opened OK");
             Arc::new(vm)
         }
         Err(e) => {
-            eprintln!("[FFI] FAILED to open vault DB: {e:?}");
+            ffi_error!("[FFI] FAILED to open vault DB: {e:?}");
             return PrivStackError::StorageError;
         }
     };
@@ -635,17 +693,17 @@ where
     } else {
         Path::new(path).with_extension("blobs.duckdb")
     };
-    eprintln!("[FFI] Opening blob store: {}", blob_db_path.display());
+    ffi_debug!("[FFI] Opening blob store: {}", blob_db_path.display());
     let blob_store = match BlobStore::open_with_encryptor(
         &blob_db_path,
         vault_manager.clone() as Arc<dyn privstack_crypto::DataEncryptor>,
     ) {
         Ok(bs) => {
-            eprintln!("[FFI] Blob store opened OK");
+            ffi_debug!("[FFI] Blob store opened OK");
             bs
         }
         Err(e) => {
-            eprintln!("[FFI] FAILED to open blob store: {e:?}");
+            ffi_error!("[FFI] FAILED to open blob store: {e:?}");
             return PrivStackError::StorageError;
         }
     };
@@ -656,17 +714,17 @@ where
     } else {
         Path::new(path).with_extension("entities.duckdb")
     };
-    eprintln!("[FFI] Opening entity store: {}", entity_path.display());
+    ffi_debug!("[FFI] Opening entity store: {}", entity_path.display());
     let entity_store = match EntityStore::open_with_encryptor(
         &entity_path,
         vault_manager.clone() as Arc<dyn privstack_crypto::DataEncryptor>,
     ) {
         Ok(s) => {
-            eprintln!("[FFI] Entity store opened OK");
+            ffi_debug!("[FFI] Entity store opened OK");
             s
         }
         Err(e) => {
-            eprintln!("[FFI] FAILED to open entity store: {e:?}");
+            ffi_error!("[FFI] FAILED to open entity store: {e:?}");
             return PrivStackError::StorageError;
         }
     };
@@ -677,14 +735,14 @@ where
     } else {
         Path::new(path).with_extension("events.duckdb")
     };
-    eprintln!("[FFI] Opening event store: {}", events_path.display());
+    ffi_debug!("[FFI] Opening event store: {}", events_path.display());
     let event_store = match EventStore::open(&events_path) {
         Ok(s) => {
-            eprintln!("[FFI] Event store opened OK");
+            ffi_debug!("[FFI] Event store opened OK");
             s
         }
         Err(e) => {
-            eprintln!("[FFI] FAILED to open event store: {e:?}");
+            ffi_error!("[FFI] FAILED to open event store: {e:?}");
             return PrivStackError::StorageError;
         }
     };
@@ -722,14 +780,14 @@ where
         };
         match ds_path {
             Some(p) => {
-                eprintln!("[FFI] Opening dataset store: {}", p.display());
+                ffi_debug!("[FFI] Opening dataset store: {}", p.display());
                 match privstack_datasets::DatasetStore::open(&p) {
                     Ok(ds) => {
-                        eprintln!("[FFI] Dataset store opened OK");
+                        ffi_debug!("[FFI] Dataset store opened OK");
                         Some(ds)
                     }
                     Err(e) => {
-                        eprintln!("[FFI] WARN: Failed to open dataset store: {e:?}");
+                        ffi_warn!("[FFI] WARN: Failed to open dataset store: {e:?}");
                         None
                     }
                 }
@@ -1197,7 +1255,7 @@ pub unsafe extern "C" fn privstack_auth_reset_with_unified_recovery(
         });
 
         if let Err(e) = cloud_result {
-            eprintln!("[FFI] Cloud key recovery skipped during unified recovery: {e}");
+            ffi_warn!("[FFI] Cloud key recovery skipped during unified recovery: {e}");
         }
     }
 
@@ -1772,7 +1830,7 @@ pub unsafe extern "C" fn privstack_blob_list(
 /// - Must be called after `privstack_init`.
 #[unsafe(no_mangle)]
 pub extern "C" fn privstack_sync_start() -> PrivStackError {
-    eprintln!("[FFI SYNC] privstack_sync_start called");
+    ffi_debug!("[FFI SYNC] privstack_sync_start called");
     let mut handle = HANDLE.lock().unwrap();
     let handle = match handle.as_mut() {
         Some(h) => h,
@@ -1780,21 +1838,21 @@ pub extern "C" fn privstack_sync_start() -> PrivStackError {
     };
 
     if handle.p2p_transport.is_some() {
-        eprintln!("[FFI SYNC] privstack_sync_start: already running");
+        ffi_warn!("[FFI SYNC] privstack_sync_start: already running");
         return PrivStackError::SyncAlreadyRunning;
     }
 
     let mut config = P2pConfig::default();
 
     if let Some(sync_code) = handle.pairing_manager.lock().unwrap().current_code().cloned() {
-        eprintln!("[FFI SYNC] privstack_sync_start: using sync code hash");
+        ffi_debug!("[FFI SYNC] privstack_sync_start: using sync code hash");
         if let Ok(hash_bytes) = hex::decode(&sync_code.hash) {
             config.sync_code_hash = Some(hash_bytes);
         }
     }
 
     config.device_name = handle.device_name.clone();
-    eprintln!("[FFI SYNC] privstack_sync_start: device_name={}", config.device_name);
+    ffi_debug!("[FFI SYNC] privstack_sync_start: device_name={}", config.device_name);
 
     // Load or create a persistent keypair so the libp2p PeerId is stable across restarts.
     // This ensures remote peers map to the same PrivStack PeerId every time.
@@ -1803,23 +1861,23 @@ pub extern "C" fn privstack_sync_start() -> PrivStackError {
     let mut transport = match P2pTransport::with_keypair(handle.peer_id, keypair, config) {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("[FFI SYNC] privstack_sync_start: failed to create transport: {:?}", e);
+            ffi_error!("[FFI SYNC] privstack_sync_start: failed to create transport: {:?}", e);
             return PrivStackError::SyncError;
         }
     };
 
-    eprintln!("[FFI SYNC] privstack_sync_start: libp2p_peer_id={}", transport.libp2p_peer_id());
-    eprintln!("[FFI SYNC] privstack_sync_start: starting transport...");
+    ffi_debug!("[FFI SYNC] privstack_sync_start: libp2p_peer_id={}", transport.libp2p_peer_id());
+    ffi_debug!("[FFI SYNC] privstack_sync_start: starting transport...");
     let result = handle.runtime.block_on(transport.start());
     if let Err(e) = result {
-        eprintln!("[FFI SYNC] privstack_sync_start: transport start failed: {:?}", e);
+        ffi_error!("[FFI SYNC] privstack_sync_start: transport start failed: {:?}", e);
         return PrivStackError::SyncError;
     }
-    eprintln!("[FFI SYNC] privstack_sync_start: transport started");
+    ffi_debug!("[FFI SYNC] privstack_sync_start: transport started");
 
     let transport = Arc::new(TokioMutex::new(transport));
 
-    eprintln!("[FFI SYNC] privstack_sync_start: creating orchestrator...");
+    ffi_debug!("[FFI SYNC] privstack_sync_start: creating orchestrator...");
     let orch_entity_store = Arc::clone(&handle.entity_store);
     let orch_event_store = Arc::clone(&handle.event_store);
 
@@ -1828,7 +1886,7 @@ pub extern "C" fn privstack_sync_start() -> PrivStackError {
     handle.personal_policy = Some(policy.clone());
 
     let (orch_handle, event_rx, command_rx, orchestrator) = {
-        eprintln!("[FFI SYNC] privstack_sync_start: using personal orchestrator with pairing");
+        ffi_debug!("[FFI SYNC] privstack_sync_start: using personal orchestrator with pairing");
         create_personal_orchestrator(
             handle.peer_id,
             orch_entity_store,
@@ -1841,25 +1899,25 @@ pub extern "C" fn privstack_sync_start() -> PrivStackError {
 
     let transport_clone = transport.clone();
     handle.runtime.spawn(async move {
-        eprintln!("[FFI SYNC] Orchestrator task starting...");
+        ffi_debug!("[FFI SYNC] Orchestrator task starting...");
         if let Err(e) = orchestrator.run(transport_clone, command_rx).await {
-            eprintln!("[FFI SYNC] Orchestrator error: {}", e);
+            ffi_error!("[FFI SYNC] Orchestrator error: {}", e);
         }
-        eprintln!("[FFI SYNC] Orchestrator task exiting");
+        ffi_debug!("[FFI SYNC] Orchestrator task exiting");
     });
 
     handle.p2p_transport = Some(transport);
     handle.orchestrator_handle = Some(orch_handle);
     handle.sync_event_rx = Some(event_rx);
 
-    eprintln!("[FFI SYNC] privstack_sync_start: complete");
+    ffi_debug!("[FFI SYNC] privstack_sync_start: complete");
     PrivStackError::Ok
 }
 
 /// Stops the P2P sync transport and orchestrator.
 #[unsafe(no_mangle)]
 pub extern "C" fn privstack_sync_stop() -> PrivStackError {
-    eprintln!("[FFI SYNC] privstack_sync_stop called");
+    ffi_debug!("[FFI SYNC] privstack_sync_stop called");
     let mut handle = HANDLE.lock().unwrap();
     let handle = match handle.as_mut() {
         Some(h) => h,
@@ -1867,24 +1925,24 @@ pub extern "C" fn privstack_sync_stop() -> PrivStackError {
     };
 
     if let Some(ref orch_handle) = handle.orchestrator_handle {
-        eprintln!("[FFI SYNC] privstack_sync_stop: shutting down orchestrator...");
+        ffi_debug!("[FFI SYNC] privstack_sync_stop: shutting down orchestrator...");
         let _ = handle.runtime.block_on(orch_handle.shutdown());
-        eprintln!("[FFI SYNC] privstack_sync_stop: orchestrator shutdown complete");
+        ffi_debug!("[FFI SYNC] privstack_sync_stop: orchestrator shutdown complete");
     }
     handle.orchestrator_handle = None;
     handle.sync_event_rx = None;
 
     if let Some(ref transport) = handle.p2p_transport {
-        eprintln!("[FFI SYNC] privstack_sync_stop: stopping transport...");
+        ffi_debug!("[FFI SYNC] privstack_sync_stop: stopping transport...");
         let _ = handle.runtime.block_on(async {
             let mut t = transport.lock().await;
             t.stop().await
         });
-        eprintln!("[FFI SYNC] privstack_sync_stop: transport stopped");
+        ffi_debug!("[FFI SYNC] privstack_sync_stop: transport stopped");
     }
     handle.p2p_transport = None;
 
-    eprintln!("[FFI SYNC] privstack_sync_stop: complete");
+    ffi_debug!("[FFI SYNC] privstack_sync_stop: complete");
     PrivStackError::Ok
 }
 
@@ -2251,7 +2309,7 @@ pub unsafe extern "C" fn privstack_sync_record_event(
 
     // Save to event store immediately (same rationale as privstack_sync_snapshot).
     if let Err(e) = handle.event_store.save_event(&event) {
-        eprintln!("[FFI SYNC] record_event: failed to save event to store: {:?}", e);
+        ffi_error!("[FFI SYNC] record_event: failed to save event to store: {:?}", e);
         return PrivStackError::SyncError;
     }
 
@@ -2397,7 +2455,7 @@ pub unsafe extern "C" fn privstack_sync_snapshot(
     // progress (periodic_sync holds the command loop, blocking RecordLocalEvent).
     // The duplicate INSERT OR IGNORE in handle_local_event is harmless.
     if let Err(e) = handle.event_store.save_event(&event) {
-        eprintln!("[FFI SYNC] snapshot: failed to save event to store: {:?}", e);
+        ffi_error!("[FFI SYNC] snapshot: failed to save event to store: {:?}", e);
         return PrivStackError::SyncError;
     }
 
@@ -4802,9 +4860,9 @@ pub extern "C" fn privstack_plugin_get_link_providers() -> *mut c_char {
     };
 
     let providers = handle.plugin_host.get_all_link_providers();
-    eprintln!("[FFI] get_link_providers returning {} providers", providers.len());
+    ffi_debug!("[FFI] get_link_providers returning {} providers", providers.len());
     for p in &providers {
-        eprintln!("[FFI]   provider: {} -> link_type={}", p.plugin_id, p.link_type);
+        ffi_debug!("[FFI]   provider: {} -> link_type={}", p.plugin_id, p.link_type);
     }
     let json = serde_json::to_string(&providers).unwrap_or_else(|_| "[]".to_string());
     to_c_string(&json)
@@ -4904,7 +4962,7 @@ pub unsafe extern "C" fn privstack_plugin_get_entity_view_data(
     match handle.plugin_host.get_entity_view_data(pid, iid) {
         Ok(json) => to_c_string(&json),
         Err(e) => {
-            eprintln!(
+            ffi_error!(
                 "[privstack-ffi] get_entity_view_data({}, {}) failed: {:?}",
                 pid, iid, e
             );
@@ -5091,7 +5149,7 @@ pub unsafe extern "C" fn privstack_plugin_load_wasm(
             PrivStackError::PluginError
         }
         Err(e) => {
-            eprintln!("[privstack-ffi] Failed to load Wasm plugin from {}: {:?}", path_str, e);
+            ffi_error!("[privstack-ffi] Failed to load Wasm plugin from {}: {:?}", path_str, e);
             PrivStackError::PluginError
         }
     }
@@ -5279,7 +5337,7 @@ pub unsafe extern "C" fn privstack_plugin_fetch_url(
         Err(e) => {
             *out_data = std::ptr::null_mut();
             *out_len = 0;
-            eprintln!("[privstack_ffi] plugin fetch_url failed: plugin={id} url={url_str} error={e}");
+            ffi_error!("[privstack_ffi] plugin fetch_url failed: plugin={id} url={url_str} error={e}");
             PrivStackError::PluginPermissionDenied
         }
     }
@@ -5313,7 +5371,7 @@ pub unsafe extern "C" fn privstack_plugin_get_view_state(
     match handle.plugin_host.get_view_state(id) {
         Ok(json) => to_c_string(&json),
         Err(e) => {
-            eprintln!("[privstack-ffi] get_view_state({}) failed: {:?}", id, e);
+            ffi_error!("[privstack-ffi] get_view_state({}) failed: {:?}", id, e);
             let msg = format!(
                 r#"{{"components":{{"type":"error","message":"get_view_state failed: {}"}}}}"#,
                 e.to_string().replace('"', "'")
@@ -5352,7 +5410,7 @@ pub unsafe extern "C" fn privstack_plugin_get_view_data(
     match handle.plugin_host.get_view_data(id) {
         Ok(json) => to_c_string(&json),
         Err(e) => {
-            eprintln!("[privstack-ffi] get_view_data({}) failed: {:?}", id, e);
+            ffi_error!("[privstack-ffi] get_view_data({}) failed: {:?}", id, e);
             to_c_string(r#"{}"#)
         }
     }
@@ -5676,7 +5734,7 @@ pub extern "C" fn privstack_compact_databases() -> *mut c_char {
                     }));
                 }
                 Err(e) => {
-                    eprintln!("[compact] entities failed: {}", e);
+                    ffi_error!("[compact] entities failed: {}", e);
                     results.insert("entities".into(), serde_json::json!({
                         "error": format!("{}", e),
                     }));
@@ -5699,7 +5757,7 @@ pub extern "C" fn privstack_compact_databases() -> *mut c_char {
                             }));
                         }
                         None => {
-                            eprintln!("[compact] {} failed", label);
+                            ffi_error!("[compact] {} failed", label);
                             results.insert((*label).into(), serde_json::json!({
                                 "error": "compact failed",
                             }));

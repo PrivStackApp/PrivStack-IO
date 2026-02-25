@@ -30,7 +30,7 @@ pub unsafe extern "C" fn privstack_dataset_create_relation(
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] create_relation failed: {e:?}");
+                    ffi_error!("[FFI DATASET] create_relation failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -67,7 +67,7 @@ pub unsafe extern "C" fn privstack_dataset_delete_relation(
         match store.delete_relation(id_str) {
             Ok(()) => PrivStackError::Ok,
             Err(e) => {
-                eprintln!("[FFI DATASET] delete_relation failed: {e:?}");
+                ffi_error!("[FFI DATASET] delete_relation failed: {e:?}");
                 PrivStackError::StorageError
             }
         }
@@ -94,7 +94,7 @@ pub unsafe extern "C" fn privstack_dataset_list_relations(
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] list_relations failed: {e:?}");
+                    ffi_error!("[FFI DATASET] list_relations failed: {e:?}");
                     to_c_string("[]")
                 }
             }

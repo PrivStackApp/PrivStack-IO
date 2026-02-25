@@ -25,7 +25,7 @@ pub unsafe extern "C" fn privstack_dataset_create_empty(
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] create_empty failed: {e:?}");
+                    ffi_error!("[FFI DATASET] create_empty failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn privstack_dataset_duplicate(
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] duplicate failed: {e:?}");
+                    ffi_error!("[FFI DATASET] duplicate failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -80,7 +80,7 @@ pub unsafe extern "C" fn privstack_dataset_import_content(
                     to_c_string(&json)
                 }
                 Err(e) => {
-                    eprintln!("[FFI DATASET] import_content failed: {e:?}");
+                    ffi_error!("[FFI DATASET] import_content failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn privstack_dataset_insert_row(
             match store.insert_row(&dataset_id, &values) {
                 Ok(()) => to_c_string(r#"{"ok":true}"#),
                 Err(e) => {
-                    eprintln!("[FFI DATASET] insert_row failed: {e:?}");
+                    ffi_error!("[FFI DATASET] insert_row failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn privstack_dataset_update_cell(
             match store.update_cell(&dataset_id, req.row_index, &req.column, req.value.clone()) {
                 Ok(()) => to_c_string(r#"{"ok":true}"#),
                 Err(e) => {
-                    eprintln!("[FFI DATASET] update_cell failed: {e:?}");
+                    ffi_error!("[FFI DATASET] update_cell failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -164,7 +164,7 @@ pub unsafe extern "C" fn privstack_dataset_delete_rows(
             match store.delete_rows(&dataset_id, &req.row_indices) {
                 Ok(()) => to_c_string(r#"{"ok":true}"#),
                 Err(e) => {
-                    eprintln!("[FFI DATASET] delete_rows failed: {e:?}");
+                    ffi_error!("[FFI DATASET] delete_rows failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -197,7 +197,7 @@ pub unsafe extern "C" fn privstack_dataset_add_column(
             ) {
                 Ok(()) => to_c_string(r#"{"ok":true}"#),
                 Err(e) => {
-                    eprintln!("[FFI DATASET] add_column failed: {e:?}");
+                    ffi_error!("[FFI DATASET] add_column failed: {e:?}");
                     to_c_string(&super::error_json(&e.to_string()))
                 }
             }
@@ -244,7 +244,7 @@ pub unsafe extern "C" fn privstack_dataset_drop_column(
         match store.drop_column(&dataset_id, &req.column_name) {
             Ok(()) => PrivStackError::Ok,
             Err(e) => {
-                eprintln!("[FFI DATASET] drop_column failed: {e:?}");
+                ffi_error!("[FFI DATASET] drop_column failed: {e:?}");
                 PrivStackError::StorageError
             }
         }
@@ -295,7 +295,7 @@ pub unsafe extern "C" fn privstack_dataset_alter_column_type(
         match store.alter_column_type(&dataset_id, &req.column_name, new_type) {
             Ok(()) => PrivStackError::Ok,
             Err(e) => {
-                eprintln!("[FFI DATASET] alter_column_type failed: {e:?}");
+                ffi_error!("[FFI DATASET] alter_column_type failed: {e:?}");
                 PrivStackError::StorageError
             }
         }
@@ -346,7 +346,7 @@ pub unsafe extern "C" fn privstack_dataset_rename_column(
         match store.rename_column(&dataset_id, &req.column_name, new_name) {
             Ok(()) => PrivStackError::Ok,
             Err(e) => {
-                eprintln!("[FFI DATASET] rename_column failed: {e:?}");
+                ffi_error!("[FFI DATASET] rename_column failed: {e:?}");
                 PrivStackError::StorageError
             }
         }
