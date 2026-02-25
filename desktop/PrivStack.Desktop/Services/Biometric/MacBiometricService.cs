@@ -7,6 +7,11 @@ namespace PrivStack.Desktop.Services.Biometric;
 /// <summary>
 /// macOS biometric service using Touch ID via LocalAuthentication.framework
 /// and Keychain via Security.framework for secure password storage.
+///
+/// Debug builds use the legacy file-based Keychain API (SecKeychainAddGenericPassword)
+/// which works without entitlements for unsigned dev builds.
+/// Release builds use the modern SecItem API (SecItemAdd) with biometric access control,
+/// which requires keychain-access-groups entitlement on signed/notarized builds.
 /// </summary>
 public class MacBiometricService : IBiometricService
 {
@@ -22,8 +27,11 @@ public class MacBiometricService : IBiometricService
     {
         get
         {
-            var existing = SecItemCopyMatching();
-            return existing != null;
+#if DEBUG
+            return LegacyKeychainExists();
+#else
+            return ModernKeychainExists();
+#endif
         }
     }
 
@@ -59,20 +67,300 @@ public class MacBiometricService : IBiometricService
 
     public async Task<bool> EnrollAsync(string masterPassword)
     {
+#if DEBUG
+        return await LegacyEnrollAsync(masterPassword);
+#else
+        return await ModernEnrollAsync(masterPassword);
+#endif
+    }
+
+    public async Task<string?> AuthenticateAsync(string reason)
+    {
+#if DEBUG
+        return await LegacyAuthenticateAsync(reason);
+#else
+        return await ModernAuthenticateAsync(reason);
+#endif
+    }
+
+    public void Unenroll()
+    {
+#if DEBUG
+        LegacyKeychainDelete();
+#else
+        ModernKeychainDelete();
+#endif
+        _log.Information("Biometric enrollment removed");
+    }
+
+    // =====================================================================
+    // DEBUG: Legacy file-based Keychain API (no entitlements required)
+    // =====================================================================
+
+#if DEBUG
+
+    private bool LegacyKeychainExists()
+    {
+        try
+        {
+            var serviceBytes = Encoding.UTF8.GetBytes(KeychainService);
+            var accountBytes = Encoding.UTF8.GetBytes(KeychainAccount);
+
+            var status = SecKeychainFindGenericPassword(
+                IntPtr.Zero,
+                serviceBytes.Length, serviceBytes,
+                accountBytes.Length, accountBytes,
+                out _, out _,
+                out var itemRef);
+
+            if (itemRef != IntPtr.Zero)
+                CFRelease(itemRef);
+
+            return status == 0; // errSecSuccess
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task<bool> LegacyEnrollAsync(string masterPassword)
+    {
         return await Task.Run(() =>
         {
             try
             {
                 // Remove any existing entry first
-                SecItemDelete();
+                LegacyKeychainDelete();
+
+                var serviceBytes = Encoding.UTF8.GetBytes(KeychainService);
+                var accountBytes = Encoding.UTF8.GetBytes(KeychainAccount);
+                var passwordBytes = Encoding.UTF8.GetBytes(masterPassword);
+
+                var status = SecKeychainAddGenericPassword(
+                    IntPtr.Zero,
+                    serviceBytes.Length, serviceBytes,
+                    accountBytes.Length, accountBytes,
+                    passwordBytes.Length, passwordBytes,
+                    out var itemRef);
+
+                if (itemRef != IntPtr.Zero)
+                    CFRelease(itemRef);
+
+                Array.Clear(passwordBytes);
+
+                if (status == 0)
+                {
+                    _log.Information("Biometric enrollment successful (legacy keychain)");
+                    return true;
+                }
+
+                _log.Error("SecKeychainAddGenericPassword failed with status {Status}", status);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex, "Biometric enrollment failed (legacy keychain)");
+                return false;
+            }
+        });
+    }
+
+    private async Task<string?> LegacyAuthenticateAsync(string reason)
+    {
+        // First verify biometric via LAContext
+        var biometricOk = await EvaluateBiometricPolicyAsync(reason);
+        if (!biometricOk) return null;
+
+        // Then read password from legacy keychain
+        return await Task.Run(() =>
+        {
+            try
+            {
+                var serviceBytes = Encoding.UTF8.GetBytes(KeychainService);
+                var accountBytes = Encoding.UTF8.GetBytes(KeychainAccount);
+
+                var status = SecKeychainFindGenericPassword(
+                    IntPtr.Zero,
+                    serviceBytes.Length, serviceBytes,
+                    accountBytes.Length, accountBytes,
+                    out var passwordLength, out var passwordData,
+                    out var itemRef);
+
+                if (itemRef != IntPtr.Zero)
+                    CFRelease(itemRef);
+
+                if (status != 0 || passwordData == IntPtr.Zero)
+                {
+                    _log.Warning("SecKeychainFindGenericPassword failed with status {Status}", status);
+                    return null;
+                }
+
+                var bytes = new byte[passwordLength];
+                Marshal.Copy(passwordData, bytes, 0, passwordLength);
+                SecKeychainItemFreeContent(IntPtr.Zero, passwordData);
+
+                var password = Encoding.UTF8.GetString(bytes);
+                Array.Clear(bytes);
+
+                _log.Information("Biometric authentication successful (legacy keychain)");
+                return password;
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex, "Biometric authentication failed (legacy keychain)");
+                return null;
+            }
+        });
+    }
+
+    private void LegacyKeychainDelete()
+    {
+        try
+        {
+            var serviceBytes = Encoding.UTF8.GetBytes(KeychainService);
+            var accountBytes = Encoding.UTF8.GetBytes(KeychainAccount);
+
+            var status = SecKeychainFindGenericPassword(
+                IntPtr.Zero,
+                serviceBytes.Length, serviceBytes,
+                accountBytes.Length, accountBytes,
+                out _, out _,
+                out var itemRef);
+
+            if (status == 0 && itemRef != IntPtr.Zero)
+            {
+                SecKeychainItemDelete(itemRef);
+                CFRelease(itemRef);
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Failed to delete legacy keychain item");
+        }
+    }
+
+    /// <summary>
+    /// Evaluates Touch ID via LAContext.evaluatePolicy:localizedReason:reply:
+    /// Uses a ManualResetEventSlim to bridge the async ObjC callback.
+    /// </summary>
+    private static async Task<bool> EvaluateBiometricPolicyAsync(string reason)
+    {
+        return await Task.Run(() =>
+        {
+            var context = objc_msgSend_ReturnIntPtr(
+                objc_msgSend_ReturnIntPtr(objc_getClass("LAContext"), sel_registerName("alloc")),
+                sel_registerName("init"));
+
+            if (context == IntPtr.Zero) return false;
+
+            try
+            {
+                var reasonNs = CreateNSString(reason);
+                var gate = new ManualResetEventSlim(false);
+                var success = false;
+
+                // Create block for reply:(BOOL success, NSError *error)
+                BlockLiteral.EvaluatePolicy(context, 1, reasonNs, (ok, _) =>
+                {
+                    success = ok;
+                    gate.Set();
+                });
+
+                gate.Wait(TimeSpan.FromSeconds(60));
+
+                CFRelease(reasonNs);
+                return success;
+            }
+            finally
+            {
+                objc_msgSend_Void(context, sel_registerName("release"));
+            }
+        });
+    }
+
+    // --- Legacy Keychain P/Invoke ---
+
+    [DllImport("/System/Library/Frameworks/Security.framework/Security")]
+    private static extern int SecKeychainAddGenericPassword(
+        IntPtr keychain,
+        int serviceNameLength, byte[] serviceName,
+        int accountNameLength, byte[] accountName,
+        int passwordLength, byte[] passwordData,
+        out IntPtr itemRef);
+
+    [DllImport("/System/Library/Frameworks/Security.framework/Security")]
+    private static extern int SecKeychainFindGenericPassword(
+        IntPtr keychain,
+        int serviceNameLength, byte[] serviceName,
+        int accountNameLength, byte[] accountName,
+        out int passwordLength, out IntPtr passwordData,
+        out IntPtr itemRef);
+
+    [DllImport("/System/Library/Frameworks/Security.framework/Security")]
+    private static extern int SecKeychainItemDelete(IntPtr itemRef);
+
+    [DllImport("/System/Library/Frameworks/Security.framework/Security")]
+    private static extern int SecKeychainItemFreeContent(IntPtr attrList, IntPtr data);
+
+#endif
+
+    // =====================================================================
+    // RELEASE: Modern SecItem API (requires keychain entitlement)
+    // =====================================================================
+
+#if !DEBUG
+
+    private bool ModernKeychainExists()
+    {
+        try
+        {
+            var serviceData = CFStringCreateWithCString(KeychainService);
+            var accountData = CFStringCreateWithCString(KeychainAccount);
+
+            var keys = new[]
+            {
+                kSecClass, kSecAttrService, kSecAttrAccount,
+                kSecUseAuthenticationUI
+            };
+            var values = new[]
+            {
+                kSecClassGenericPassword, serviceData, accountData,
+                kSecUseAuthenticationUISkip
+            };
+
+            var query = CFDictionaryCreate(keys, values, keys.Length);
+            var status = SecItemCopyMatching(query, out _);
+
+            CFRelease(query);
+            CFRelease(serviceData);
+            CFRelease(accountData);
+
+            // -25293 = errSecInteractionNotAllowed (item exists but needs auth)
+            // 0 = errSecSuccess
+            return status == 0 || status == -25293;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task<bool> ModernEnrollAsync(string masterPassword)
+    {
+        return await Task.Run(() =>
+        {
+            try
+            {
+                ModernKeychainDelete();
 
                 var passwordBytes = Encoding.UTF8.GetBytes(masterPassword);
                 var passwordData = CFDataCreate(IntPtr.Zero, passwordBytes, passwordBytes.Length);
+                Array.Clear(passwordBytes);
 
                 var serviceData = CFStringCreateWithCString(KeychainService);
                 var accountData = CFStringCreateWithCString(KeychainAccount);
 
-                // Create access control with biometry
                 var accessControl = SecAccessControlCreateWithFlags(
                     IntPtr.Zero,
                     kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
@@ -82,6 +370,9 @@ public class MacBiometricService : IBiometricService
                 if (accessControl == IntPtr.Zero)
                 {
                     _log.Error("Failed to create SecAccessControl for biometric");
+                    CFRelease(passwordData);
+                    CFRelease(serviceData);
+                    CFRelease(accountData);
                     return false;
                 }
 
@@ -105,9 +396,9 @@ public class MacBiometricService : IBiometricService
                 CFRelease(accountData);
                 CFRelease(accessControl);
 
-                if (status == 0) // errSecSuccess
+                if (status == 0)
                 {
-                    _log.Information("Biometric enrollment successful");
+                    _log.Information("Biometric enrollment successful (modern SecItem)");
                     return true;
                 }
 
@@ -116,13 +407,13 @@ public class MacBiometricService : IBiometricService
             }
             catch (Exception ex)
             {
-                _log.Error(ex, "Biometric enrollment failed");
+                _log.Error(ex, "Biometric enrollment failed (modern SecItem)");
                 return false;
             }
         });
     }
 
-    public async Task<string?> AuthenticateAsync(string reason)
+    private async Task<string?> ModernAuthenticateAsync(string reason)
     {
         return await Task.Run(() =>
         {
@@ -151,7 +442,7 @@ public class MacBiometricService : IBiometricService
                 CFRelease(accountData);
                 CFRelease(promptData);
 
-                if (status == 0 && resultData != IntPtr.Zero) // errSecSuccess
+                if (status == 0 && resultData != IntPtr.Zero)
                 {
                     var length = CFDataGetLength(resultData);
                     var bytes = new byte[length];
@@ -160,11 +451,11 @@ public class MacBiometricService : IBiometricService
 
                     var password = Encoding.UTF8.GetString(bytes);
                     Array.Clear(bytes);
-                    _log.Information("Biometric authentication successful");
+                    _log.Information("Biometric authentication successful (modern SecItem)");
                     return password;
                 }
 
-                if (status == -128) // errSecUserCanceled
+                if (status == -128)
                     _log.Debug("Biometric authentication cancelled by user");
                 else
                     _log.Warning("SecItemCopyMatching failed with status {Status}", status);
@@ -173,57 +464,13 @@ public class MacBiometricService : IBiometricService
             }
             catch (Exception ex)
             {
-                _log.Error(ex, "Biometric authentication failed");
+                _log.Error(ex, "Biometric authentication failed (modern SecItem)");
                 return null;
             }
         });
     }
 
-    public void Unenroll()
-    {
-        SecItemDelete();
-        _log.Information("Biometric enrollment removed");
-    }
-
-    // --- Private helpers ---
-
-    private string? SecItemCopyMatching()
-    {
-        try
-        {
-            var serviceData = CFStringCreateWithCString(KeychainService);
-            var accountData = CFStringCreateWithCString(KeychainAccount);
-
-            // Query without biometric prompt — just check existence via kSecUseAuthenticationUI = kSecUseAuthenticationUISkip
-            var keys = new[]
-            {
-                kSecClass, kSecAttrService, kSecAttrAccount,
-                kSecUseAuthenticationUI
-            };
-            var values = new[]
-            {
-                kSecClassGenericPassword, serviceData, accountData,
-                kSecUseAuthenticationUISkip
-            };
-
-            var query = CFDictionaryCreate(keys, values, keys.Length);
-            var status = SecItemCopyMatching(query, out _);
-
-            CFRelease(query);
-            CFRelease(serviceData);
-            CFRelease(accountData);
-
-            // -25293 = errSecInteractionNotAllowed (item exists but needs auth)
-            // 0 = errSecSuccess
-            return (status == 0 || status == -25293) ? "enrolled" : null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private void SecItemDelete()
+    private void ModernKeychainDelete()
     {
         try
         {
@@ -242,11 +489,11 @@ public class MacBiometricService : IBiometricService
         }
         catch (Exception ex)
         {
-            _log.Warning(ex, "Failed to delete keychain item");
+            _log.Warning(ex, "Failed to delete modern keychain item");
         }
     }
 
-    // --- P/Invoke: Security.framework ---
+    // --- Modern SecItem P/Invoke ---
 
     [DllImport("/System/Library/Frameworks/Security.framework/Security")]
     private static extern int SecItemAdd(IntPtr attributes, IntPtr result);
@@ -261,7 +508,42 @@ public class MacBiometricService : IBiometricService
     private static extern IntPtr SecAccessControlCreateWithFlags(
         IntPtr allocator, IntPtr protection, long flags, IntPtr error);
 
-    // --- P/Invoke: CoreFoundation ---
+    // --- Modern SecItem constants ---
+
+    private static readonly IntPtr kSecAttrAccessControl = GetSecurityConstant("kSecAttrAccessControl");
+    private static readonly IntPtr kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly =
+        GetSecurityConstant("kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly");
+    private static readonly IntPtr kSecReturnData = GetSecurityConstant("kSecReturnData");
+    private static readonly IntPtr kSecValueData = GetSecurityConstant("kSecValueData");
+    private static readonly IntPtr kSecUseOperationPrompt = GetSecurityConstant("kSecUseOperationPrompt");
+    private static readonly IntPtr kSecUseAuthenticationUI = GetSecurityConstant("kSecUseAuthenticationUI");
+    private static readonly IntPtr kSecUseAuthenticationUISkip = GetSecurityConstant("kSecUseAuthenticationUISkip");
+    private static readonly IntPtr kCFBooleanTrue = GetCFConstant("kCFBooleanTrue");
+
+#endif
+
+    // =====================================================================
+    // Shared: CoreFoundation + ObjC Runtime + Security constants
+    // =====================================================================
+
+    private static readonly IntPtr _securityLib = NativeLibrary.Load("/System/Library/Frameworks/Security.framework/Security");
+    private static readonly IntPtr _cfLib = NativeLibrary.Load("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation");
+
+    private static IntPtr GetSecurityConstant(string name) =>
+        Marshal.ReadIntPtr(NativeLibrary.GetExport(_securityLib, name));
+
+    private static IntPtr GetCFConstant(string name) =>
+        Marshal.ReadIntPtr(NativeLibrary.GetExport(_cfLib, name));
+
+    private static readonly IntPtr kSecClass = GetSecurityConstant("kSecClass");
+    private static readonly IntPtr kSecClassGenericPassword = GetSecurityConstant("kSecClassGenericPassword");
+    private static readonly IntPtr kSecAttrService = GetSecurityConstant("kSecAttrService");
+    private static readonly IntPtr kSecAttrAccount = GetSecurityConstant("kSecAttrAccount");
+
+    private static readonly IntPtr kCFTypeDictionaryKeyCallBacks = NativeLibrary.GetExport(_cfLib, "kCFTypeDictionaryKeyCallBacks");
+    private static readonly IntPtr kCFTypeDictionaryValueCallBacks = NativeLibrary.GetExport(_cfLib, "kCFTypeDictionaryValueCallBacks");
+
+    // --- CoreFoundation ---
 
     [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
     private static extern IntPtr CFDataCreate(IntPtr allocator, byte[] bytes, int length);
@@ -286,7 +568,13 @@ public class MacBiometricService : IBiometricService
             kCFTypeDictionaryKeyCallBacks, kCFTypeDictionaryValueCallBacks);
     }
 
-    // --- P/Invoke: ObjC Runtime (for LAContext) ---
+    [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
+    private static extern IntPtr CFStringCreateWithCString(IntPtr allocator, string value, uint encoding);
+
+    private static IntPtr CFStringCreateWithCString(string value) =>
+        CFStringCreateWithCString(IntPtr.Zero, value, 0x08000100); // kCFStringEncodingUTF8
+
+    // --- ObjC Runtime ---
 
     [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_getClass")]
     private static extern IntPtr objc_getClass(string className);
@@ -304,39 +592,125 @@ public class MacBiometricService : IBiometricService
     [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
     private static extern void objc_msgSend_Void(IntPtr target, IntPtr selector);
 
-    // --- Security framework constants (loaded at runtime) ---
-
-    private static readonly IntPtr _securityLib = NativeLibrary.Load("/System/Library/Frameworks/Security.framework/Security");
-    private static readonly IntPtr _cfLib = NativeLibrary.Load("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation");
-
-    private static IntPtr GetSecurityConstant(string name) =>
-        Marshal.ReadIntPtr(NativeLibrary.GetExport(_securityLib, name));
-
-    private static IntPtr GetCFConstant(string name) =>
-        Marshal.ReadIntPtr(NativeLibrary.GetExport(_cfLib, name));
-
-    private static readonly IntPtr kSecClass = GetSecurityConstant("kSecClass");
-    private static readonly IntPtr kSecClassGenericPassword = GetSecurityConstant("kSecClassGenericPassword");
-    private static readonly IntPtr kSecAttrService = GetSecurityConstant("kSecAttrService");
-    private static readonly IntPtr kSecAttrAccount = GetSecurityConstant("kSecAttrAccount");
-    private static readonly IntPtr kSecValueData = GetSecurityConstant("kSecValueData");
-    private static readonly IntPtr kSecReturnData = GetSecurityConstant("kSecReturnData");
-    private static readonly IntPtr kSecAttrAccessControl = GetSecurityConstant("kSecAttrAccessControl");
-    private static readonly IntPtr kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly =
-        GetSecurityConstant("kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly");
-    private static readonly IntPtr kSecUseOperationPrompt = GetSecurityConstant("kSecUseOperationPrompt");
-    private static readonly IntPtr kSecUseAuthenticationUI = GetSecurityConstant("kSecUseAuthenticationUI");
-    private static readonly IntPtr kSecUseAuthenticationUISkip = GetSecurityConstant("kSecUseAuthenticationUISkip");
-
-    private static readonly IntPtr kCFBooleanTrue = GetCFConstant("kCFBooleanTrue");
-    private static readonly IntPtr kCFTypeDictionaryKeyCallBacks = NativeLibrary.GetExport(_cfLib, "kCFTypeDictionaryKeyCallBacks");
-    private static readonly IntPtr kCFTypeDictionaryValueCallBacks = NativeLibrary.GetExport(_cfLib, "kCFTypeDictionaryValueCallBacks");
-
-    private static IntPtr CFStringCreateWithCString(string value)
+    private static IntPtr CreateNSString(string value)
     {
-        return CFStringCreateWithCString(IntPtr.Zero, value, 0x08000100); // kCFStringEncodingUTF8
+        var cls = objc_getClass("NSString");
+        var alloc = objc_msgSend_ReturnIntPtr(cls, sel_registerName("alloc"));
+        var utf8 = Encoding.UTF8.GetBytes(value + '\0');
+        var handle = GCHandle.Alloc(utf8, GCHandleType.Pinned);
+        try
+        {
+            return objc_msgSend_InitWithUTF8(alloc, sel_registerName("initWithUTF8String:"), handle.AddrOfPinnedObject());
+        }
+        finally
+        {
+            handle.Free();
+        }
     }
 
-    [DllImport("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")]
-    private static extern IntPtr CFStringCreateWithCString(IntPtr allocator, string value, uint encoding);
+    [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+    private static extern IntPtr objc_msgSend_InitWithUTF8(IntPtr target, IntPtr selector, IntPtr utf8Str);
+
+    // =====================================================================
+    // LAContext block-based evaluatePolicy bridging
+    // =====================================================================
+
+    /// <summary>
+    /// Bridges ObjC block callbacks for LAContext.evaluatePolicy:localizedReason:reply:
+    /// </summary>
+    private static class BlockLiteral
+    {
+        // Block layout: isa, flags, reserved, invoke, descriptor
+        // For evaluatePolicy reply block: void (^)(BOOL success, NSError *error)
+
+        private delegate void BlockInvokeDelegate(IntPtr block, byte success, IntPtr error);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Block
+        {
+            public IntPtr Isa;
+            public int Flags;
+            public int Reserved;
+            public IntPtr Invoke;
+            public IntPtr Descriptor;
+            public IntPtr Context; // our GCHandle
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct BlockDescriptor
+        {
+            public ulong Reserved;
+            public ulong Size;
+        }
+
+        private static readonly IntPtr _nsConcreteStackBlock;
+        private static readonly BlockDescriptor _descriptor;
+
+        static BlockLiteral()
+        {
+            var objcLib = NativeLibrary.Load("/usr/lib/libobjc.A.dylib");
+            _nsConcreteStackBlock = NativeLibrary.GetExport(objcLib, "_NSConcreteStackBlock");
+            _descriptor = new BlockDescriptor
+            {
+                Reserved = 0,
+                Size = (ulong)Marshal.SizeOf<Block>()
+            };
+        }
+
+        public static void EvaluatePolicy(IntPtr laContext, long policy, IntPtr localizedReason, Action<bool, IntPtr> callback)
+        {
+            BlockInvokeDelegate invoker = (block, success, error) =>
+            {
+                var blockStruct = Marshal.PtrToStructure<Block>(block);
+                var handle = GCHandle.FromIntPtr(blockStruct.Context);
+                var cb = (Action<bool, IntPtr>)handle.Target!;
+                cb(success != 0, error);
+            };
+
+            var callbackHandle = GCHandle.Alloc(callback);
+            var invokerHandle = GCHandle.Alloc(invoker); // prevent GC during native call
+
+            var descriptorPtr = Marshal.AllocHGlobal(Marshal.SizeOf<BlockDescriptor>());
+            Marshal.StructureToPtr(_descriptor, descriptorPtr, false);
+
+            var blockData = new Block
+            {
+                Isa = _nsConcreteStackBlock,
+                Flags = 1 << 25, // BLOCK_HAS_COPY_DISPOSE not needed for stack block
+                Reserved = 0,
+                Invoke = Marshal.GetFunctionPointerForDelegate(invoker),
+                Descriptor = descriptorPtr,
+                Context = GCHandle.ToIntPtr(callbackHandle)
+            };
+
+            var blockPtr = Marshal.AllocHGlobal(Marshal.SizeOf<Block>());
+            Marshal.StructureToPtr(blockData, blockPtr, false);
+
+            try
+            {
+                objc_msgSend_EvaluatePolicy(laContext,
+                    sel_registerName("evaluatePolicy:localizedReason:reply:"),
+                    policy, localizedReason, blockPtr);
+
+                // Wait handled by caller via ManualResetEventSlim
+            }
+            finally
+            {
+                // Don't free immediately — the block callback is async.
+                // We rely on the ManualResetEventSlim gate in the caller.
+                // Clean up after gate is set.
+                Task.Delay(2000).ContinueWith(_ =>
+                {
+                    callbackHandle.Free();
+                    invokerHandle.Free();
+                    Marshal.FreeHGlobal(blockPtr);
+                    Marshal.FreeHGlobal(descriptorPtr);
+                });
+            }
+        }
+
+        [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+        private static extern void objc_msgSend_EvaluatePolicy(
+            IntPtr target, IntPtr selector, long policy, IntPtr localizedReason, IntPtr reply);
+    }
 }
