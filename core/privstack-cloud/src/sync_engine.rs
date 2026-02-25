@@ -253,7 +253,11 @@ impl CloudSyncEngine {
                     }
                     if self.outbox.should_flush() {
                         if let Err(e) = self.flush_outbox().await {
-                            if !e.is_rate_limited() {
+                            if e.is_rate_limited() {
+                                // silenced — rate limit backoff handled elsewhere
+                            } else if e.is_transient() {
+                                debug!("outbox flush failed (transient, will retry next cycle): {e}");
+                            } else {
                                 error!("outbox flush failed: {e}");
                             }
                         }
@@ -265,7 +269,11 @@ impl CloudSyncEngine {
                         continue;
                     }
                     if let Err(e) = self.poll_and_apply().await {
-                        if !e.is_rate_limited() {
+                        if e.is_rate_limited() {
+                            // silenced — rate limit backoff handled elsewhere
+                        } else if e.is_transient() {
+                            debug!("poll failed (transient, will retry next cycle): {e}");
+                        } else {
                             warn!("poll failed: {e}");
                         }
                     }

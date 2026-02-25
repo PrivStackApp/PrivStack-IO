@@ -65,6 +65,29 @@ impl CloudError {
         }
     }
 
+    /// Returns true if this error is likely transient (503, connection reset,
+    /// dispatch failure) and will probably resolve on the next sync cycle.
+    pub fn is_transient(&self) -> bool {
+        match self {
+            CloudError::RateLimited { .. } => true,
+            CloudError::S3(msg) => {
+                msg.contains("503")
+                    || msg.contains("dispatch failure")
+                    || msg.contains("service error")
+                    || msg.contains("ConnectionReset")
+                    || msg.contains("Connection reset")
+                    || msg.contains("timed out")
+                    || msg.contains("timeout")
+            }
+            CloudError::Http(e) => {
+                e.is_timeout()
+                    || e.is_connect()
+                    || e.status().is_some_and(|s| s.as_u16() == 503 || s.as_u16() == 429)
+            }
+            _ => false,
+        }
+    }
+
     /// Returns the retry-after duration if this is a rate-limit error.
     pub fn retry_after(&self) -> Option<std::time::Duration> {
         match self {
