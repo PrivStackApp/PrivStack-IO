@@ -398,14 +398,21 @@ public partial class MainWindow : Window
         var trayControl = this.FindControl<AiSuggestionTray>("AiSuggestionTrayControl");
         if (trayControl == null) return;
 
+        // Close link picker if open (clean state before reparent)
+        vm.AiTrayVM.ChatLinkPicker.Close();
+
         // Remove from inline drawer
         var inlineGrid = trayControl.Parent as Grid;
         inlineGrid?.Children.Remove(trayControl);
 
+        // Explicitly set DataContext — the XAML binding "{Binding AiTrayVM}" would fail
+        // in the floating window since its DataContext IS the AiSuggestionTrayViewModel,
+        // not a MainWindowViewModel that has an AiTrayVM property.
+        trayControl.DataContext = vm.AiTrayVM;
+
         // Create floating window
         _floatingAiWindow = new AiTrayWindow
         {
-            DataContext = vm.AiTrayVM,
             Content = trayControl
         };
 
