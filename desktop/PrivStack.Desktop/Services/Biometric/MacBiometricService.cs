@@ -606,6 +606,7 @@ public class MacBiometricService : IBiometricService
 
             if (context == IntPtr.Zero) return false;
 
+            Action? cleanup = null;
             try
             {
                 var reasonNs = CreateNSString(reason);
@@ -613,19 +614,21 @@ public class MacBiometricService : IBiometricService
                 var success = false;
 
                 // Create block for reply:(BOOL success, NSError *error)
-                BlockLiteral.EvaluatePolicy(context, 1, reasonNs, (ok, _) =>
+                // EvaluatePolicy returns a cleanup action we must call after the gate signals.
+                cleanup = BlockLiteral.EvaluatePolicy(context, 1, reasonNs, (ok, _) =>
                 {
                     success = ok;
                     gate.Set();
                 });
 
-                gate.Wait(TimeSpan.FromSeconds(60));
+                var signaled = gate.Wait(TimeSpan.FromSeconds(60));
 
                 CFRelease(reasonNs);
-                return success;
+                return signaled && success;
             }
             finally
             {
+                cleanup?.Invoke();
                 objc_msgSend_Void(context, sel_registerName("release"));
             }
         });
@@ -637,12 +640,13 @@ public class MacBiometricService : IBiometricService
 
     /// <summary>
     /// Bridges ObjC block callbacks for LAContext.evaluatePolicy:localizedReason:reply:
+    /// The block is heap-allocated with _NSConcreteGlobalBlock (no copy/dispose needed)
+    /// and cleaned up after the caller's gate is signaled.
     /// </summary>
     private static class BlockLiteral
     {
-        // Block layout: isa, flags, reserved, invoke, descriptor
-        // For evaluatePolicy reply block: void (^)(BOOL success, NSError *error)
-
+        // reply block signature: void (^)(BOOL success, NSError *error)
+        // On ARM64, BOOL is a single byte.
         private delegate void BlockInvokeDelegate(IntPtr block, byte success, IntPtr error);
 
         [StructLayout(LayoutKind.Sequential)]
@@ -653,7 +657,7 @@ public class MacBiometricService : IBiometricService
             public int Reserved;
             public IntPtr Invoke;
             public IntPtr Descriptor;
-            public IntPtr Context; // our GCHandle
+            public IntPtr Context; // GCHandle to our Action callback
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -663,70 +667,74 @@ public class MacBiometricService : IBiometricService
             public ulong Size;
         }
 
-        private static readonly IntPtr _nsConcreteStackBlock;
-        private static readonly BlockDescriptor _descriptor;
+        private static readonly IntPtr _nsConcreteGlobalBlock;
+        private static readonly IntPtr _descriptorPtr;
+
+        // Pin the delegate to prevent GC — it's reused across all calls
+        private static readonly BlockInvokeDelegate _invokerDelegate = InvokerImpl;
+        private static readonly IntPtr _invokerFnPtr = Marshal.GetFunctionPointerForDelegate(_invokerDelegate);
 
         static BlockLiteral()
         {
             var objcLib = NativeLibrary.Load("/usr/lib/libobjc.A.dylib");
-            _nsConcreteStackBlock = NativeLibrary.GetExport(objcLib, "_NSConcreteStackBlock");
-            _descriptor = new BlockDescriptor
+            _nsConcreteGlobalBlock = NativeLibrary.GetExport(objcLib, "_NSConcreteGlobalBlock");
+
+            var desc = new BlockDescriptor
             {
                 Reserved = 0,
                 Size = (ulong)Marshal.SizeOf<Block>()
             };
+            _descriptorPtr = Marshal.AllocHGlobal(Marshal.SizeOf<BlockDescriptor>());
+            Marshal.StructureToPtr(desc, _descriptorPtr, false);
         }
 
-        public static void EvaluatePolicy(IntPtr laContext, long policy, IntPtr localizedReason, Action<bool, IntPtr> callback)
+        private static void InvokerImpl(IntPtr block, byte success, IntPtr error)
         {
-            BlockInvokeDelegate invoker = (block, success, error) =>
+            try
             {
                 var blockStruct = Marshal.PtrToStructure<Block>(block);
+                if (blockStruct.Context == IntPtr.Zero) return;
                 var handle = GCHandle.FromIntPtr(blockStruct.Context);
-                var cb = (Action<bool, IntPtr>)handle.Target!;
-                cb(success != 0, error);
-            };
+                if (handle.Target is Action<bool, IntPtr> cb)
+                    cb(success != 0, error);
+            }
+            catch
+            {
+                // Swallow — we're being called from native code
+            }
+        }
 
+        /// <summary>
+        /// Calls evaluatePolicy:localizedReason:reply: and returns a cleanup action.
+        /// The caller MUST invoke the cleanup action after the gate is signaled.
+        /// </summary>
+        public static Action EvaluatePolicy(IntPtr laContext, long policy, IntPtr localizedReason, Action<bool, IntPtr> callback)
+        {
             var callbackHandle = GCHandle.Alloc(callback);
-            var invokerHandle = GCHandle.Alloc(invoker); // prevent GC during native call
-
-            var descriptorPtr = Marshal.AllocHGlobal(Marshal.SizeOf<BlockDescriptor>());
-            Marshal.StructureToPtr(_descriptor, descriptorPtr, false);
 
             var blockData = new Block
             {
-                Isa = _nsConcreteStackBlock,
-                Flags = 1 << 25, // BLOCK_HAS_COPY_DISPOSE not needed for stack block
+                Isa = _nsConcreteGlobalBlock,
+                Flags = 1 << 28, // BLOCK_IS_GLOBAL — no copy/dispose
                 Reserved = 0,
-                Invoke = Marshal.GetFunctionPointerForDelegate(invoker),
-                Descriptor = descriptorPtr,
+                Invoke = _invokerFnPtr,
+                Descriptor = _descriptorPtr,
                 Context = GCHandle.ToIntPtr(callbackHandle)
             };
 
             var blockPtr = Marshal.AllocHGlobal(Marshal.SizeOf<Block>());
             Marshal.StructureToPtr(blockData, blockPtr, false);
 
-            try
-            {
-                objc_msgSend_EvaluatePolicy(laContext,
-                    sel_registerName("evaluatePolicy:localizedReason:reply:"),
-                    policy, localizedReason, blockPtr);
+            objc_msgSend_EvaluatePolicy(laContext,
+                sel_registerName("evaluatePolicy:localizedReason:reply:"),
+                policy, localizedReason, blockPtr);
 
-                // Wait handled by caller via ManualResetEventSlim
-            }
-            finally
+            // Return cleanup action — caller invokes after gate.Wait() completes
+            return () =>
             {
-                // Don't free immediately — the block callback is async.
-                // We rely on the ManualResetEventSlim gate in the caller.
-                // Clean up after gate is set.
-                Task.Delay(2000).ContinueWith(_ =>
-                {
-                    callbackHandle.Free();
-                    invokerHandle.Free();
-                    Marshal.FreeHGlobal(blockPtr);
-                    Marshal.FreeHGlobal(descriptorPtr);
-                });
-            }
+                callbackHandle.Free();
+                Marshal.FreeHGlobal(blockPtr);
+            };
         }
 
         [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
