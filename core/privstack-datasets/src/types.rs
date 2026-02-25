@@ -56,8 +56,8 @@ impl DatasetColumnType {
                 Self::Float
             }
             s if s.contains("BOOLEAN") => Self::Boolean,
-            s if s.contains("DATE") && !s.contains("TIMESTAMP") => Self::Date,
             s if s.contains("TIMESTAMP") || s.contains("DATETIME") => Self::Timestamp,
+            s if s.contains("DATE") => Self::Date,
             s if s.contains("BLOB") => Self::Blob,
             _ => Self::Unknown,
         }

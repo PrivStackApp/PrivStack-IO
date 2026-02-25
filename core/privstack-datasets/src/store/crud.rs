@@ -167,11 +167,7 @@ impl DatasetStore {
 
         conn.execute_batch(&format!("DROP TABLE IF EXISTS {table}"))?;
 
-        let deleted = conn.execute(
-            "DELETE FROM _datasets_meta WHERE id = ?",
-            params![id.to_string()],
-        )?;
-
+        // Delete FK-dependent rows before the meta row to avoid constraint violations
         conn.execute(
             "DELETE FROM _dataset_relations WHERE source_dataset_id = ? OR target_dataset_id = ?",
             params![id.to_string(), id.to_string()],
@@ -182,6 +178,11 @@ impl DatasetStore {
         )?;
         conn.execute(
             "DELETE FROM _dataset_views WHERE dataset_id = ?",
+            params![id.to_string()],
+        )?;
+
+        let deleted = conn.execute(
+            "DELETE FROM _datasets_meta WHERE id = ?",
             params![id.to_string()],
         )?;
 

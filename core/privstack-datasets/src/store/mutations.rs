@@ -414,6 +414,11 @@ impl DatasetStore {
                 Ok(affected) => {
                     let preview = self.query_mutation_preview(&conn, sql, &stmt_type);
                     let _ = conn.execute_batch("ROLLBACK");
+                    // Reset connection state after rollback — DuckDB 1.4.4's Rust
+                    // driver leaves stale statement state after ROLLBACK, causing
+                    // panics on subsequent prepare/query_map calls. A trivial
+                    // execute_batch forces the driver to clear statement caches.
+                    let _ = conn.execute_batch("SELECT 1");
 
                     Ok(MutationResult {
                         affected_rows: affected as i64,
@@ -424,6 +429,7 @@ impl DatasetStore {
                 }
                 Err(e) => {
                     let _ = conn.execute_batch("ROLLBACK");
+                    let _ = conn.execute_batch("SELECT 1");
                     Err(DatasetError::DuckDb(e))
                 }
             }
@@ -448,13 +454,18 @@ impl DatasetStore {
         // Try to extract table name and query it for preview
         let table_name = extract_table_name(sql);
         if let Some(table) = table_name {
+            // Use DESCRIBE to get column info (avoids DuckDB 1.4.4 panic where
+            // column_count()/column_name() crash on un-executed prepared statements).
+            let desc_sql = format!("DESCRIBE SELECT * FROM {table}");
+            let mut desc_stmt = conn.prepare(&desc_sql)?;
+            let col_names: Vec<String> = desc_stmt
+                .query_map([], |row| row.get::<_, String>(0))?
+                .filter_map(|r| r.ok())
+                .collect();
+            let col_count = col_names.len();
+
             let preview_sql = format!("SELECT * FROM {table} LIMIT 50");
             let mut stmt = conn.prepare(&preview_sql)?;
-            let col_count = stmt.column_count();
-            let col_names: Vec<String> = (0..col_count)
-                .map(|i| stmt.column_name(i).map_or("?", |v| v).to_string())
-                .collect();
-
             let rows: Vec<Vec<serde_json::Value>> = stmt
                 .query_map([], |row| {
                     let mut vals = Vec::with_capacity(col_count);
