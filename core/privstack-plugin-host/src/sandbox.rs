@@ -2700,4 +2700,316 @@ mod tests {
         };
         assert!(!sandbox.handle_sdk_send(&msg_other).success);
     }
+
+    // ================================================================
+    // TrackingLimiter — ResourceLimiter trait impl
+    // ================================================================
+
+    #[test]
+    fn tracking_limiter_initial_memory_zero() {
+        let limiter = TrackingLimiter::new(1024);
+        assert_eq!(limiter.current_memory_bytes(), 0);
+    }
+
+    #[test]
+    fn tracking_limiter_memory_growing_allowed_within_limit() {
+        let mut limiter = TrackingLimiter::new(1024);
+        let result = limiter.memory_growing(0, 512, None).unwrap();
+        assert!(result);
+        assert_eq!(limiter.current_memory_bytes(), 512);
+    }
+
+    #[test]
+    fn tracking_limiter_memory_growing_allowed_at_limit() {
+        let mut limiter = TrackingLimiter::new(1024);
+        let result = limiter.memory_growing(0, 1024, None).unwrap();
+        assert!(result);
+        assert_eq!(limiter.current_memory_bytes(), 1024);
+    }
+
+    #[test]
+    fn tracking_limiter_memory_growing_denied_over_limit() {
+        let mut limiter = TrackingLimiter::new(1024);
+        let result = limiter.memory_growing(0, 1025, None).unwrap();
+        assert!(!result);
+        // Still tracks the desired amount even when denied
+        assert_eq!(limiter.current_memory_bytes(), 1025);
+    }
+
+    #[test]
+    fn tracking_limiter_memory_growing_tracks_incremental_growth() {
+        let mut limiter = TrackingLimiter::new(4096);
+        limiter.memory_growing(0, 1024, None).unwrap();
+        assert_eq!(limiter.current_memory_bytes(), 1024);
+
+        limiter.memory_growing(1024, 2048, None).unwrap();
+        assert_eq!(limiter.current_memory_bytes(), 2048);
+
+        limiter.memory_growing(2048, 3072, None).unwrap();
+        assert_eq!(limiter.current_memory_bytes(), 3072);
+    }
+
+    #[test]
+    fn tracking_limiter_memory_growing_with_maximum_param() {
+        let mut limiter = TrackingLimiter::new(2048);
+        // The maximum parameter is ignored by our implementation
+        let result = limiter.memory_growing(0, 1024, Some(4096)).unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn tracking_limiter_table_growing_allowed() {
+        let mut limiter = TrackingLimiter::new(1024);
+        let result = limiter.table_growing(0, 100, None).unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn tracking_limiter_table_growing_denied_over_limit() {
+        let mut limiter = TrackingLimiter::new(1024);
+        // Default max_table_elements is 20_000
+        let result = limiter.table_growing(0, 20_001, None).unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn tracking_limiter_table_growing_allowed_at_limit() {
+        let mut limiter = TrackingLimiter::new(1024);
+        let result = limiter.table_growing(0, 20_000, None).unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn tracking_limiter_instances() {
+        let limiter = TrackingLimiter::new(1024);
+        assert_eq!(limiter.instances(), 50);
+    }
+
+    #[test]
+    fn tracking_limiter_tables() {
+        let limiter = TrackingLimiter::new(1024);
+        assert_eq!(limiter.tables(), 100);
+    }
+
+    #[test]
+    fn tracking_limiter_memories() {
+        let limiter = TrackingLimiter::new(1024);
+        assert_eq!(limiter.memories(), 50);
+    }
+
+    // ================================================================
+    // has_runtime
+    // ================================================================
+
+    #[test]
+    fn has_runtime_false_for_metadata_only() {
+        let (es, ev) = test_stores();
+        let sandbox = PluginSandbox::new(
+            test_metadata(), test_schemas(),
+            PermissionSet::default_first_party(), ResourceLimits::first_party(), es, ev,
+        ).unwrap();
+        assert!(!sandbox.has_runtime());
+    }
+
+    // ================================================================
+    // get_resource_metrics on metadata-only sandbox
+    // ================================================================
+
+    #[test]
+    fn get_resource_metrics_metadata_only() {
+        let (es, ev) = test_stores();
+        let sandbox = PluginSandbox::new(
+            test_metadata(), test_schemas(),
+            PermissionSet::default_first_party(), ResourceLimits::first_party(), es, ev,
+        ).unwrap();
+
+        let metrics = sandbox.get_resource_metrics();
+        assert_eq!(metrics.memory_used_bytes, 0);
+        assert_eq!(metrics.memory_limit_bytes, 64 * 1024 * 1024);
+        assert!((metrics.memory_usage_ratio - 0.0).abs() < f64::EPSILON);
+        assert_eq!(metrics.fuel_consumed_last_call, 0);
+        assert_eq!(metrics.fuel_budget_per_call, 1_000_000_000);
+        assert_eq!(metrics.fuel_average_last_1000, 0);
+        assert_eq!(metrics.fuel_peak, 0);
+        assert_eq!(metrics.fuel_history_count, 0);
+        assert_eq!(metrics.entity_count, 0);
+        assert_eq!(metrics.disk_usage_bytes, 0);
+    }
+
+    #[test]
+    fn get_resource_metrics_with_third_party_limits() {
+        let (es, ev) = test_stores();
+        let sandbox = PluginSandbox::new(
+            test_metadata(), test_schemas(),
+            PermissionSet::default_third_party(), ResourceLimits::third_party(), es, ev,
+        ).unwrap();
+
+        let metrics = sandbox.get_resource_metrics();
+        assert_eq!(metrics.memory_limit_bytes, 32 * 1024 * 1024);
+        assert_eq!(metrics.fuel_budget_per_call, 500_000_000);
+    }
+
+    #[test]
+    fn get_resource_metrics_with_entities() {
+        let (es, ev) = test_stores();
+        // Create a test entity via save_entity_raw
+        let entity = privstack_model::Entity {
+            id: "test-1".into(),
+            entity_type: "test_item".into(),
+            data: serde_json::json!({"title": "test"}),
+            created_at: chrono::Utc::now().timestamp_millis(),
+            modified_at: chrono::Utc::now().timestamp_millis(),
+            created_by: "device-1".into(),
+        };
+        es.save_entity_raw(&entity).unwrap();
+
+        let sandbox = PluginSandbox::new(
+            test_metadata(), test_schemas(),
+            PermissionSet::default_first_party(), ResourceLimits::first_party(),
+            Arc::clone(&es), Arc::clone(&ev),
+        ).unwrap();
+
+        let metrics = sandbox.get_resource_metrics();
+        assert!(metrics.entity_count >= 1);
+        assert!(metrics.disk_usage_bytes > 0);
+    }
+
+    #[test]
+    fn resource_metrics_serialize() {
+        let (es, ev) = test_stores();
+        let sandbox = PluginSandbox::new(
+            test_metadata(), test_schemas(),
+            PermissionSet::default_first_party(), ResourceLimits::first_party(), es, ev,
+        ).unwrap();
+
+        let metrics = sandbox.get_resource_metrics();
+        let json = serde_json::to_string(&metrics).unwrap();
+        assert!(json.contains("memory_used_bytes"));
+        assert!(json.contains("fuel_budget_per_call"));
+    }
+
+    // ================================================================
+    // call_link_type / call_navigate_to_item error paths
+    // ================================================================
+
+    #[test]
+    fn call_link_type_metadata_only_fails() {
+        let (es, ev) = test_stores();
+        let mut sandbox = PluginSandbox::new(
+            test_metadata(), test_schemas(),
+            PermissionSet::default_first_party(), ResourceLimits::first_party(), es, ev,
+        ).unwrap();
+
+        assert!(sandbox.call_link_type().is_err());
+    }
+
+    #[test]
+    fn call_navigate_to_item_metadata_only_fails() {
+        let (es, ev) = test_stores();
+        let mut sandbox = PluginSandbox::new(
+            test_metadata(), test_schemas(),
+            PermissionSet::default_first_party(), ResourceLimits::first_party(), es, ev,
+        ).unwrap();
+
+        assert!(sandbox.call_navigate_to_item("some-item").is_err());
+    }
+
+    // ================================================================
+    // from_wasm_cached error path
+    // ================================================================
+
+    #[test]
+    fn from_wasm_cached_nonexistent_file_returns_error() {
+        let (es, ev) = test_stores();
+        let mut config = wasmtime::Config::new();
+        config.wasm_component_model(true);
+        config.consume_fuel(true);
+        let engine = Engine::new(&config).unwrap();
+
+        let result = PluginSandbox::from_wasm_cached(
+            Path::new("/nonexistent/path/plugin.wasm"),
+            &engine,
+            PermissionSet::default_first_party(),
+            ResourceLimits::first_party(),
+            es,
+            ev,
+        );
+        match result {
+            Err(e) => assert!(e.to_string().contains("failed to read")),
+            Ok(_) => panic!("expected error for nonexistent file"),
+        }
+    }
+
+    // ================================================================
+    // track_fuel_consumption no-op for metadata-only
+    // ================================================================
+
+    #[test]
+    fn track_fuel_consumption_no_op_metadata_only() {
+        let (es, ev) = test_stores();
+        let mut sandbox = PluginSandbox::new(
+            test_metadata(), test_schemas(),
+            PermissionSet::default_first_party(), ResourceLimits::first_party(), es, ev,
+        ).unwrap();
+
+        // Should not panic — just a no-op since runtime is None
+        sandbox.track_fuel_consumption();
+        assert_eq!(sandbox.last_fuel_consumed, 0);
+    }
+
+    // ================================================================
+    // PluginResourceMetrics Debug coverage
+    // ================================================================
+
+    #[test]
+    fn plugin_resource_metrics_debug() {
+        let (es, ev) = test_stores();
+        let sandbox = PluginSandbox::new(
+            test_metadata(), test_schemas(),
+            PermissionSet::default_first_party(), ResourceLimits::first_party(), es, ev,
+        ).unwrap();
+
+        let metrics = sandbox.get_resource_metrics();
+        let debug_str = format!("{:?}", metrics);
+        assert!(debug_str.contains("PluginResourceMetrics"));
+        assert!(debug_str.contains("memory_used_bytes"));
+    }
+
+    #[test]
+    fn plugin_resource_metrics_clone() {
+        let (es, ev) = test_stores();
+        let sandbox = PluginSandbox::new(
+            test_metadata(), test_schemas(),
+            PermissionSet::default_first_party(), ResourceLimits::first_party(), es, ev,
+        ).unwrap();
+
+        let metrics = sandbox.get_resource_metrics();
+        let cloned = metrics.clone();
+        assert_eq!(cloned.memory_used_bytes, metrics.memory_used_bytes);
+        assert_eq!(cloned.fuel_budget_per_call, metrics.fuel_budget_per_call);
+    }
+
+    // ================================================================
+    // get_resource_metrics zero memory limit edge case
+    // ================================================================
+
+    #[test]
+    fn get_resource_metrics_zero_memory_limit() {
+        let (es, ev) = test_stores();
+        let limits = ResourceLimits {
+            max_memory_bytes: 0,
+            fuel_per_call: 1000,
+            call_timeout_ms: 1000,
+            shutdown_deadline_ms: 1000,
+        };
+        let sandbox = PluginSandbox::new(
+            test_metadata(), test_schemas(),
+            PermissionSet::default_first_party(), limits, es, ev,
+        ).unwrap();
+
+        let metrics = sandbox.get_resource_metrics();
+        // Zero memory limit should yield 0.0 ratio (not divide-by-zero)
+        assert!((metrics.memory_usage_ratio - 0.0).abs() < f64::EPSILON);
+        assert_eq!(metrics.memory_limit_bytes, 0);
+    }
 }

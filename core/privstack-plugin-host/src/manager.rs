@@ -1132,4 +1132,292 @@ mod tests {
         assert_eq!(mgr.plugin_count(), 0);
         assert!(!mgr.is_loaded("anything"));
     }
+
+    // ================================================================
+    // navigate_to_item — capability not supported on metadata-only
+    // ================================================================
+
+    #[test]
+    fn navigate_to_item_capability_not_supported() {
+        let (es, ev) = test_stores();
+        let mut mgr = PluginHostManager::new_for_test(es, ev);
+        mgr.load_plugin(
+            test_metadata("p1"),
+            test_schemas(),
+            PermissionSet::default_first_party(),
+            ResourceLimits::first_party(),
+        )
+        .unwrap();
+
+        // Metadata-only sandboxes have has_deep_link_target = false
+        let result = mgr.navigate_to_item("p1", "item-1");
+        assert!(matches!(
+            result,
+            Err(PluginHostError::CapabilityNotSupported { .. })
+        ));
+    }
+
+    #[test]
+    fn navigate_to_item_plugin_not_found() {
+        let (es, ev) = test_stores();
+        let mut mgr = PluginHostManager::new_for_test(es, ev);
+        assert!(matches!(
+            mgr.navigate_to_item("missing", "item-1"),
+            Err(PluginHostError::PluginNotFound(_))
+        ));
+    }
+
+    // ================================================================
+    // get_entity_view_data — capability not supported
+    // ================================================================
+
+    #[test]
+    fn get_entity_view_data_capability_not_supported() {
+        let (es, ev) = test_stores();
+        let mut mgr = PluginHostManager::new_for_test(es, ev);
+        mgr.load_plugin(
+            test_metadata("p1"),
+            test_schemas(),
+            PermissionSet::default_first_party(),
+            ResourceLimits::first_party(),
+        )
+        .unwrap();
+
+        let result = mgr.get_entity_view_data("p1", "item-1");
+        assert!(matches!(
+            result,
+            Err(PluginHostError::CapabilityNotSupported { .. })
+        ));
+    }
+
+    #[test]
+    fn get_entity_view_data_plugin_not_found() {
+        let (es, ev) = test_stores();
+        let mut mgr = PluginHostManager::new_for_test(es, ev);
+        assert!(matches!(
+            mgr.get_entity_view_data("missing", "item-1"),
+            Err(PluginHostError::PluginNotFound(_))
+        ));
+    }
+
+    // ================================================================
+    // get_plugin_metrics / get_all_plugin_metrics
+    // ================================================================
+
+    #[test]
+    fn get_plugin_metrics_success() {
+        let (es, ev) = test_stores();
+        let mut mgr = PluginHostManager::new_for_test(es, ev);
+        mgr.load_plugin(
+            test_metadata("p1"),
+            test_schemas(),
+            PermissionSet::default_first_party(),
+            ResourceLimits::first_party(),
+        )
+        .unwrap();
+
+        let metrics = mgr.get_plugin_metrics("p1").unwrap();
+        assert_eq!(metrics.memory_limit_bytes, 64 * 1024 * 1024);
+        assert_eq!(metrics.fuel_budget_per_call, 1_000_000_000);
+        assert_eq!(metrics.entity_count, 0);
+    }
+
+    #[test]
+    fn get_plugin_metrics_not_found() {
+        let (es, ev) = test_stores();
+        let mgr = PluginHostManager::new_for_test(es, ev);
+        assert!(matches!(
+            mgr.get_plugin_metrics("missing"),
+            Err(PluginHostError::PluginNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn get_all_plugin_metrics_returns_all() {
+        let (es, ev) = test_stores();
+        let mut mgr = PluginHostManager::new_for_test(es, ev);
+        mgr.load_plugin(
+            test_metadata("p1"),
+            test_schemas(),
+            PermissionSet::default_first_party(),
+            ResourceLimits::first_party(),
+        )
+        .unwrap();
+        mgr.load_plugin(
+            test_metadata("p2"),
+            test_schemas(),
+            PermissionSet::default_first_party(),
+            ResourceLimits::third_party(),
+        )
+        .unwrap();
+
+        let all_metrics = mgr.get_all_plugin_metrics();
+        assert_eq!(all_metrics.len(), 2);
+
+        // Find p2's metrics and check third-party limits
+        let p2_metrics = all_metrics.iter().find(|(id, _)| id == "p2").unwrap();
+        assert_eq!(p2_metrics.1.memory_limit_bytes, 32 * 1024 * 1024);
+    }
+
+    #[test]
+    fn get_all_plugin_metrics_empty() {
+        let (es, ev) = test_stores();
+        let mgr = PluginHostManager::new_for_test(es, ev);
+        assert!(mgr.get_all_plugin_metrics().is_empty());
+    }
+
+    // ================================================================
+    // get_plugin / get_plugin_mut
+    // ================================================================
+
+    #[test]
+    fn get_plugin_success() {
+        let (es, ev) = test_stores();
+        let mut mgr = PluginHostManager::new_for_test(es, ev);
+        mgr.load_plugin(
+            test_metadata("p1"),
+            test_schemas(),
+            PermissionSet::default_first_party(),
+            ResourceLimits::first_party(),
+        )
+        .unwrap();
+
+        let plugin = mgr.get_plugin("p1").unwrap();
+        assert_eq!(plugin.plugin_id(), "p1");
+    }
+
+    #[test]
+    fn get_plugin_not_found() {
+        let (es, ev) = test_stores();
+        let mgr = PluginHostManager::new_for_test(es, ev);
+        assert!(matches!(
+            mgr.get_plugin("missing"),
+            Err(PluginHostError::PluginNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn get_plugin_mut_success() {
+        let (es, ev) = test_stores();
+        let mut mgr = PluginHostManager::new_for_test(es, ev);
+        mgr.load_plugin(
+            test_metadata("p1"),
+            test_schemas(),
+            PermissionSet::default_first_party(),
+            ResourceLimits::first_party(),
+        )
+        .unwrap();
+
+        let plugin = mgr.get_plugin_mut("p1").unwrap();
+        assert_eq!(plugin.plugin_id(), "p1");
+    }
+
+    #[test]
+    fn get_plugin_mut_not_found() {
+        let (es, ev) = test_stores();
+        let mut mgr = PluginHostManager::new_for_test(es, ev);
+        assert!(matches!(
+            mgr.get_plugin_mut("missing"),
+            Err(PluginHostError::PluginNotFound(_))
+        ));
+    }
+
+    // ================================================================
+    // load_plugin_from_wasm error — nonexistent file
+    // ================================================================
+
+    #[test]
+    fn load_plugin_from_wasm_nonexistent_file() {
+        let (es, ev) = test_stores();
+        let mut mgr = PluginHostManager::new_for_test(es, ev);
+        let result = mgr.load_plugin_from_wasm(
+            std::path::Path::new("/nonexistent/plugin.wasm"),
+            PermissionSet::default_first_party(),
+            ResourceLimits::first_party(),
+        );
+        assert!(result.is_err());
+    }
+
+    // ================================================================
+    // Navigation items with icons
+    // ================================================================
+
+    #[test]
+    fn navigation_items_include_icons() {
+        let (es, ev) = test_stores();
+        let mut mgr = PluginHostManager::new_for_test(es, ev);
+
+        let mut m1 = test_metadata("p1");
+        m1.icon = Some("FileText".into());
+
+        mgr.load_plugin(
+            m1,
+            test_schemas(),
+            PermissionSet::default_first_party(),
+            ResourceLimits::first_party(),
+        )
+        .unwrap();
+
+        let items = mgr.get_navigation_items();
+        assert_eq!(items[0].icon.as_deref(), Some("FileText"));
+        assert!(items[0].subtitle.is_none());
+        assert!(items[0].tooltip.is_none());
+        assert!(!items[0].show_badge);
+        assert_eq!(items[0].badge_count, 0);
+        assert!(items[0].shortcut_hint.is_none());
+    }
+
+    // ================================================================
+    // with_policy constructor
+    // ================================================================
+
+    #[test]
+    fn with_policy_uses_custom_policy() {
+        let (es, ev) = test_stores();
+        let policy = PolicyEngine::with_config(PolicyConfig {
+            mode: PolicyMode::Allowlist,
+            allowed_plugin_ids: vec!["allowed".into()],
+            ..PolicyConfig::default()
+        });
+        let mut mgr = PluginHostManager::with_policy(es, ev, policy);
+
+        // Allowed plugin loads
+        mgr.load_plugin(
+            test_metadata("allowed"),
+            test_schemas(),
+            PermissionSet::default_first_party(),
+            ResourceLimits::first_party(),
+        )
+        .unwrap();
+
+        // Disallowed plugin blocked
+        let result = mgr.load_plugin(
+            test_metadata("blocked"),
+            test_schemas(),
+            PermissionSet::default_first_party(),
+            ResourceLimits::first_party(),
+        );
+        assert!(matches!(result, Err(PluginHostError::PolicyDenied(_))));
+    }
+
+    // ================================================================
+    // fetch_url_for_plugin with network permission (connection error)
+    // ================================================================
+
+    #[test]
+    fn fetch_url_network_error() {
+        let (es, ev) = test_stores();
+        let mut mgr = PluginHostManager::new_for_test(es, ev);
+        mgr.load_plugin(
+            test_metadata("p1"),
+            test_schemas(),
+            PermissionSet::all_granted(), // Grant network
+            ResourceLimits::first_party(),
+        )
+        .unwrap();
+
+        // URL that will fail to connect
+        let result = mgr.fetch_url_for_plugin("p1", "http://[::1]:1/nonexistent");
+        assert!(matches!(result, Err(PluginHostError::NetworkError(_))));
+    }
 }
