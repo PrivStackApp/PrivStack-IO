@@ -83,6 +83,22 @@ public class MacBiometricService : IBiometricService
 #endif
     }
 
+    public async Task<bool> VerifyBiometricAsync(string reason)
+    {
+        _log.Debug("VerifyBiometricAsync called with reason: {Reason}", reason);
+        try
+        {
+            var result = await EvaluateBiometricPolicyAsync(reason);
+            _log.Information("Biometric verification result: {Result}", result);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "Biometric verification failed");
+            return false;
+        }
+    }
+
     public void Unenroll()
     {
 #if DEBUG
@@ -238,45 +254,6 @@ public class MacBiometricService : IBiometricService
         {
             _log.Warning(ex, "Failed to delete legacy keychain item");
         }
-    }
-
-    /// <summary>
-    /// Evaluates Touch ID via LAContext.evaluatePolicy:localizedReason:reply:
-    /// Uses a ManualResetEventSlim to bridge the async ObjC callback.
-    /// </summary>
-    private static async Task<bool> EvaluateBiometricPolicyAsync(string reason)
-    {
-        return await Task.Run(() =>
-        {
-            var context = objc_msgSend_ReturnIntPtr(
-                objc_msgSend_ReturnIntPtr(objc_getClass("LAContext"), sel_registerName("alloc")),
-                sel_registerName("init"));
-
-            if (context == IntPtr.Zero) return false;
-
-            try
-            {
-                var reasonNs = CreateNSString(reason);
-                var gate = new ManualResetEventSlim(false);
-                var success = false;
-
-                // Create block for reply:(BOOL success, NSError *error)
-                BlockLiteral.EvaluatePolicy(context, 1, reasonNs, (ok, _) =>
-                {
-                    success = ok;
-                    gate.Set();
-                });
-
-                gate.Wait(TimeSpan.FromSeconds(60));
-
-                CFRelease(reasonNs);
-                return success;
-            }
-            finally
-            {
-                objc_msgSend_Void(context, sel_registerName("release"));
-            }
-        });
     }
 
     // --- Legacy Keychain P/Invoke ---
@@ -610,6 +587,49 @@ public class MacBiometricService : IBiometricService
 
     [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
     private static extern IntPtr objc_msgSend_InitWithUTF8(IntPtr target, IntPtr selector, IntPtr utf8Str);
+
+    // =====================================================================
+    // Touch ID evaluation (shared across DEBUG/RELEASE)
+    // =====================================================================
+
+    /// <summary>
+    /// Evaluates Touch ID via LAContext.evaluatePolicy:localizedReason:reply:
+    /// Uses a ManualResetEventSlim to bridge the async ObjC callback.
+    /// </summary>
+    private static async Task<bool> EvaluateBiometricPolicyAsync(string reason)
+    {
+        return await Task.Run(() =>
+        {
+            var context = objc_msgSend_ReturnIntPtr(
+                objc_msgSend_ReturnIntPtr(objc_getClass("LAContext"), sel_registerName("alloc")),
+                sel_registerName("init"));
+
+            if (context == IntPtr.Zero) return false;
+
+            try
+            {
+                var reasonNs = CreateNSString(reason);
+                var gate = new ManualResetEventSlim(false);
+                var success = false;
+
+                // Create block for reply:(BOOL success, NSError *error)
+                BlockLiteral.EvaluatePolicy(context, 1, reasonNs, (ok, _) =>
+                {
+                    success = ok;
+                    gate.Set();
+                });
+
+                gate.Wait(TimeSpan.FromSeconds(60));
+
+                CFRelease(reasonNs);
+                return success;
+            }
+            finally
+            {
+                objc_msgSend_Void(context, sel_registerName("release"));
+            }
+        });
+    }
 
     // =====================================================================
     // LAContext block-based evaluatePolicy bridging

@@ -20,18 +20,15 @@ public partial class AppLockOverlayViewModel : ObservableObject
     private readonly IAuthService _authService;
     private readonly IBiometricService _biometricService;
     private readonly IAppSettingsService _appSettings;
-    private readonly IMasterPasswordCache? _passwordCache;
 
     public AppLockOverlayViewModel(
         IAuthService authService,
         IBiometricService biometricService,
-        IAppSettingsService appSettings,
-        IMasterPasswordCache? passwordCache = null)
+        IAppSettingsService appSettings)
     {
         _authService = authService;
         _biometricService = biometricService;
         _appSettings = appSettings;
-        _passwordCache = passwordCache;
     }
 
     [ObservableProperty]
@@ -65,10 +62,14 @@ public partial class AppLockOverlayViewModel : ObservableObject
     {
         ErrorMessage = null;
         Password = string.Empty;
+        IsBiometricAuthenticating = false;
 
         var available = await _biometricService.IsAvailableAsync();
         IsBiometricAvailable = available && _biometricService.IsEnrolled;
         BiometricDisplayName = _biometricService.BiometricDisplayName;
+
+        _log.Information("AppLockOverlay initialized: BiometricAvailable={Available}, Enrolled={Enrolled}",
+            available, _biometricService.IsEnrolled);
 
         if (IsBiometricAvailable)
         {
@@ -83,29 +84,26 @@ public partial class AppLockOverlayViewModel : ObservableObject
 
         IsBiometricAuthenticating = true;
         ErrorMessage = null;
+        _log.Debug("Starting biometric verification...");
 
         try
         {
-            var password = await _biometricService.AuthenticateAsync("Verify biometric unlock");
-            if (password != null)
+            // Only verify biometric works — no keychain access needed.
+            // The app is already unlocked; we just need proof Touch ID functions.
+            var verified = await _biometricService.VerifyBiometricAsync("Verify biometric unlock");
+            _log.Information("Biometric verification result: {Result}", verified);
+
+            if (verified)
             {
-                // Validate the password is correct
-                if (_authService.ValidateMasterPassword(password))
-                {
-                    Unlocked?.Invoke(true);
-                    return;
-                }
-                ErrorMessage = "Biometric unlock failed. Please enter your password.";
-                _log.Warning("Biometric-retrieved password was incorrect during validation");
+                Unlocked?.Invoke(true);
+                return;
             }
-            else
-            {
-                ErrorMessage = $"{BiometricDisplayName} cancelled. Enter your password to continue.";
-            }
+
+            ErrorMessage = $"{BiometricDisplayName} cancelled. Enter your password to continue.";
         }
         catch (Exception ex)
         {
-            _log.Warning(ex, "Biometric authentication error during validation");
+            _log.Warning(ex, "Biometric verification error");
             ErrorMessage = "Biometric error. Please enter your password.";
         }
         finally

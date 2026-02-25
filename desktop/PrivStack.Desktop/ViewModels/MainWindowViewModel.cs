@@ -80,8 +80,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 _appLockOverlayVM = new AppLockOverlayViewModel(
                     App.Services.GetRequiredService<IAuthService>(),
                     App.Services.GetRequiredService<Services.Biometric.IBiometricService>(),
-                    _appSettings,
-                    App.Services.GetService<IMasterPasswordCache>());
+                    _appSettings);
 
                 _appLockOverlayVM.Unlocked += OnAppLockUnlocked;
             }

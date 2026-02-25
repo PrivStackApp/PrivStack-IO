@@ -130,6 +130,11 @@ public class WindowsBiometricService : IBiometricService
         }
     }
 
+    public async Task<bool> VerifyBiometricAsync(string reason)
+    {
+        return await RequestUserConsentAsync(reason);
+    }
+
     public void Unenroll()
     {
         try

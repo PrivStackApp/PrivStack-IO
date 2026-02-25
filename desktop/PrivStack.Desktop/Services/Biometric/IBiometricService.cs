@@ -38,6 +38,13 @@ public interface IBiometricService
     Task<string?> AuthenticateAsync(string reason);
 
     /// <summary>
+    /// Prompts biometric verification only (no keychain access).
+    /// Returns true if the user successfully authenticated, false if cancelled or failed.
+    /// Use this when you only need to verify biometric works (e.g. enrollment validation).
+    /// </summary>
+    Task<bool> VerifyBiometricAsync(string reason);
+
+    /// <summary>
     /// Removes the stored master password from the OS keychain.
     /// </summary>
     void Unenroll();
