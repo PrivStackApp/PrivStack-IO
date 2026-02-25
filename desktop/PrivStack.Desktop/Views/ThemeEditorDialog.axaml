@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:PrivStack.Desktop.ViewModels"
              xmlns:views="using:PrivStack.Desktop.Views"
-             mc:Ignorable="d" d:DesignWidth="1300" d:DesignHeight="820"
+             mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="850"
              x:Class="PrivStack.Desktop.Views.ThemeEditorDialog"
              x:DataType="vm:ThemeEditorViewModel"
              IsVisible="{Binding IsOpen, FallbackValue=False}">
@@ -16,10 +16,10 @@
                 VerticalAlignment="Stretch"
                 PointerPressed="OnBackdropPressed"/>
 
-        <!-- Dialog Container -->
-        <Border HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                Width="1300" MaxHeight="820"
+        <!-- Dialog Container: stretches to fill window with comfortable margins -->
+        <Border HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                Margin="48,36"
                 Background="{DynamicResource ThemeSurfaceElevatedBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="1"
@@ -40,7 +40,7 @@
                                            FontSize="{DynamicResource ThemeFontSizeLg}"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                                <TextBlock Text="Customize colors and preview changes in real time"
+                                <TextBlock Text="Customize colors and preview every token state in real time"
                                            FontSize="{DynamicResource ThemeFontSizeXsSm}"
                                            Foreground="{DynamicResource ThemeTextMutedBrush}"/>
                             </StackPanel>
@@ -93,8 +93,8 @@
                     </Grid>
                 </Border>
 
-                <!-- Body: Colors (left) + Preview (right) -->
-                <Grid Grid.Row="1" ColumnDefinitions="*,*">
+                <!-- Body: Colors (left, fixed) + Preview (right, fills remaining) -->
+                <Grid Grid.Row="1" ColumnDefinitions="420,*">
 
                     <!-- Left column: Color groups -->
                     <Border Grid.Column="0"
@@ -161,12 +161,13 @@
                                                                            FontSize="{DynamicResource ThemeFontSizeXsSm}"
                                                                            Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                                                                            VerticalAlignment="Center"
-                                                                           Margin="8,0,0,0"/>
+                                                                           Margin="8,0,0,0"
+                                                                           TextTrimming="CharacterEllipsis"/>
 
                                                                 <!-- Hex input -->
                                                                 <TextBox Grid.Column="2"
                                                                          Text="{Binding HexText}"
-                                                                         Width="95"
+                                                                         Width="100"
                                                                          FontSize="{DynamicResource ThemeFontSizeXs}"
                                                                          FontFamily="{DynamicResource ThemeFontMono}"
                                                                          Padding="4,3"

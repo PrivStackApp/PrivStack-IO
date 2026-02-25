@@ -2,272 +2,512 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="600"
+             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="900"
              x:Class="PrivStack.Desktop.Views.ThemePreviewPanel">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="16" Margin="16">
+        <StackPanel Spacing="12" Margin="20">
 
-            <!-- Typography -->
+            <!-- ═══ TYPOGRAPHY ═══ -->
             <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="6">
                     <TextBlock Text="Typography" FontWeight="SemiBold"
                                FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="0,0,0,4"/>
+
+                    <TextBlock Text="Primary text — headings, body copy"
+                               FontSize="{DynamicResource ThemeFontSizeSm}"
                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                    <TextBlock Text="Primary text color" FontSize="{DynamicResource ThemeFontSizeSm}"
-                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                    <TextBlock Text="Secondary text color" FontSize="{DynamicResource ThemeFontSizeSm}"
+                    <TextBlock Text="Secondary text — descriptions, labels"
+                               FontSize="{DynamicResource ThemeFontSizeSm}"
                                Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-                    <TextBlock Text="Muted text color" FontSize="{DynamicResource ThemeFontSizeSm}"
+                    <TextBlock Text="Muted text — placeholders, hints, disabled"
+                               FontSize="{DynamicResource ThemeFontSizeSm}"
                                Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                    <TextBlock Text="Primary accent link" FontSize="{DynamicResource ThemeFontSizeSm}"
-                               Foreground="{DynamicResource ThemePrimaryBrush}"/>
-                    <TextBlock Text="Secondary accent link" FontSize="{DynamicResource ThemeFontSizeSm}"
-                               Foreground="{DynamicResource ThemeSecondaryBrush}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,4,0,0">
+                        <TextBlock Text="Primary accent link" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                   Foreground="{DynamicResource ThemePrimaryBrush}" TextDecorations="Underline"/>
+                        <TextBlock Text="Secondary accent link" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                   Foreground="{DynamicResource ThemeSecondaryBrush}" TextDecorations="Underline"/>
+                    </StackPanel>
+
+                    <!-- Text on accent backgrounds -->
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                        <Border Background="{DynamicResource ThemePrimaryBrush}" CornerRadius="4" Padding="10,4">
+                            <TextBlock Text="Text on primary" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeTextOnAccentBrush}"/>
+                        </Border>
+                        <Border Background="{DynamicResource ThemeSecondaryBrush}" CornerRadius="4" Padding="10,4">
+                            <TextBlock Text="Text on secondary" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeTextOnAccentBrush}"/>
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
-            <!-- Buttons -->
+            <!-- ═══ TEXT SELECTION & HIGHLIGHTS ═══ -->
             <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
                 <StackPanel Spacing="8">
-                    <TextBlock Text="Buttons" FontWeight="SemiBold"
-                               FontSize="{DynamicResource ThemeFontSizeMd}"/>
+                    <TextBlock Text="Text Selection &amp; Highlights" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="0,0,0,4"/>
+
+                    <!-- Simulated selected text on each surface -->
+                    <TextBlock Text="Selection on surfaces" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                    <Grid ColumnDefinitions="*,*" Margin="0,0,0,4">
+                        <Border Grid.Column="0" Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="4" Padding="10,6" Margin="0,0,4,0">
+                            <Panel>
+                                <TextBlock Text="Selected on surface" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                <Border Background="{DynamicResource ThemeSelectionBrush}" IsHitTestVisible="False"
+                                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" CornerRadius="2"/>
+                            </Panel>
+                        </Border>
+                        <Border Grid.Column="1" Background="{DynamicResource ThemeSurfaceElevatedBrush}" CornerRadius="4" Padding="10,6" Margin="4,0,0,0">
+                            <Panel>
+                                <TextBlock Text="Selected on elevated" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                <Border Background="{DynamicResource ThemeSelectionBrush}" IsHitTestVisible="False"
+                                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch" CornerRadius="2"/>
+                            </Panel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Interactive selection test -->
+                    <SelectableTextBlock Text="Drag to select this text and test your selection color interactively"
+                                         FontSize="{DynamicResource ThemeFontSizeSm}"
+                                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                         Margin="0,0,0,4"/>
+
+                    <!-- Highlight colors -->
+                    <TextBlock Text="Note highlight colors" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
                     <WrapPanel Orientation="Horizontal">
-                        <Button Content="Primary" Background="{DynamicResource ThemePrimaryBrush}"
-                                Foreground="{DynamicResource ThemeTextOnAccentBrush}"
-                                Padding="12,6" Margin="0,0,8,8"/>
-                        <Button Content="Secondary" Background="{DynamicResource ThemeSecondaryBrush}"
-                                Foreground="{DynamicResource ThemeTextOnAccentBrush}"
-                                Padding="12,6" Margin="0,0,8,8"/>
-                        <Button Content="Default" Padding="12,6" Margin="0,0,8,8"/>
-                        <Button Content="Danger" Background="{DynamicResource ThemeDangerBrush}"
-                                Foreground="{DynamicResource ThemeTextOnAccentBrush}" Padding="12,6" Margin="0,0,8,8"/>
+                        <Border Background="{DynamicResource ThemeHighlightYellowBrush}" CornerRadius="3"
+                                Padding="8,3" Margin="0,0,6,6">
+                            <TextBlock Text="Yellow" FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="#1A1A2E"/>
+                        </Border>
+                        <Border Background="{DynamicResource ThemeHighlightBlueBrush}" CornerRadius="3"
+                                Padding="8,3" Margin="0,0,6,6">
+                            <TextBlock Text="Blue" FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="#1A1A2E"/>
+                        </Border>
+                        <Border Background="{DynamicResource ThemeHighlightGreenBrush}" CornerRadius="3"
+                                Padding="8,3" Margin="0,0,6,6">
+                            <TextBlock Text="Green" FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="#1A1A2E"/>
+                        </Border>
+                        <Border Background="{DynamicResource ThemeHighlightPinkBrush}" CornerRadius="3"
+                                Padding="8,3" Margin="0,0,6,6">
+                            <TextBlock Text="Pink" FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="#1A1A2E"/>
+                        </Border>
+                        <Border Background="{DynamicResource ThemeHighlightPurpleBrush}" CornerRadius="3"
+                                Padding="8,3" Margin="0,0,6,6">
+                            <TextBlock Text="Purple" FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="#1A1A2E"/>
+                        </Border>
+                        <Border Background="{DynamicResource ThemeHighlightOrangeBrush}" CornerRadius="3"
+                                Padding="8,3" Margin="0,0,6,6">
+                            <TextBlock Text="Orange" FontSize="{DynamicResource ThemeFontSizeXsSm}" Foreground="#1A1A2E"/>
+                        </Border>
                     </WrapPanel>
                 </StackPanel>
             </Border>
 
-            <!-- Surface Nesting -->
-            <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="8" Padding="16">
+            <!-- ═══ BUTTONS — ALL STATES ═══ -->
+            <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
                 <StackPanel Spacing="8">
-                    <TextBlock Text="Surface Nesting" FontWeight="SemiBold"
-                               FontSize="{DynamicResource ThemeFontSizeMd}"/>
-                    <TextBlock Text="Background layer" FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                    <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="6" Padding="12">
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Surface layer" FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                            <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}" CornerRadius="4" Padding="12">
-                                <TextBlock Text="Elevated surface layer" FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-                            </Border>
-                        </StackPanel>
-                    </Border>
+                    <TextBlock Text="Buttons" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="0,0,0,4"/>
+
+                    <!-- Column headers -->
+                    <Grid ColumnDefinitions="80,*,*,*">
+                        <TextBlock Grid.Column="1" Text="Normal" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                   Foreground="{DynamicResource ThemeTextMutedBrush}" Margin="0,0,8,4"/>
+                        <TextBlock Grid.Column="2" Text="Hover" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                   Foreground="{DynamicResource ThemeTextMutedBrush}" Margin="0,0,8,4"/>
+                        <TextBlock Grid.Column="3" Text="Glow / Muted" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                   Foreground="{DynamicResource ThemeTextMutedBrush}" Margin="0,0,0,4"/>
+                    </Grid>
+
+                    <!-- Primary row -->
+                    <Grid ColumnDefinitions="80,*,*,*">
+                        <TextBlock Text="Primary" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" VerticalAlignment="Center"/>
+                        <Border Grid.Column="1" Background="{DynamicResource ThemePrimaryBrush}" CornerRadius="4"
+                                Padding="12,6" Margin="0,0,8,0" HorizontalAlignment="Left">
+                            <TextBlock Text="Primary" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeTextOnAccentBrush}"/>
+                        </Border>
+                        <Border Grid.Column="2" Background="{DynamicResource ThemePrimaryHoverBrush}" CornerRadius="4"
+                                Padding="12,6" Margin="0,0,8,0" HorizontalAlignment="Left">
+                            <TextBlock Text="Hovered" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeTextOnAccentBrush}"/>
+                        </Border>
+                        <Border Grid.Column="3" Background="{DynamicResource ThemePrimaryMutedBrush}" CornerRadius="4"
+                                Padding="12,6" HorizontalAlignment="Left">
+                            <TextBlock Text="Muted" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                        </Border>
+                    </Grid>
+
+                    <!-- Secondary row -->
+                    <Grid ColumnDefinitions="80,*,*,*">
+                        <TextBlock Text="Secondary" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" VerticalAlignment="Center"/>
+                        <Border Grid.Column="1" Background="{DynamicResource ThemeSecondaryBrush}" CornerRadius="4"
+                                Padding="12,6" Margin="0,0,8,0" HorizontalAlignment="Left">
+                            <TextBlock Text="Secondary" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeTextOnAccentBrush}"/>
+                        </Border>
+                        <Border Grid.Column="2" Background="{DynamicResource ThemeSecondaryHoverBrush}" CornerRadius="4"
+                                Padding="12,6" Margin="0,0,8,0" HorizontalAlignment="Left">
+                            <TextBlock Text="Hovered" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeTextOnAccentBrush}"/>
+                        </Border>
+                        <Border Grid.Column="3" Background="{DynamicResource ThemeSecondaryMutedBrush}" CornerRadius="4"
+                                Padding="12,6" HorizontalAlignment="Left">
+                            <TextBlock Text="Muted" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeSecondaryBrush}"/>
+                        </Border>
+                    </Grid>
+
+                    <!-- Danger row -->
+                    <Grid ColumnDefinitions="80,*,*,*">
+                        <TextBlock Text="Danger" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" VerticalAlignment="Center"/>
+                        <Border Grid.Column="1" Background="{DynamicResource ThemeDangerBrush}" CornerRadius="4"
+                                Padding="12,6" Margin="0,0,8,0" HorizontalAlignment="Left">
+                            <TextBlock Text="Danger" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeTextOnAccentBrush}"/>
+                        </Border>
+                        <Border Grid.Column="2" Background="{DynamicResource ThemeDangerMutedBrush}" CornerRadius="4"
+                                Padding="12,6" Margin="0,0,8,0" HorizontalAlignment="Left">
+                            <TextBlock Text="Muted" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeDangerBrush}"/>
+                        </Border>
+                        <Button Grid.Column="3" Content="Default" Padding="12,6" HorizontalAlignment="Left"
+                                FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                    </Grid>
                 </StackPanel>
             </Border>
 
-            <!-- Interaction States -->
+            <!-- ═══ SURFACE NESTING ═══ -->
+            <Border Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="8" Padding="16">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Surface Hierarchy" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="0,0,0,4"/>
+                    <TextBlock Text="Background" FontSize="{DynamicResource ThemeFontSizeXs}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                    <Grid ColumnDefinitions="*,*" Margin="0,4,0,0">
+                        <!-- Left: nesting stack -->
+                        <Border Grid.Column="0" Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="6" Padding="12" Margin="0,0,6,0">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Surface" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}" CornerRadius="4" Padding="12">
+                                    <TextBlock Text="Elevated" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                        <!-- Right: special surfaces -->
+                        <StackPanel Grid.Column="1" Spacing="6" Margin="6,0,0,0">
+                            <Border Background="{DynamicResource ThemeInputBackgroundBrush}"
+                                    BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                                    CornerRadius="4" Padding="10,6">
+                                <TextBlock Text="Input background" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                            </Border>
+                            <Border Background="{DynamicResource ThemeSurfaceRecessedBrush}" CornerRadius="4" Padding="10,6">
+                                <TextBlock Text="Recessed surface" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                            </Border>
+                            <Border Background="{DynamicResource ThemeSurfaceGlassBrush}" CornerRadius="4" Padding="10,6"
+                                    BorderBrush="{DynamicResource ThemeBorderSubtleBrush}" BorderThickness="1">
+                                <TextBlock Text="Glass surface" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ═══ INTERACTION STATES ═══ -->
             <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
                 <StackPanel Spacing="4">
-                    <TextBlock Text="List Items" FontWeight="SemiBold"
-                               FontSize="{DynamicResource ThemeFontSizeMd}" Margin="0,0,0,8"/>
+                    <TextBlock Text="List Items &amp; Interaction States" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="0,0,0,8"/>
+                    <Border Background="Transparent" CornerRadius="4" Padding="10,8">
+                        <TextBlock Text="Normal" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                   FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                    </Border>
                     <Border Background="{DynamicResource ThemeHoverBrush}" CornerRadius="4" Padding="10,8">
-                        <TextBlock Text="Hovered item" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                        <TextBlock Text="Hovered" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                                    FontSize="{DynamicResource ThemeFontSizeSm}"/>
                     </Border>
                     <Border Background="{DynamicResource ThemeSelectedBrush}" CornerRadius="4" Padding="10,8">
                         <Grid ColumnDefinitions="Auto,*">
                             <Border Width="3" Height="16" CornerRadius="2" Margin="0,0,8,0"
                                     Background="{DynamicResource ThemePrimaryBrush}"/>
-                            <TextBlock Grid.Column="1" Text="Selected item"
+                            <TextBlock Grid.Column="1" Text="Selected"
                                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                                        FontSize="{DynamicResource ThemeFontSizeSm}"/>
                         </Grid>
                     </Border>
                     <Border Background="{DynamicResource ThemePressedBrush}" CornerRadius="4" Padding="10,8">
-                        <TextBlock Text="Pressed item" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                   FontSize="{DynamicResource ThemeFontSizeSm}"/>
-                    </Border>
-                    <Border Background="Transparent" CornerRadius="4" Padding="10,8">
-                        <TextBlock Text="Normal item" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                        <TextBlock Text="Pressed" Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                                    FontSize="{DynamicResource ThemeFontSizeSm}"/>
                     </Border>
                 </StackPanel>
             </Border>
 
-            <!-- Text Selection -->
-            <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Text Selection" FontWeight="SemiBold"
-                               FontSize="{DynamicResource ThemeFontSizeMd}"
-                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                    <TextBlock Text="Drag to select text and see your selection color"
-                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                               Foreground="{DynamicResource ThemeTextMutedBrush}"
-                               Margin="0,0,0,4"/>
-                    <!-- Simulated selected text -->
-                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}" CornerRadius="6" Padding="12">
-                        <StackPanel Spacing="6">
-                            <Panel>
-                                <TextBlock Text="The quick brown fox jumps over the lazy dog"
-                                           FontSize="{DynamicResource ThemeFontSizeSm}"
-                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                                <!-- Selection highlight overlay on "brown fox jumps" -->
-                                <Border Background="{DynamicResource ThemeSelectionBrush}"
-                                        HorizontalAlignment="Left" VerticalAlignment="Center"
-                                        Margin="68,0,0,0" Padding="0" Height="20" Width="120"
-                                        IsHitTestVisible="False"/>
-                            </Panel>
-                            <SelectableTextBlock Text="Or select this text to test interactively"
-                                                 FontSize="{DynamicResource ThemeFontSizeSm}"
-                                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </Border>
-
-            <!-- Highlights -->
-            <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Highlights" FontWeight="SemiBold"
-                               FontSize="{DynamicResource ThemeFontSizeMd}"
-                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                    <WrapPanel Orientation="Horizontal">
-                        <Border Background="{DynamicResource ThemeHighlightYellowBrush}" CornerRadius="3"
-                                Padding="8,3" Margin="0,0,6,6">
-                            <TextBlock Text="Yellow highlight" FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                       Foreground="#1A1A2E"/>
-                        </Border>
-                        <Border Background="{DynamicResource ThemeHighlightBlueBrush}" CornerRadius="3"
-                                Padding="8,3" Margin="0,0,6,6">
-                            <TextBlock Text="Blue highlight" FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                       Foreground="#1A1A2E"/>
-                        </Border>
-                        <Border Background="{DynamicResource ThemeHighlightGreenBrush}" CornerRadius="3"
-                                Padding="8,3" Margin="0,0,6,6">
-                            <TextBlock Text="Green highlight" FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                       Foreground="#1A1A2E"/>
-                        </Border>
-                        <Border Background="{DynamicResource ThemeHighlightPinkBrush}" CornerRadius="3"
-                                Padding="8,3" Margin="0,0,6,6">
-                            <TextBlock Text="Pink highlight" FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                       Foreground="#1A1A2E"/>
-                        </Border>
-                        <Border Background="{DynamicResource ThemeHighlightPurpleBrush}" CornerRadius="3"
-                                Padding="8,3" Margin="0,0,6,6">
-                            <TextBlock Text="Purple highlight" FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                       Foreground="#1A1A2E"/>
-                        </Border>
-                        <Border Background="{DynamicResource ThemeHighlightOrangeBrush}" CornerRadius="3"
-                                Padding="8,3" Margin="0,0,6,6">
-                            <TextBlock Text="Orange highlight" FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                       Foreground="#1A1A2E"/>
-                        </Border>
-                    </WrapPanel>
-                </StackPanel>
-            </Border>
-
-            <!-- Semantic Badges -->
+            <!-- ═══ SEMANTIC COLORS ═══ -->
             <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
                 <StackPanel Spacing="8">
                     <TextBlock Text="Semantic Colors" FontWeight="SemiBold"
-                               FontSize="{DynamicResource ThemeFontSizeMd}"/>
-                    <WrapPanel Orientation="Horizontal">
-                        <Border Background="{DynamicResource ThemeSuccessMutedBrush}" CornerRadius="4"
-                                Padding="10,4" Margin="0,0,8,8">
-                            <TextBlock Text="Success" Foreground="{DynamicResource ThemeSuccessBrush}"
-                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="0,0,0,4"/>
+
+                    <!-- Badges: solid + muted side by side -->
+                    <Grid ColumnDefinitions="*,*,*,*" Margin="0,0,0,0">
+                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,6,0">
+                            <TextBlock Text="Success" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                            <Border Background="{DynamicResource ThemeSuccessBrush}" CornerRadius="4" Padding="8,4">
+                                <TextBlock Text="Solid" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextOnAccentBrush}" HorizontalAlignment="Center"/>
+                            </Border>
+                            <Border Background="{DynamicResource ThemeSuccessMutedBrush}" CornerRadius="4" Padding="8,4">
+                                <TextBlock Text="Muted" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeSuccessBrush}" HorizontalAlignment="Center"/>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,6,0">
+                            <TextBlock Text="Warning" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                            <Border Background="{DynamicResource ThemeWarningBrush}" CornerRadius="4" Padding="8,4">
+                                <TextBlock Text="Solid" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextOnAccentBrush}" HorizontalAlignment="Center"/>
+                            </Border>
+                            <Border Background="{DynamicResource ThemeWarningMutedBrush}" CornerRadius="4" Padding="8,4">
+                                <TextBlock Text="Muted" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeWarningBrush}" HorizontalAlignment="Center"/>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,6,0">
+                            <TextBlock Text="Danger" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                            <Border Background="{DynamicResource ThemeDangerBrush}" CornerRadius="4" Padding="8,4">
+                                <TextBlock Text="Solid" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextOnAccentBrush}" HorizontalAlignment="Center"/>
+                            </Border>
+                            <Border Background="{DynamicResource ThemeDangerMutedBrush}" CornerRadius="4" Padding="8,4">
+                                <TextBlock Text="Muted" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeDangerBrush}" HorizontalAlignment="Center"/>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3" Spacing="4">
+                            <TextBlock Text="Info" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                            <Border Background="{DynamicResource ThemeInfoBrush}" CornerRadius="4" Padding="8,4">
+                                <TextBlock Text="Solid" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextOnAccentBrush}" HorizontalAlignment="Center"/>
+                            </Border>
+                            <Border Background="{DynamicResource ThemeInfoMutedBrush}" CornerRadius="4" Padding="8,4">
+                                <TextBlock Text="Muted" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeInfoBrush}" HorizontalAlignment="Center"/>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Stage badges -->
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                        <Border Background="{DynamicResource ThemeAlphaBadgeBrush}" CornerRadius="4" Padding="10,3">
+                            <TextBlock Text="ALPHA" FontSize="{DynamicResource ThemeFontSizeXs}" FontWeight="Bold"
+                                       Foreground="{DynamicResource ThemeTextOnAccentBrush}"/>
                         </Border>
-                        <Border Background="{DynamicResource ThemeWarningMutedBrush}" CornerRadius="4"
-                                Padding="10,4" Margin="0,0,8,8">
-                            <TextBlock Text="Warning" Foreground="{DynamicResource ThemeWarningBrush}"
-                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                        <Border Background="{DynamicResource ThemeBetaBadgeBrush}" CornerRadius="4" Padding="10,3">
+                            <TextBlock Text="BETA" FontSize="{DynamicResource ThemeFontSizeXs}" FontWeight="Bold"
+                                       Foreground="{DynamicResource ThemeTextOnAccentBrush}"/>
                         </Border>
-                        <Border Background="{DynamicResource ThemeDangerMutedBrush}" CornerRadius="4"
-                                Padding="10,4" Margin="0,0,8,8">
-                            <TextBlock Text="Danger" Foreground="{DynamicResource ThemeDangerBrush}"
-                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                        </Border>
-                        <Border Background="{DynamicResource ThemePrimaryMutedBrush}" CornerRadius="4"
-                                Padding="10,4" Margin="0,0,8,8">
-                            <TextBlock Text="Info" Foreground="{DynamicResource ThemePrimaryBrush}"
-                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                        </Border>
-                        <Border Background="{DynamicResource ThemeSecondaryMutedBrush}" CornerRadius="4"
-                                Padding="10,4" Margin="0,0,8,8">
-                            <TextBlock Text="Tag" Foreground="{DynamicResource ThemeSecondaryBrush}"
-                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                        </Border>
-                    </WrapPanel>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
-            <!-- Form Elements -->
+            <!-- ═══ FORM ELEMENTS ═══ -->
             <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
                 <StackPanel Spacing="8">
                     <TextBlock Text="Form Elements" FontWeight="SemiBold"
-                               FontSize="{DynamicResource ThemeFontSizeMd}"/>
-                    <TextBox Watermark="Text input..." Padding="12,8"/>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <CheckBox Content="Checkbox" IsChecked="True"/>
-                        <CheckBox Content="Unchecked"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <RadioButton Content="Option A" IsChecked="True"/>
-                        <RadioButton Content="Option B"/>
-                    </StackPanel>
-                    <ToggleSwitch OnContent="Enabled" OffContent="Disabled" IsChecked="True"/>
-                    <ProgressBar Value="65" Minimum="0" Maximum="100" Height="6"
-                                 Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="0,0,0,4"/>
+                    <Grid ColumnDefinitions="*,*">
+                        <StackPanel Grid.Column="0" Spacing="8" Margin="0,0,8,0">
+                            <TextBox Watermark="Text input..." Padding="10,7"/>
+                            <TextBox Text="Focused input" Padding="10,7"/>
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <CheckBox Content="Checked" IsChecked="True"/>
+                                <CheckBox Content="Unchecked"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="8" Margin="8,0,0,0">
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <RadioButton Content="Selected" IsChecked="True" GroupName="PreviewGroup"/>
+                                <RadioButton Content="Unselected" GroupName="PreviewGroup"/>
+                            </StackPanel>
+                            <ToggleSwitch OnContent="Enabled" OffContent="Disabled" IsChecked="True"/>
+                            <ProgressBar Value="65" Minimum="0" Maximum="100" Height="6"
+                                         Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                            <ProgressBar Value="40" Minimum="0" Maximum="100" Height="6"
+                                         Foreground="{DynamicResource ThemeSecondaryBrush}"/>
+                        </StackPanel>
+                    </Grid>
                 </StackPanel>
             </Border>
 
-            <!-- Borders -->
+            <!-- ═══ BORDERS ═══ -->
             <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
                 <StackPanel Spacing="8">
                     <TextBlock Text="Borders" FontWeight="SemiBold"
-                               FontSize="{DynamicResource ThemeFontSizeMd}"/>
-                    <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                            CornerRadius="4" Padding="12">
-                        <TextBlock Text="Standard border" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-                    </Border>
-                    <Border BorderBrush="{DynamicResource ThemeBorderSubtleBrush}" BorderThickness="1"
-                            CornerRadius="4" Padding="12">
-                        <TextBlock Text="Subtle border" FontSize="{DynamicResource ThemeFontSizeSm}"
-                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
-                    </Border>
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="0,0,0,4"/>
+                    <Grid ColumnDefinitions="*,*">
+                        <Border Grid.Column="0" BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                                CornerRadius="4" Padding="12" Margin="0,0,6,0">
+                            <TextBlock Text="Standard border" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                        </Border>
+                        <Border Grid.Column="1" BorderBrush="{DynamicResource ThemeBorderSubtleBrush}" BorderThickness="1"
+                                CornerRadius="4" Padding="12" Margin="6,0,0,0">
+                            <TextBlock Text="Subtle border" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                        </Border>
+                    </Grid>
                 </StackPanel>
             </Border>
 
-            <!-- Nav Sidebar Preview -->
+            <!-- ═══ NAVIGATION SIDEBAR ═══ -->
             <Border Background="{DynamicResource ThemeNavBackgroundBrush}" CornerRadius="8" Padding="12">
                 <StackPanel Spacing="2">
-                    <TextBlock Text="Navigation" FontWeight="SemiBold"
+                    <TextBlock Text="Navigation Sidebar" FontWeight="SemiBold"
                                FontSize="{DynamicResource ThemeFontSizeXsSm}"
                                Foreground="{DynamicResource ThemeTextMutedBrush}"
-                               Margin="8,0,0,8"/>
+                               Margin="8,4,0,8"/>
                     <Border Background="{DynamicResource ThemeNavSelectedBrush}" CornerRadius="4" Padding="10,8">
                         <Grid ColumnDefinitions="Auto,*">
                             <Border Width="3" Height="14" CornerRadius="2" Margin="0,0,8,0"
                                     Background="{DynamicResource ThemePrimaryBrush}"/>
-                            <TextBlock Grid.Column="1" Text="Notes"
+                            <TextBlock Grid.Column="1" Text="Active item"
                                        Foreground="{DynamicResource ThemeNavTextHoverBrush}"
                                        FontSize="{DynamicResource ThemeFontSizeSm}"/>
                         </Grid>
                     </Border>
                     <Border Background="Transparent" CornerRadius="4" Padding="10,8" Margin="3,0,0,0">
-                        <TextBlock Text="Tasks" Foreground="{DynamicResource ThemeNavTextBrush}"
-                                   FontSize="{DynamicResource ThemeFontSizeSm}"/>
-                    </Border>
-                    <Border Background="Transparent" CornerRadius="4" Padding="10,8" Margin="3,0,0,0">
-                        <TextBlock Text="Calendar" Foreground="{DynamicResource ThemeNavTextBrush}"
+                        <TextBlock Text="Normal item" Foreground="{DynamicResource ThemeNavTextBrush}"
                                    FontSize="{DynamicResource ThemeFontSizeSm}"/>
                     </Border>
                     <Border Background="{DynamicResource ThemeNavHoverBrush}" CornerRadius="4" Padding="10,8" Margin="3,0,0,0">
-                        <TextBlock Text="Files (hover)" Foreground="{DynamicResource ThemeNavTextHoverBrush}"
+                        <TextBlock Text="Hovered item" Foreground="{DynamicResource ThemeNavTextHoverBrush}"
                                    FontSize="{DynamicResource ThemeFontSizeSm}"/>
                     </Border>
+                    <Border Background="Transparent" CornerRadius="4" Padding="10,8" Margin="3,0,0,0">
+                        <TextBlock Text="Normal item" Foreground="{DynamicResource ThemeNavTextBrush}"
+                                   FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- ═══ SCROLLBAR ═══ -->
+            <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Scrollbar" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="0,0,0,4"/>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Track" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                <Border Background="{DynamicResource ThemeScrollTrackBrush}"
+                                        Width="12" Height="60" CornerRadius="6"/>
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Thumb" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                <Border Background="{DynamicResource ThemeScrollTrackBrush}"
+                                        Width="12" Height="60" CornerRadius="6">
+                                    <Border Background="{DynamicResource ThemeScrollThumbBrush}"
+                                            Width="12" Height="24" CornerRadius="6"
+                                            VerticalAlignment="Top" Margin="0,8,0,0"/>
+                                </Border>
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Thumb hover" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                <Border Background="{DynamicResource ThemeScrollTrackBrush}"
+                                        Width="12" Height="60" CornerRadius="6">
+                                    <Border Background="{DynamicResource ThemeScrollThumbHoverBrush}"
+                                            Width="12" Height="24" CornerRadius="6"
+                                            VerticalAlignment="Top" Margin="0,8,0,0"/>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ═══ CALENDAR ═══ -->
+            <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Calendar" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="0,0,0,4"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Border Background="{DynamicResource ThemeCalendarEventBrush}" CornerRadius="4" Padding="12,6">
+                            <TextBlock Text="Calendar event" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeTextOnAccentBrush}"/>
+                        </Border>
+                        <Border Background="{DynamicResource ThemeCalendarEventMutedBrush}" CornerRadius="4" Padding="12,6">
+                            <TextBlock Text="Event muted" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="{DynamicResource ThemeCalendarEventBrush}"/>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ═══ MODAL OVERLAY ═══ -->
+            <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Modal &amp; Overlays" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="0,0,0,4"/>
+                    <Grid ColumnDefinitions="*,*" Height="60">
+                        <Border Grid.Column="0" Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="4" Margin="0,0,6,0">
+                            <Panel>
+                                <TextBlock Text="Content behind" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Border Background="{DynamicResource ThemeModalBackdropBrush}"
+                                        CornerRadius="4"/>
+                                <TextBlock Text="Standard backdrop" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="White" HorizontalAlignment="Center"
+                                           VerticalAlignment="Bottom" Margin="0,0,0,4"/>
+                            </Panel>
+                        </Border>
+                        <Border Grid.Column="1" Background="{DynamicResource ThemeBackgroundBrush}" CornerRadius="4" Margin="6,0,0,0">
+                            <Panel>
+                                <TextBlock Text="Content behind" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Border Background="{DynamicResource ThemeModalBackdropHeavyBrush}"
+                                        CornerRadius="4"/>
+                                <TextBlock Text="Heavy backdrop" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="White" HorizontalAlignment="Center"
+                                           VerticalAlignment="Bottom" Margin="0,0,0,4"/>
+                            </Panel>
+                        </Border>
+                    </Grid>
                 </StackPanel>
             </Border>
 
