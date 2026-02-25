@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PrivStack.Desktop.Native;
@@ -298,6 +300,13 @@ public partial class UnlockViewModel : ViewModelBase
             _log.Error(ex, "[Reset] Failed to wipe data");
             ErrorMessage = $"Failed to reset data: {ex.Message}";
         }
+    }
+
+    [RelayCommand]
+    private void ExitApp()
+    {
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
+            lifetime.Shutdown();
     }
 
     /// <summary>

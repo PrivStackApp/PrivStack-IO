@@ -125,24 +125,36 @@
                     </Button>
                 </StackPanel>
 
-                <!-- Unlock Button (hidden during app loading) -->
-                <Button Command="{Binding UnlockCommand}"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        Classes="action-btn"
-                        Background="{DynamicResource ThemePrimaryBrush}"
-                        Foreground="{DynamicResource ThemeTextOnAccentBrush}"
-                        Padding="16,12"
-                        IsVisible="{Binding !IsAppLoading}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="Unlock"
-                                   IsVisible="{Binding !IsLoading}"
-                                   FontWeight="SemiBold"/>
-                        <TextBlock Text="Unlocking..."
-                                   IsVisible="{Binding IsLoading}"
-                                   FontWeight="SemiBold"/>
-                    </StackPanel>
-                </Button>
+                <!-- Exit / Unlock Buttons (hidden during app loading) -->
+                <Grid ColumnDefinitions="*,8,*" IsVisible="{Binding !IsAppLoading}">
+                    <Button Grid.Column="0"
+                            Command="{Binding ExitAppCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                            Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                            Padding="16,12"
+                            CornerRadius="8">
+                        <TextBlock Text="Exit" FontWeight="SemiBold"/>
+                    </Button>
+                    <Button Grid.Column="2"
+                            Command="{Binding UnlockCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            Classes="action-btn"
+                            Background="{DynamicResource ThemePrimaryBrush}"
+                            Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                            Padding="16,12">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Unlock"
+                                       IsVisible="{Binding !IsLoading}"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="Unlocking..."
+                                       IsVisible="{Binding IsLoading}"
+                                       FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
 
                 <!-- App Loading State (shown after successful unlock) -->
                 <StackPanel IsVisible="{Binding IsAppLoading}" Spacing="16" HorizontalAlignment="Center">
