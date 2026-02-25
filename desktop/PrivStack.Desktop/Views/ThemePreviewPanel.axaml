@@ -338,25 +338,36 @@
 
             <!-- ═══ FORM ELEMENTS ═══ -->
             <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="10">
                     <TextBlock Text="Form Elements" FontWeight="SemiBold"
                                FontSize="{DynamicResource ThemeFontSizeMd}"
                                Foreground="{DynamicResource ThemeTextPrimaryBrush}" Margin="0,0,0,4"/>
+
+                    <!-- Text inputs -->
                     <Grid ColumnDefinitions="*,*">
-                        <StackPanel Grid.Column="0" Spacing="8" Margin="0,0,8,0">
-                            <TextBox Watermark="Text input..." Padding="10,7"/>
-                            <TextBox Text="Focused input" Padding="10,7"/>
-                            <StackPanel Orientation="Horizontal" Spacing="16">
-                                <CheckBox Content="Checked" IsChecked="True"/>
-                                <CheckBox Content="Unchecked"/>
-                            </StackPanel>
+                        <TextBox Grid.Column="0" Watermark="Text input..." Padding="10,7" Margin="0,0,8,0"/>
+                        <TextBox Grid.Column="1" Text="Disabled input" IsEnabled="False" Padding="10,7" Margin="8,0,0,0"/>
+                    </Grid>
+
+                    <!-- Checkboxes + Radio buttons -->
+                    <Grid ColumnDefinitions="*,*">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16" Margin="0,0,8,0"
+                                    VerticalAlignment="Center">
+                            <CheckBox Content="Checked" IsChecked="True"/>
+                            <CheckBox Content="Unchecked"/>
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Spacing="8" Margin="8,0,0,0">
-                            <StackPanel Orientation="Horizontal" Spacing="16">
-                                <RadioButton Content="Selected" IsChecked="True" GroupName="PreviewGroup"/>
-                                <RadioButton Content="Unselected" GroupName="PreviewGroup"/>
-                            </StackPanel>
-                            <ToggleSwitch OnContent="Enabled" OffContent="Disabled" IsChecked="True"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16" Margin="8,0,0,0"
+                                    VerticalAlignment="Center">
+                            <RadioButton Content="Option A" IsChecked="True" GroupName="PreviewGroup"/>
+                            <RadioButton Content="Option B" GroupName="PreviewGroup"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Toggle + Progress bars -->
+                    <Grid ColumnDefinitions="*,*">
+                        <ToggleSwitch Grid.Column="0" OnContent="Enabled" OffContent="Disabled"
+                                      IsChecked="True" Margin="0,0,8,0"/>
+                        <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center" Margin="8,0,0,0">
                             <ProgressBar Value="65" Minimum="0" Maximum="100" Height="6"
                                          Foreground="{DynamicResource ThemePrimaryBrush}"/>
                             <ProgressBar Value="40" Minimum="0" Maximum="100" Height="6"
