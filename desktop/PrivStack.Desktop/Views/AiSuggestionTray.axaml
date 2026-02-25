@@ -140,32 +140,53 @@
                 BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
                 BorderThickness="0,0,0,1"
                 Padding="8,4">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-                <Button Content="Chat"
-                        Classes="view-toggle"
-                        Classes.active="{Binding IsChatTab}"
-                        Click="OnTabChat"
-                        Padding="10,5"
-                        FontSize="{DynamicResource ThemeFontSizeSm}"
-                        CornerRadius="{DynamicResource ThemeRadiusSm}"
-                        Name="TabChat"/>
-                <Button Content="Intents"
-                        Classes="view-toggle"
-                        Classes.active="{Binding IsIntentsTab}"
-                        Click="OnTabIntents"
-                        Padding="10,5"
-                        FontSize="{DynamicResource ThemeFontSizeSm}"
-                        CornerRadius="{DynamicResource ThemeRadiusSm}"
-                        Name="TabIntents"/>
-                <Button Content="History"
-                        Classes="view-toggle"
-                        Classes.active="{Binding IsHistoryTab}"
-                        Click="OnTabHistory"
-                        Padding="10,5"
-                        FontSize="{DynamicResource ThemeFontSizeSm}"
-                        CornerRadius="{DynamicResource ThemeRadiusSm}"
-                        Name="TabHistory"/>
-            </StackPanel>
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Button Content="Chat"
+                            Classes="view-toggle"
+                            Classes.active="{Binding IsChatTab}"
+                            Click="OnTabChat"
+                            Padding="10,5"
+                            FontSize="{DynamicResource ThemeFontSizeSm}"
+                            CornerRadius="{DynamicResource ThemeRadiusSm}"
+                            Name="TabChat"/>
+                    <Button Content="Intents"
+                            Classes="view-toggle"
+                            Classes.active="{Binding IsIntentsTab}"
+                            Click="OnTabIntents"
+                            Padding="10,5"
+                            FontSize="{DynamicResource ThemeFontSizeSm}"
+                            CornerRadius="{DynamicResource ThemeRadiusSm}"
+                            Name="TabIntents"/>
+                    <Button Content="History"
+                            Classes="view-toggle"
+                            Classes.active="{Binding IsHistoryTab}"
+                            Click="OnTabHistory"
+                            Padding="10,5"
+                            FontSize="{DynamicResource ThemeFontSizeSm}"
+                            CornerRadius="{DynamicResource ThemeRadiusSm}"
+                            Name="TabHistory"/>
+                </StackPanel>
+
+                <!-- Reattach button (detached mode only) -->
+                <Button Grid.Column="1"
+                        IsVisible="{Binding IsDetached}"
+                        Command="{Binding RequestReattachCommand}"
+                        ToolTip.Tip="Reattach to main window"
+                        Background="Transparent" BorderThickness="0"
+                        Padding="4" MinWidth="24" MinHeight="24"
+                        VerticalAlignment="Center"
+                        Cursor="Hand">
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover /template/ ContentPresenter">
+                            <Setter Property="Background" Value="{DynamicResource ThemeSecondaryBrush}"/>
+                        </Style>
+                    </Button.Styles>
+                    <PathIcon Data="M3,2 L13,2 L13,18 L3,18 Z"
+                              Width="12" Height="12"
+                              Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                </Button>
+            </Grid>
         </Border>
 
         <!-- ═══ Chat Tab ═══ -->

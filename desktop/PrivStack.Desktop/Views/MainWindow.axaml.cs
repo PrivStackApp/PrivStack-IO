@@ -424,6 +424,8 @@ public partial class MainWindow : Window
             mainPos.Y + 40);
 
         _floatingAiWindow.WindowClosingByUser += OnFloatingAiWindowClosing;
+        vm.AiTrayVM.ReattachRequested += OnAiTrayReattachRequested;
+        vm.AiTrayVM.IsDetached = true;
         _floatingAiWindow.Show();
     }
 
@@ -448,6 +450,8 @@ public partial class MainWindow : Window
         }
 
         _isReattaching = true;
+        vm.AiTrayVM.ReattachRequested -= OnAiTrayReattachRequested;
+        vm.AiTrayVM.IsDetached = false;
         _floatingAiWindow.WindowClosingByUser -= OnFloatingAiWindowClosing;
         _floatingAiWindow.Close();
         _floatingAiWindow = null;
@@ -481,10 +485,18 @@ public partial class MainWindow : Window
                 }
 
                 _floatingAiWindow = null;
+                vm.AiTrayVM.ReattachRequested -= OnAiTrayReattachRequested;
+                vm.AiTrayVM.IsDetached = false;
                 vm.AiTrayDisplayMode = AiTrayDisplayMode.AttachedFull;
                 vm.AiTrayMaxHeight = double.PositiveInfinity;
             }
         });
+    }
+
+    private void OnAiTrayReattachRequested(object? sender, EventArgs e)
+    {
+        if (DataContext is MainWindowViewModel vm)
+            vm.SetAiTrayDisplayModeCommand.Execute(AiTrayDisplayMode.AttachedFull);
     }
 
     private void UpdateAiTrayMaxHeight()

@@ -16,6 +16,12 @@
         Background="{DynamicResource ThemeSurfaceBrush}"
         Icon="avares://PrivStack.Desktop/Assets/privstack-logo.png">
 
+    <Window.Styles>
+        <Style Selector="Window > ContentPresenter">
+            <Setter Property="Margin" Value="8,0,8,8"/>
+        </Style>
+    </Window.Styles>
+
     <!-- The AiSuggestionTray UserControl is set as Content programmatically -->
 
 </Window>

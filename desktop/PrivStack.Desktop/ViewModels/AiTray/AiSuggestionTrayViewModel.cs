@@ -137,6 +137,15 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
     /// <summary>Raised when the view should scroll to the bottom.</summary>
     public event EventHandler? ScrollToBottomRequested;
 
+    /// <summary>Raised when the user clicks the reattach button in the detached window.</summary>
+    public event EventHandler? ReattachRequested;
+
+    [ObservableProperty]
+    private bool _isDetached;
+
+    [RelayCommand]
+    private void RequestReattach() => ReattachRequested?.Invoke(this, EventArgs.Empty);
+
     // ── Active Item Context ──────────────────────────────────────────
 
     private string? _activeItemContextShort;
