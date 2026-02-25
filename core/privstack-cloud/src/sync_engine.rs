@@ -203,6 +203,13 @@ impl CloudSyncEngine {
                     );
                     self.poll_interval = recommended;
                 }
+                // Update the API client's sliding window counter with server limits.
+                self.api
+                    .configure_rate_limits(
+                        limits.max_requests_per_window,
+                        limits.window_seconds,
+                    )
+                    .await;
                 self.rate_limits = limits;
             }
             Err(e) => {

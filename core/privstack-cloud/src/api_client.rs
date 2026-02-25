@@ -9,8 +9,9 @@ use crate::types::*;
 use privstack_crypto::SealedEnvelope;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
 
@@ -22,6 +23,56 @@ struct AuthState {
     /// Monotonically increasing counter bumped on every successful refresh.
     /// Used to detect when a concurrent refresh has already updated tokens.
     refresh_generation: u64,
+}
+
+/// Sliding window request counter for proactive rate-limit enforcement.
+/// Tracks timestamps of recent requests and blocks when approaching the limit.
+struct RequestCounter {
+    /// Timestamps of requests within the current window.
+    timestamps: VecDeque<Instant>,
+    /// Maximum allowed requests per window (75% of server limit).
+    max_per_window: u64,
+    /// Window duration.
+    window: Duration,
+}
+
+impl RequestCounter {
+    fn new(max_requests_per_window: u64, window_seconds: u64) -> Self {
+        // Enforce 75% of the server-advertised limit.
+        let max_per_window = (max_requests_per_window as f64 * 0.75) as u64;
+        Self {
+            timestamps: VecDeque::new(),
+            max_per_window,
+            window: Duration::from_secs(window_seconds),
+        }
+    }
+
+    /// Record a request and return Ok, or Err with seconds to wait if at capacity.
+    fn record_or_throttle(&mut self) -> Result<(), u64> {
+        let now = Instant::now();
+        let cutoff = now.checked_sub(self.window).unwrap_or(now);
+
+        // Evict expired timestamps.
+        while self.timestamps.front().is_some_and(|t| *t < cutoff) {
+            self.timestamps.pop_front();
+        }
+
+        if self.timestamps.len() as u64 >= self.max_per_window {
+            // Compute how long until the oldest request leaves the window.
+            let oldest = self.timestamps.front().copied().unwrap_or(now);
+            let wait = self.window.saturating_sub(now.duration_since(oldest));
+            return Err(wait.as_secs().max(1));
+        }
+
+        self.timestamps.push_back(now);
+        Ok(())
+    }
+
+    /// Update limits from server configuration.
+    fn update_limits(&mut self, max_requests_per_window: u64, window_seconds: u64) {
+        self.max_per_window = (max_requests_per_window as f64 * 0.75) as u64;
+        self.window = Duration::from_secs(window_seconds);
+    }
 }
 
 /// HTTP client for the PrivStack cloud control plane.
@@ -36,6 +87,8 @@ pub struct CloudApiClient {
     /// Global rate-limit gate: when set, all API requests are blocked until
     /// the deadline passes. Set on any 429 response, cleared automatically.
     rate_limited_until: Arc<RwLock<Option<Instant>>>,
+    /// Sliding window counter to stay under 75% of the server rate limit.
+    request_counter: Arc<RwLock<RequestCounter>>,
 }
 
 #[derive(Deserialize)]
@@ -54,9 +107,12 @@ struct TokenUser {
 impl CloudApiClient {
     pub fn new(config: CloudConfig) -> Self {
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
+            .timeout(Duration::from_secs(30))
             .build()
             .expect("failed to build HTTP client");
+
+        // Default: 600 req/60s window — 75% = 450 req/window.
+        let counter = RequestCounter::new(600, 60);
 
         Self {
             client,
@@ -69,6 +125,7 @@ impl CloudApiClient {
             })),
             refresh_lock: Arc::new(tokio::sync::Mutex::new(())),
             rate_limited_until: Arc::new(RwLock::new(None)),
+            request_counter: Arc::new(RwLock::new(counter)),
         }
     }
 
@@ -317,28 +374,44 @@ impl CloudApiClient {
     }
 
     /// Returns remaining pause duration, or `None` if not rate-limited.
-    pub async fn rate_limit_remaining(&self) -> Option<std::time::Duration> {
+    pub async fn rate_limit_remaining(&self) -> Option<Duration> {
         let guard = self.rate_limited_until.read().await;
         guard.and_then(|deadline| deadline.checked_duration_since(Instant::now()))
     }
 
-    /// Pre-flight gate: returns `RateLimited` error if the global pause is active.
+    /// Pre-flight gate: returns `RateLimited` error if the global pause is active
+    /// OR if the sliding window counter indicates we're at 75% capacity.
     async fn enforce_rate_limit(&self) -> CloudResult<()> {
-        let guard = self.rate_limited_until.read().await;
-        if let Some(deadline) = *guard {
-            let now = Instant::now();
-            if now < deadline {
-                let remaining = deadline - now;
-                return Err(CloudError::RateLimited {
-                    retry_after_secs: remaining.as_secs().max(1),
-                });
+        // Check hard 429 backoff gate first.
+        {
+            let guard = self.rate_limited_until.read().await;
+            if let Some(deadline) = *guard {
+                let now = Instant::now();
+                if now < deadline {
+                    let remaining = deadline - now;
+                    return Err(CloudError::RateLimited {
+                        retry_after_secs: remaining.as_secs().max(1),
+                    });
+                }
             }
         }
+
+        // Then check proactive sliding window throttle.
+        let mut counter = self.request_counter.write().await;
+        if let Err(wait_secs) = counter.record_or_throttle() {
+            debug!("proactive rate throttle: at 75% capacity, wait {wait_secs}s");
+            return Err(CloudError::RateLimited {
+                retry_after_secs: wait_secs,
+            });
+        }
+
         Ok(())
     }
 
     /// Checks a response for 429 status, sets the global pause, and returns
-    /// a `RateLimited` error. Only extends the deadline, never shortens it.
+    /// a `RateLimited` error. Uses 2x the server's Retry-After with a 60-second
+    /// minimum to ensure we don't immediately hit the limit again.
+    /// Only extends the deadline, never shortens it.
     async fn check_rate_limit_response(
         &self,
         resp: &reqwest::Response,
@@ -347,14 +420,17 @@ impl CloudApiClient {
             return None;
         }
 
-        let retry_after_secs = resp
+        let server_retry_after = resp
             .headers()
             .get("retry-after")
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(60);
 
-        let new_deadline = Instant::now() + std::time::Duration::from_secs(retry_after_secs);
+        // Double the server's retry-after with a 60-second floor.
+        let backoff_secs = (server_retry_after * 2).max(60);
+
+        let new_deadline = Instant::now() + Duration::from_secs(backoff_secs);
 
         let mut guard = self.rate_limited_until.write().await;
         let should_extend = guard.map_or(true, |existing| new_deadline > existing);
@@ -362,8 +438,20 @@ impl CloudApiClient {
             *guard = Some(new_deadline);
         }
 
-        warn!("429 rate limited — pausing all API requests for {retry_after_secs}s");
-        Some(CloudError::RateLimited { retry_after_secs })
+        warn!(
+            "429 rate limited — server said {server_retry_after}s, pausing all API requests for {backoff_secs}s (2x with 60s floor)"
+        );
+        Some(CloudError::RateLimited { retry_after_secs: backoff_secs })
+    }
+
+    /// Update the sliding window counter with server-provided rate-limit config.
+    pub async fn configure_rate_limits(&self, max_requests_per_window: u64, window_seconds: u64) {
+        let mut counter = self.request_counter.write().await;
+        counter.update_limits(max_requests_per_window, window_seconds);
+        debug!(
+            "rate counter updated: 75% of {max_requests_per_window}/{window_seconds}s = {} req/window",
+            (max_requests_per_window as f64 * 0.75) as u64
+        );
     }
 
     // ── Workspaces ──

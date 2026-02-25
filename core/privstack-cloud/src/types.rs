@@ -286,6 +286,12 @@ pub struct CloudSyncStatus {
     pub pending_upload_count: usize,
     pub last_sync_at: Option<DateTime<Utc>>,
     pub connected_devices: usize,
+    /// True when the API client is paused due to a 429 or proactive throttle.
+    #[serde(default)]
+    pub is_rate_limited: bool,
+    /// Seconds remaining until the rate-limit pause expires (0 if not limited).
+    #[serde(default)]
+    pub rate_limit_remaining_secs: u64,
 }
 
 /// Commands sent to the cloud sync engine.

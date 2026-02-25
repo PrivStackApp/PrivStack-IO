@@ -41,6 +41,14 @@ public record CloudSyncStatus
 
     [JsonPropertyName("connected_devices")]
     public int ConnectedDevices { get; init; }
+
+    /// <summary>True when the Rust API client is paused due to a 429 or proactive throttle.</summary>
+    [JsonPropertyName("is_rate_limited")]
+    public bool IsRateLimited { get; init; }
+
+    /// <summary>Seconds remaining until the rate-limit pause expires (0 if not limited).</summary>
+    [JsonPropertyName("rate_limit_remaining_secs")]
+    public long RateLimitRemainingSecs { get; init; }
 }
 
 /// <summary>

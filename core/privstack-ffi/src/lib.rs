@@ -116,6 +116,8 @@ pub enum PrivStackError {
     RecoveryNotConfigured = 34,
     /// Invalid recovery mnemonic.
     InvalidRecoveryMnemonic = 35,
+    /// Rate limited by the cloud API — client should back off.
+    RateLimited = 36,
     /// Unknown error.
     Unknown = 99,
 }

@@ -114,6 +114,9 @@ public enum PrivStackError
     /// <summary>Invalid recovery mnemonic.</summary>
     InvalidRecoveryMnemonic = 35,
 
+    /// <summary>Rate limited by the cloud API — client should back off.</summary>
+    RateLimited = 36,
+
     /// <summary>Unknown error.</summary>
     Unknown = 99,
 }

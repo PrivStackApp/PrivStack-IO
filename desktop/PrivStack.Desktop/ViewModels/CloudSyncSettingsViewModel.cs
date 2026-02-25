@@ -127,6 +127,14 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
     [ObservableProperty]
     private CloudQuota? _quota;
 
+    /// <summary>True when the Rust API client is paused due to rate limiting.</summary>
+    [ObservableProperty]
+    private bool _isRateLimited;
+
+    /// <summary>Human-readable rate limit status (e.g. "Paused — rate limited (42s remaining)").</summary>
+    [ObservableProperty]
+    private string? _rateLimitDisplay;
+
     public ObservableCollection<CloudDeviceInfo> Devices { get; } = [];
 
     // ========================================
@@ -414,6 +422,17 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
             ConnectedDeviceCount = status.ConnectedDevices;
             LastSyncDisplay = status.LastSyncAt?.ToLocalTime().ToString("MMM d, h:mm tt") ?? "Never";
 
+            // Update rate limit state from Rust core.
+            IsRateLimited = status.IsRateLimited;
+            RateLimitDisplay = status.IsRateLimited
+                ? $"Paused — rate limited ({status.RateLimitRemainingSecs}s remaining)"
+                : null;
+
+            // When rate limited, skip all API calls (quota, devices, tokens) to
+            // avoid generating more 429 errors. The status itself is local-only.
+            if (status.IsRateLimited)
+                return;
+
             var workspace = _workspaceService.GetActiveWorkspace();
             if (workspace?.CloudWorkspaceId != null)
                 Quota = await Task.Run(() => _cloudSync.GetQuota(workspace.CloudWorkspaceId));
@@ -425,6 +444,13 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
 
             // Persist latest tokens (may have been rotated by Rust on 401 refresh)
             PersistCurrentTokens();
+        }
+        catch (PrivStackException ex) when (ex.ErrorCode == PrivStackError.RateLimited)
+        {
+            // Rust is already handling the backoff — just update UI state.
+            IsRateLimited = true;
+            RateLimitDisplay = "Paused — rate limited";
+            Log.Debug("Cloud sync status refresh hit rate limit — Rust backoff active");
         }
         catch (PrivStackException ex) when (ex.ErrorCode == PrivStackError.CloudAuthError)
         {
@@ -705,7 +731,13 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
         {
             while (!ct.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromSeconds(15), ct);
+                // When rate limited, slow the timer to 30s (just to update the
+                // remaining-seconds display). Normal operation uses 15s.
+                var delay = IsRateLimited
+                    ? TimeSpan.FromSeconds(30)
+                    : TimeSpan.FromSeconds(15);
+
+                await Task.Delay(delay, ct);
                 if (ct.IsCancellationRequested) break;
                 try { await RefreshStatusAsync(); }
                 catch { /* swallow — timer will retry */ }

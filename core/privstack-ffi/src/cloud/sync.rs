@@ -195,6 +195,13 @@ pub unsafe extern "C" fn privstack_cloudsync_get_status(
         .as_ref()
         .and_then(|h| handle.runtime.block_on(h.last_sync_at()));
 
+    let is_rate_limited = handle.runtime.block_on(api.is_rate_limited());
+    let rate_limit_remaining_secs = handle
+        .runtime
+        .block_on(api.rate_limit_remaining())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
     let status = CloudSyncStatus {
         is_syncing,
         is_authenticated,
@@ -202,6 +209,8 @@ pub unsafe extern "C" fn privstack_cloudsync_get_status(
         pending_upload_count: 0,
         last_sync_at,
         connected_devices: 0,
+        is_rate_limited,
+        rate_limit_remaining_secs,
     };
 
     write_json_out(out_json, &status)

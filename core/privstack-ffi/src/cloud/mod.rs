@@ -57,8 +57,11 @@ pub(crate) fn android_log(level: &str, msg: &str) {
 
 /// Converts a `CloudError` to the appropriate FFI error code.
 pub(crate) fn cloud_err(e: &CloudError) -> PrivStackError {
-    android_log("ERROR", &format!("[cloud_err] {e}"));
+    // Rate limit errors are expected transient conditions — log as WARN, not ERROR.
+    let level = if e.is_rate_limited() { "WARN" } else { "ERROR" };
+    android_log(level, &format!("[cloud_err] {e}"));
     match e {
+        CloudError::RateLimited { .. } => PrivStackError::RateLimited,
         CloudError::AuthRequired | CloudError::AuthFailed(_) => PrivStackError::CloudAuthError,
         CloudError::QuotaExceeded { .. } => PrivStackError::QuotaExceeded,
         CloudError::ShareDenied(_) => PrivStackError::ShareDenied,
