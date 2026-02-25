@@ -1048,3 +1048,701 @@ fn save_entity_with_is_favorite() {
     let retrieved = store.get_entity("fav-1").unwrap().unwrap();
     assert_eq!(retrieved.data["is_favorite"], true);
 }
+
+// ── Sync Ledger ─────────────────────────────────────────────────
+
+#[test]
+fn list_all_entity_ids_excludes_trashed() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    let e1 = test_entity("Active");
+    let e2 = test_entity("Trashed");
+    let e2_id = e2.id.clone();
+    store.save_entity(&e1, &schema).unwrap();
+    store.save_entity(&e2, &schema).unwrap();
+    store.trash_entity(&e2_id).unwrap();
+
+    let ids = store.list_all_entity_ids().unwrap();
+    assert_eq!(ids.len(), 1);
+    assert_eq!(ids[0], e1.id);
+}
+
+#[test]
+fn list_all_entity_ids_empty_store() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let ids = store.list_all_entity_ids().unwrap();
+    assert!(ids.is_empty());
+}
+
+#[test]
+fn mark_entity_synced_and_check() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    let e = test_entity("Syncable");
+    let id = e.id.clone();
+    store.save_entity(&e, &schema).unwrap();
+
+    // Before sync, entity should need syncing
+    let needs = store.entities_needing_sync("peer-1").unwrap();
+    assert!(needs.contains(&id));
+
+    // Mark synced with a timestamp after modified_at
+    store.mark_entity_synced("peer-1", &id, 2000).unwrap();
+
+    // Now entity should not need syncing (synced_at > modified_at)
+    let needs = store.entities_needing_sync("peer-1").unwrap();
+    assert!(!needs.contains(&id));
+}
+
+#[test]
+fn entities_needing_sync_includes_unsynced() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    let e1 = test_entity("E1");
+    let e2 = test_entity("E2");
+    let e1_id = e1.id.clone();
+    let e2_id = e2.id.clone();
+    store.save_entity(&e1, &schema).unwrap();
+    store.save_entity(&e2, &schema).unwrap();
+
+    // Mark only e1 as synced
+    store.mark_entity_synced("peer-1", &e1_id, 2000).unwrap();
+
+    let needs = store.entities_needing_sync("peer-1").unwrap();
+    assert!(!needs.contains(&e1_id));
+    assert!(needs.contains(&e2_id));
+}
+
+#[test]
+fn entities_needing_sync_includes_modified_after_sync() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    let mut e = test_entity("Modified");
+    e.modified_at = 3000;
+    let id = e.id.clone();
+    store.save_entity(&e, &schema).unwrap();
+
+    // Synced at 2000 but modified at 3000 → needs re-sync
+    store.mark_entity_synced("peer-1", &id, 2000).unwrap();
+    let needs = store.entities_needing_sync("peer-1").unwrap();
+    assert!(needs.contains(&id));
+}
+
+#[test]
+fn entities_needing_sync_excludes_local_only() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let entity = Entity {
+        id: "local-only-1".into(),
+        entity_type: "bookmark".into(),
+        data: serde_json::json!({"title": "Local", "local_only": true}),
+        created_at: 1, modified_at: 1, created_by: "p".into(),
+    };
+    store.save_entity_raw(&entity).unwrap();
+
+    let needs = store.entities_needing_sync("peer-1").unwrap();
+    assert!(!needs.contains(&"local-only-1".to_string()));
+}
+
+#[test]
+fn mark_entities_synced_batch() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    let e1 = test_entity("B1");
+    let e2 = test_entity("B2");
+    let ids = vec![e1.id.clone(), e2.id.clone()];
+    store.save_entity(&e1, &schema).unwrap();
+    store.save_entity(&e2, &schema).unwrap();
+
+    store.mark_entities_synced("peer-1", &ids, 5000).unwrap();
+
+    let needs = store.entities_needing_sync("peer-1").unwrap();
+    assert!(needs.is_empty());
+}
+
+#[test]
+fn clear_sync_ledger_for_peer() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    let e = test_entity("Clearable");
+    let id = e.id.clone();
+    store.save_entity(&e, &schema).unwrap();
+    store.mark_entity_synced("peer-1", &id, 5000).unwrap();
+
+    store.clear_sync_ledger_for_peer("peer-1").unwrap();
+
+    let needs = store.entities_needing_sync("peer-1").unwrap();
+    assert!(needs.contains(&id));
+}
+
+#[test]
+fn invalidate_sync_ledger_for_entity() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    let e = test_entity("Invalidate");
+    let id = e.id.clone();
+    store.save_entity(&e, &schema).unwrap();
+    store.mark_entity_synced("peer-1", &id, 5000).unwrap();
+    store.mark_entity_synced("peer-2", &id, 5000).unwrap();
+
+    store.invalidate_sync_ledger_for_entity(&id).unwrap();
+
+    // Both peers should now need to re-sync this entity
+    assert!(store.entities_needing_sync("peer-1").unwrap().contains(&id));
+    assert!(store.entities_needing_sync("peer-2").unwrap().contains(&id));
+}
+
+// ── Storage Estimation ──────────────────────────────────────────
+
+#[test]
+fn estimate_storage_bytes() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    store.save_entity(&test_entity("Est1"), &schema).unwrap();
+    store.save_entity(&test_entity("Est2"), &schema).unwrap();
+
+    let bytes = store.estimate_storage_bytes("bookmark").unwrap();
+    assert!(bytes > 0);
+}
+
+#[test]
+fn estimate_storage_bytes_empty() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let bytes = store.estimate_storage_bytes("nothing").unwrap();
+    assert_eq!(bytes, 0);
+}
+
+#[test]
+fn estimate_storage_by_types() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    store.save_entity(&test_entity("T1"), &schema).unwrap();
+
+    let note = Entity {
+        id: "note-est".into(),
+        entity_type: "note".into(),
+        data: serde_json::json!({"content": "hello"}),
+        created_at: 1, modified_at: 1, created_by: "p".into(),
+    };
+    store.save_entity_raw(&note).unwrap();
+
+    let results = store.estimate_storage_by_types(&["bookmark", "note", "missing"]).unwrap();
+    assert_eq!(results.len(), 3);
+
+    let bm = &results[0];
+    assert_eq!(bm.0, "bookmark");
+    assert_eq!(bm.1, 1); // count
+    assert!(bm.2 > 0);   // bytes
+
+    let nt = &results[1];
+    assert_eq!(nt.0, "note");
+    assert_eq!(nt.1, 1);
+
+    let missing = &results[2];
+    assert_eq!(missing.0, "missing");
+    assert_eq!(missing.1, 0);
+    assert_eq!(missing.2, 0);
+}
+
+// ── Cloud Sync Cursors ──────────────────────────────────────────
+
+#[test]
+fn cloud_cursors_save_and_load() {
+    let store = EntityStore::open_in_memory().unwrap();
+
+    store.save_cloud_cursor("entity:ent-1", 42).unwrap();
+    store.save_cloud_cursor("entity:ent-2", 100).unwrap();
+
+    let cursors = store.load_cloud_cursors().unwrap();
+    assert_eq!(cursors.len(), 2);
+
+    let map: std::collections::HashMap<_, _> = cursors.into_iter().collect();
+    assert_eq!(map["entity:ent-1"], 42);
+    assert_eq!(map["entity:ent-2"], 100);
+}
+
+#[test]
+fn cloud_cursor_upsert() {
+    let store = EntityStore::open_in_memory().unwrap();
+    store.save_cloud_cursor("key", 10).unwrap();
+    store.save_cloud_cursor("key", 20).unwrap();
+
+    let cursors = store.load_cloud_cursors().unwrap();
+    assert_eq!(cursors.len(), 1);
+    assert_eq!(cursors[0].1, 20);
+}
+
+#[test]
+fn clear_cloud_cursors() {
+    let store = EntityStore::open_in_memory().unwrap();
+    store.save_cloud_cursor("a", 1).unwrap();
+    store.save_cloud_cursor("b", 2).unwrap();
+
+    store.clear_cloud_cursors().unwrap();
+    let cursors = store.load_cloud_cursors().unwrap();
+    assert!(cursors.is_empty());
+}
+
+// ── Plugin Fuel History ─────────────────────────────────────────
+
+#[test]
+fn fuel_consumption_record_and_metrics() {
+    let store = EntityStore::open_in_memory().unwrap();
+
+    store.record_fuel_consumption("plugin-a", 100).unwrap();
+    store.record_fuel_consumption("plugin-a", 200).unwrap();
+    store.record_fuel_consumption("plugin-a", 300).unwrap();
+
+    let (avg, peak, count) = store.get_fuel_metrics("plugin-a").unwrap();
+    assert_eq!(count, 3);
+    assert_eq!(peak, 300);
+    assert_eq!(avg, 200); // (100+200+300)/3
+}
+
+#[test]
+fn fuel_metrics_empty_plugin() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let (avg, peak, count) = store.get_fuel_metrics("unknown").unwrap();
+    assert_eq!(avg, 0);
+    assert_eq!(peak, 0);
+    assert_eq!(count, 0);
+}
+
+#[test]
+fn clear_fuel_history() {
+    let store = EntityStore::open_in_memory().unwrap();
+    store.record_fuel_consumption("plugin-a", 100).unwrap();
+    store.record_fuel_consumption("plugin-a", 200).unwrap();
+
+    store.clear_fuel_history("plugin-a").unwrap();
+    let (_, _, count) = store.get_fuel_metrics("plugin-a").unwrap();
+    assert_eq!(count, 0);
+}
+
+#[test]
+fn fuel_consumption_isolates_plugins() {
+    let store = EntityStore::open_in_memory().unwrap();
+    store.record_fuel_consumption("a", 100).unwrap();
+    store.record_fuel_consumption("b", 999).unwrap();
+
+    let (_, peak_a, count_a) = store.get_fuel_metrics("a").unwrap();
+    assert_eq!(count_a, 1);
+    assert_eq!(peak_a, 100);
+
+    let (_, peak_b, count_b) = store.get_fuel_metrics("b").unwrap();
+    assert_eq!(count_b, 1);
+    assert_eq!(peak_b, 999);
+}
+
+// ── RAG Vector Index ────────────────────────────────────────────
+
+#[test]
+fn rag_upsert_and_delete() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let embedding = vec![0.1, 0.2, 0.3];
+
+    store.rag_upsert(
+        "ent-1", "chunk-0", "notes", "note", "hash1",
+        3, &embedding, "My Note", "note", 1000, "Hello world",
+    ).unwrap();
+
+    let hashes = store.rag_get_hashes(None).unwrap();
+    assert_eq!(hashes.len(), 1);
+    assert_eq!(hashes[0].0, "ent-1");
+    assert_eq!(hashes[0].2, "hash1");
+
+    store.rag_delete("ent-1").unwrap();
+    let hashes = store.rag_get_hashes(None).unwrap();
+    assert!(hashes.is_empty());
+}
+
+#[test]
+fn rag_upsert_updates_existing() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let emb1 = vec![0.1, 0.2, 0.3];
+    let emb2 = vec![0.4, 0.5, 0.6];
+
+    store.rag_upsert(
+        "ent-1", "chunk-0", "notes", "note", "hash1",
+        3, &emb1, "Title v1", "note", 1000, "text v1",
+    ).unwrap();
+    store.rag_upsert(
+        "ent-1", "chunk-0", "notes", "note", "hash2",
+        3, &emb2, "Title v2", "note", 2000, "text v2",
+    ).unwrap();
+
+    let hashes = store.rag_get_hashes(None).unwrap();
+    assert_eq!(hashes.len(), 1);
+    assert_eq!(hashes[0].2, "hash2"); // updated hash
+}
+
+#[test]
+fn rag_search_cosine_similarity() {
+    let store = EntityStore::open_in_memory().unwrap();
+
+    // Insert two vectors: one similar to query, one orthogonal
+    store.rag_upsert(
+        "ent-close", "chunk-0", "notes", "note", "h1",
+        3, &[0.9, 0.1, 0.0], "Close Note", "note", 1000, "close text",
+    ).unwrap();
+    store.rag_upsert(
+        "ent-far", "chunk-0", "notes", "note", "h2",
+        3, &[0.0, 0.0, 1.0], "Far Note", "note", 1000, "far text",
+    ).unwrap();
+
+    let query = vec![1.0, 0.0, 0.0];
+    let results = store.rag_search(&query, 10, None).unwrap();
+    assert_eq!(results.len(), 2);
+    // First result should be the closer one
+    assert_eq!(results[0]["entity_id"], "ent-close");
+    let score: f64 = results[0]["score"].as_f64().unwrap();
+    assert!(score > 0.5);
+}
+
+#[test]
+fn rag_search_with_type_filter() {
+    let store = EntityStore::open_in_memory().unwrap();
+
+    store.rag_upsert(
+        "note-1", "chunk-0", "notes", "note", "h1",
+        3, &[1.0, 0.0, 0.0], "Note", "note", 1000, "text",
+    ).unwrap();
+    store.rag_upsert(
+        "task-1", "chunk-0", "tasks", "task", "h2",
+        3, &[1.0, 0.0, 0.0], "Task", "task", 1000, "text",
+    ).unwrap();
+
+    let query = vec![1.0, 0.0, 0.0];
+    let results = store.rag_search(&query, 10, Some(&["note"])).unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0]["entity_type"], "note");
+}
+
+#[test]
+fn rag_delete_all() {
+    let store = EntityStore::open_in_memory().unwrap();
+    store.rag_upsert("e1", "c0", "p1", "note", "h1", 2, &[0.1, 0.2], "T1", "note", 1, "t").unwrap();
+    store.rag_upsert("e2", "c0", "p1", "task", "h2", 2, &[0.3, 0.4], "T2", "task", 2, "t").unwrap();
+
+    store.rag_delete_all().unwrap();
+    let hashes = store.rag_get_hashes(None).unwrap();
+    assert!(hashes.is_empty());
+}
+
+#[test]
+fn rag_get_hashes_with_type_filter() {
+    let store = EntityStore::open_in_memory().unwrap();
+    store.rag_upsert("e1", "c0", "p1", "note", "h1", 2, &[0.1, 0.2], "T1", "note", 1, "t").unwrap();
+    store.rag_upsert("e2", "c0", "p1", "task", "h2", 2, &[0.3, 0.4], "T2", "task", 2, "t").unwrap();
+
+    let note_hashes = store.rag_get_hashes(Some(&["note"])).unwrap();
+    assert_eq!(note_hashes.len(), 1);
+    assert_eq!(note_hashes[0].0, "e1");
+}
+
+#[test]
+fn rag_fetch_all() {
+    let store = EntityStore::open_in_memory().unwrap();
+    store.rag_upsert("e1", "c0", "p1", "note", "h1", 3, &[0.1, 0.2, 0.3], "My Note", "note", 1, "hello").unwrap();
+
+    let all = store.rag_fetch_all(None, 100).unwrap();
+    assert_eq!(all.len(), 1);
+    assert_eq!(all[0]["entity_id"], "e1");
+    assert_eq!(all[0]["title"], "My Note");
+    assert_eq!(all[0]["chunk_text"], "hello");
+
+    let emb = all[0]["embedding"].as_array().unwrap();
+    assert_eq!(emb.len(), 3);
+}
+
+#[test]
+fn rag_fetch_all_with_type_filter() {
+    let store = EntityStore::open_in_memory().unwrap();
+    store.rag_upsert("e1", "c0", "p1", "note", "h1", 2, &[0.1, 0.2], "N", "note", 1, "t").unwrap();
+    store.rag_upsert("e2", "c0", "p1", "task", "h2", 2, &[0.3, 0.4], "T", "task", 2, "t").unwrap();
+
+    let notes = store.rag_fetch_all(Some(&["note"]), 100).unwrap();
+    assert_eq!(notes.len(), 1);
+    assert_eq!(notes[0]["entity_type"], "note");
+}
+
+// ── Orphan Entities ─────────────────────────────────────────────
+
+#[test]
+fn find_orphan_entities() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    store.save_entity(&test_entity("Known"), &schema).unwrap();
+
+    let orphan = Entity {
+        id: "orphan-1".into(),
+        entity_type: "obsolete_type".into(),
+        data: serde_json::json!({"x": 1}),
+        created_at: 1, modified_at: 1, created_by: "p".into(),
+    };
+    store.save_entity_raw(&orphan).unwrap();
+
+    let valid_types = vec![("notes".into(), "bookmark".into())];
+    let orphans = store.find_orphan_entities(&valid_types).unwrap();
+    assert_eq!(orphans.len(), 1);
+    assert_eq!(orphans[0]["entity_type"], "obsolete_type");
+    assert_eq!(orphans[0]["count"], 1);
+}
+
+#[test]
+fn find_orphan_entities_none_when_all_valid() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    store.save_entity(&test_entity("Valid"), &schema).unwrap();
+
+    let valid_types = vec![("notes".into(), "bookmark".into())];
+    let orphans = store.find_orphan_entities(&valid_types).unwrap();
+    assert!(orphans.is_empty());
+}
+
+#[test]
+fn delete_orphan_entities() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    store.save_entity(&test_entity("Keep"), &schema).unwrap();
+
+    let orphan = Entity {
+        id: "orphan-del".into(),
+        entity_type: "dead_type".into(),
+        data: serde_json::json!({"x": 1}),
+        created_at: 1, modified_at: 1, created_by: "p".into(),
+    };
+    store.save_entity_raw(&orphan).unwrap();
+
+    let valid_types = vec![("notes".into(), "bookmark".into())];
+    let deleted = store.delete_orphan_entities(&valid_types).unwrap();
+    assert_eq!(deleted, 1);
+
+    // Orphan should be gone
+    assert!(store.get_entity("orphan-del").unwrap().is_none());
+    // Valid entity should remain
+    assert_eq!(store.count_entities("bookmark", false).unwrap(), 1);
+}
+
+#[test]
+fn delete_orphan_entities_empty_valid_types() {
+    let store = EntityStore::open_in_memory().unwrap();
+    store.save_entity_raw(&Entity {
+        id: "e1".into(), entity_type: "note".into(),
+        data: serde_json::json!({}), created_at: 1, modified_at: 1, created_by: "p".into(),
+    }).unwrap();
+
+    let deleted = store.delete_orphan_entities(&[]).unwrap();
+    assert_eq!(deleted, 0); // early return
+}
+
+#[test]
+fn delete_orphan_entities_cascades_auxiliary() {
+    let store = EntityStore::open_in_memory().unwrap();
+
+    let orphan = Entity {
+        id: "orphan-casc".into(),
+        entity_type: "dead_type".into(),
+        data: serde_json::json!({"x": 1}),
+        created_at: 1, modified_at: 1, created_by: "p".into(),
+    };
+    store.save_entity_raw(&orphan).unwrap();
+    store.save_link("dead_type", "orphan-casc", "note", "n1").unwrap();
+    store.mark_entity_synced("peer-1", "orphan-casc", 1000).unwrap();
+
+    let valid_types = vec![("notes".into(), "note".into())];
+    store.delete_orphan_entities(&valid_types).unwrap();
+
+    // Links and sync ledger entries should also be gone
+    let links = store.get_links_from("dead_type", "orphan-casc").unwrap();
+    assert!(links.is_empty());
+}
+
+// ── Maintenance ─────────────────────────────────────────────────
+
+#[test]
+fn checkpoint_runs_without_error() {
+    let store = EntityStore::open_in_memory().unwrap();
+    store.checkpoint().unwrap();
+}
+
+#[test]
+fn run_maintenance_cleans_orphaned_data() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    let entity = test_entity("Maint");
+    let id = entity.id.clone();
+    store.save_entity(&entity, &schema).unwrap();
+    store.save_link("bookmark", &id, "note", "n1").unwrap();
+    store.mark_entity_synced("peer-1", &id, 1000).unwrap();
+    store.save_cloud_cursor("key", 42).unwrap();
+    store.record_fuel_consumption("plugin-a", 100).unwrap();
+
+    // Delete the entity, leaving orphaned link + sync entries
+    store.delete_entity(&id).unwrap();
+
+    store.run_maintenance().unwrap();
+
+    // Cloud cursors and fuel history should be cleared
+    assert!(store.load_cloud_cursors().unwrap().is_empty());
+    let (_, _, count) = store.get_fuel_metrics("plugin-a").unwrap();
+    assert_eq!(count, 0);
+}
+
+#[test]
+fn db_diagnostics_returns_tables() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let diag = store.db_diagnostics().unwrap();
+    let tables = diag["tables"].as_array().unwrap();
+    assert!(!tables.is_empty());
+    // Should at least have the entities table
+    let table_names: Vec<&str> = tables.iter()
+        .filter_map(|t| t["table"].as_str())
+        .collect();
+    assert!(table_names.contains(&"entities"));
+}
+
+// ── Query with filter edge cases ────────────────────────────────
+
+#[test]
+fn query_entities_filter_without_slash_prefix() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    let entity = Entity {
+        id: "noslash-1".into(),
+        entity_type: "bookmark".into(),
+        data: serde_json::json!({"title": "NoSlash", "url": "x", "tags": []}),
+        created_at: 1, modified_at: 1, created_by: "p".into(),
+    };
+    store.save_entity(&entity, &schema).unwrap();
+
+    // Filter path without leading slash — should auto-prepend
+    let filters = vec![("title".to_string(), serde_json::Value::String("NoSlash".into()))];
+    let results = store.query_entities("bookmark", &filters, false, None).unwrap();
+    assert_eq!(results.len(), 1);
+}
+
+#[test]
+fn query_entities_filter_field_not_in_data() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    store.save_entity(&test_entity("Exists"), &schema).unwrap();
+
+    let filters = vec![("/nonexistent".to_string(), serde_json::Value::String("x".into()))];
+    let results = store.query_entities("bookmark", &filters, false, None).unwrap();
+    assert!(results.is_empty());
+}
+
+#[test]
+fn query_entities_with_limit_breaks_early() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    for i in 0..10 {
+        let mut e = test_entity(&format!("Match{i}"));
+        e.modified_at = 1000 + i as i64;
+        store.save_entity(&e, &schema).unwrap();
+    }
+
+    // Filter that matches all, but limit to 3
+    let filters = vec![("/url".to_string(), serde_json::Value::String("https://example.com".into()))];
+    let results = store.query_entities("bookmark", &filters, false, Some(3)).unwrap();
+    assert_eq!(results.len(), 3);
+}
+
+#[test]
+fn query_entities_include_trashed_with_filters() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let schema = test_schema();
+    let entity = Entity {
+        id: "qt-incl".into(),
+        entity_type: "bookmark".into(),
+        data: serde_json::json!({"title": "Trashed Filter", "url": "x", "tags": []}),
+        created_at: 1, modified_at: 1, created_by: "p".into(),
+    };
+    store.save_entity(&entity, &schema).unwrap();
+    store.trash_entity("qt-incl").unwrap();
+
+    let filters = vec![("/title".to_string(), serde_json::Value::String("Trashed Filter".into()))];
+    let results_exclude = store.query_entities("bookmark", &filters, false, None).unwrap();
+    assert!(results_exclude.is_empty());
+
+    let results_include = store.query_entities("bookmark", &filters, true, None).unwrap();
+    assert_eq!(results_include.len(), 1);
+}
+
+#[test]
+fn query_entities_bool_filter() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let entity = Entity {
+        id: "bf-1".into(),
+        entity_type: "item".into(),
+        data: serde_json::json!({"done": true, "label": "task"}),
+        created_at: 1, modified_at: 1, created_by: "p".into(),
+    };
+    store.save_entity_raw(&entity).unwrap();
+
+    let filters = vec![("/done".to_string(), serde_json::json!(true))];
+    let results = store.query_entities("item", &filters, false, None).unwrap();
+    assert_eq!(results.len(), 1);
+}
+
+#[test]
+fn query_entities_string_coercion_on_number() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let entity = Entity {
+        id: "coerce-1".into(),
+        entity_type: "item".into(),
+        data: serde_json::json!({"count": 42}),
+        created_at: 1, modified_at: 1, created_by: "p".into(),
+    };
+    store.save_entity_raw(&entity).unwrap();
+
+    // Filter with string "42" against actual number 42 → coercion
+    let filters = vec![("/count".to_string(), serde_json::Value::String("42".into()))];
+    let results = store.query_entities("item", &filters, false, None).unwrap();
+    assert_eq!(results.len(), 1);
+}
+
+#[test]
+fn query_entities_string_coercion_on_bool() {
+    let store = EntityStore::open_in_memory().unwrap();
+    let entity = Entity {
+        id: "coerce-bool".into(),
+        entity_type: "item".into(),
+        data: serde_json::json!({"active": true}),
+        created_at: 1, modified_at: 1, created_by: "p".into(),
+    };
+    store.save_entity_raw(&entity).unwrap();
+
+    let filters = vec![("/active".to_string(), serde_json::Value::String("true".into()))];
+    let results = store.query_entities("item", &filters, false, None).unwrap();
+    assert_eq!(results.len(), 1);
+}
+
+// ── Compact ─────────────────────────────────────────────────────
+
+#[test]
+fn compact_reduces_or_maintains_size() {
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("compact_test.db");
+    let store = EntityStore::open(&db_path).unwrap();
+    let schema = test_schema();
+
+    // Write data, then delete it to create reclaimable space
+    for i in 0..50 {
+        store.save_entity(&test_entity(&format!("C{i}")), &schema).unwrap();
+    }
+    for i in 0..40 {
+        // Delete most entities
+        let list = store.list_entities("bookmark", false, Some(1), None).unwrap();
+        if let Some(e) = list.first() {
+            store.delete_entity(&e.id).unwrap();
+        }
+    }
+
+    let (before, after) = store.compact(&db_path).unwrap();
+    assert!(before > 0);
+    assert!(after > 0);
+    // After compact, data should still be accessible
+    let remaining = store.list_entities("bookmark", false, None, None).unwrap();
+    assert_eq!(remaining.len(), 10);
+}
