@@ -19,7 +19,8 @@
         <!-- Dialog Container: stretches to fill window with comfortable margins -->
         <Border HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
-                Margin="48,36"
+                Margin="40,28"
+                MinWidth="960"
                 Background="{DynamicResource ThemeSurfaceElevatedBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="1"
@@ -94,7 +95,7 @@
                 </Border>
 
                 <!-- Body: Colors (left, fixed) + Preview (right, fills remaining) -->
-                <Grid Grid.Row="1" ColumnDefinitions="420,*">
+                <Grid Grid.Row="1" ColumnDefinitions="540,*">
 
                     <!-- Left column: Color groups -->
                     <Border Grid.Column="0"
