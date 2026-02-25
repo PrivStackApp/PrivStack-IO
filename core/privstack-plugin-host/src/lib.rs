@@ -18,6 +18,6 @@ mod wit_types;
 pub use error::PluginHostError;
 pub use manager::PluginHostManager;
 pub use permissions::{Permission, PermissionSet, PermissionTier};
-pub use policy::{PolicyConfig, PolicyEngine, PolicyMode};
-pub use sandbox::{PluginResourceMetrics, PluginSandbox, ResourceLimits};
+pub use policy::{AuditConfig, PolicyConfig, PolicyEngine, PolicyMode};
+pub use sandbox::{PluginResourceMetrics, PluginSandbox, PluginState, ResourceLimits, TrackingLimiter};
 pub use wit_types::*;
