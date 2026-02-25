@@ -30,7 +30,9 @@ internal sealed class PluginHost : IPluginHost
         IPropertyService? propertyService = null,
         IAiService? aiService = null,
         IIntentEngine? intentEngine = null,
-        IAiSuggestionService? suggestionService = null)
+        IAiSuggestionService? suggestionService = null,
+        IAudioRecorderService? audioRecorder = null,
+        ITranscriptionService? transcription = null)
     {
         Sdk = sdk;
         Capabilities = capabilities;
@@ -46,6 +48,8 @@ internal sealed class PluginHost : IPluginHost
         AI = aiService;
         IntentEngine = intentEngine;
         Suggestions = suggestionService;
+        AudioRecorder = audioRecorder;
+        Transcription = transcription;
         Messenger = WeakReferenceMessenger.Default;
         AppVersion = typeof(PluginHost).Assembly.GetName().Version ?? new Version(1, 0, 0);
     }
@@ -64,6 +68,8 @@ internal sealed class PluginHost : IPluginHost
     public IAiService? AI { get; }
     public IIntentEngine? IntentEngine { get; }
     public IAiSuggestionService? Suggestions { get; }
+    public IAudioRecorderService? AudioRecorder { get; }
+    public ITranscriptionService? Transcription { get; }
     public IMessenger Messenger { get; }
     public Version AppVersion { get; }
 

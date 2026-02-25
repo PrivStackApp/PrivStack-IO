@@ -98,6 +98,18 @@ public interface IPluginHost
     IAiSuggestionService? Suggestions { get; }
 
     /// <summary>
+    /// Audio recording service for cross-platform microphone input.
+    /// Nullable for backward compatibility with hosts that don't support recording.
+    /// </summary>
+    IAudioRecorderService? AudioRecorder { get; }
+
+    /// <summary>
+    /// Speech-to-text transcription service using Whisper.
+    /// Nullable for backward compatibility with hosts that don't support transcription.
+    /// </summary>
+    ITranscriptionService? Transcription { get; }
+
+    /// <summary>
     /// The active workspace data directory.
     /// Plugins should store all workspace-specific files under this path.
     /// </summary>
