@@ -44,32 +44,47 @@ internal sealed class LocalStorageProvider : IStorageProvider
     public string ProviderId => "default";
     public string DisplayName => "Local Storage";
 
-    public Task<string> StoreFileAsync(string sourcePath, string fileName, CancellationToken ct = default)
+    public async Task<string> StoreFileAsync(string sourcePath, string fileName, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
         var ext = Path.GetExtension(fileName);
+        var storagePath = StoragePath;
 
-        // Content-addressable: SHA-256 hash the file so duplicates reuse the same ID
-        var hash = HashFile(sourcePath);
-        var destPath = Path.Combine(StoragePath, hash + ext);
-
-        if (File.Exists(destPath))
+        // Run blocking file I/O off the UI thread. Cloud-mounted files (Google Drive,
+        // iCloud) can stall or timeout on synchronous reads — this prevents the app
+        // from hanging or crashing when dragging from those locations.
+        return await Task.Run(async () =>
         {
-            _log.Debug("LocalStorage: dedup hit for {FileName}, reusing {Id}", fileName, hash);
-            return Task.FromResult(hash);
-        }
+            var hash = await HashFileAsync(sourcePath, ct);
+            var destPath = Path.Combine(storagePath, hash + ext);
 
-        File.Copy(sourcePath, destPath, overwrite: false);
-        _log.Debug("LocalStorage: stored {FileName} as {Id}", fileName, hash);
+            if (File.Exists(destPath))
+            {
+                _log.Debug("LocalStorage: dedup hit for {FileName}, reusing {Id}", fileName, hash);
+                return hash;
+            }
 
-        return Task.FromResult(hash);
+            File.Copy(sourcePath, destPath, overwrite: false);
+            _log.Debug("LocalStorage: stored {FileName} as {Id}", fileName, hash);
+
+            return hash;
+        }, ct);
     }
 
-    private static string HashFile(string path)
+    private static async Task<string> HashFileAsync(string path, CancellationToken ct)
     {
-        using var stream = File.OpenRead(path);
-        var hashBytes = SHA256.HashData(stream);
+        // Use async file stream with a 30-second timeout to handle cloud-mounted
+        // files that may stall (Google Drive, iCloud, OneDrive).
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(30));
+
+        await using var stream = new FileStream(
+            path, FileMode.Open, FileAccess.Read, FileShare.Read,
+            bufferSize: 81920, useAsync: true);
+
+        using var sha = SHA256.Create();
+        var hashBytes = await sha.ComputeHashAsync(stream, timeoutCts.Token);
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
