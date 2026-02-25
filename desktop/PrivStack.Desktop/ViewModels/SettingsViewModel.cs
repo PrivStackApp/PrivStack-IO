@@ -579,16 +579,25 @@ public partial class SettingsViewModel : ViewModelBase
             var success = await _biometricService.EnrollAsync(BiometricEnrollPassword);
             if (success)
             {
-                _settingsService.Settings.BiometricUnlockEnabled = true;
-                _settingsService.Settings.BiometricPendingValidation = true;
-                _settingsService.Save();
-                BiometricUnlockEnabled = true;
+                // Verify biometric works using the system dialog (Touch ID / Windows Hello)
+                var verified = await _biometricService.VerifyBiometricAsync($"Verify {_biometricService.BiometricDisplayName} works");
+                if (verified)
+                {
+                    _settingsService.Settings.BiometricUnlockEnabled = true;
+                    _settingsService.Save();
+                    BiometricUnlockEnabled = true;
+                    BiometricStatus = $"{_biometricService.BiometricDisplayName} enabled successfully.";
+                }
+                else
+                {
+                    // Verification failed or cancelled — unenroll
+                    _biometricService.Unenroll();
+                    BiometricUnlockEnabled = false;
+                    BiometricStatus = $"{_biometricService.BiometricDisplayName} verification cancelled. Please try again.";
+                }
+
                 ShowBiometricEnrollPassword = false;
                 BiometricEnrollPassword = string.Empty;
-                IsBiometricEnrolling = false;
-
-                // Lock the UI with a frosted overlay so the user validates biometric
-                BiometricValidationLockRequested?.Invoke(this, EventArgs.Empty);
                 return;
             }
             else
@@ -631,7 +640,6 @@ public partial class SettingsViewModel : ViewModelBase
     /// Fired when biometric enrollment succeeds and the app should lock
     /// with a frosted overlay for validation (not a full logout).
     /// </summary>
-    public event EventHandler? BiometricValidationLockRequested;
 
     [ObservableProperty]
     private bool _isChangePasswordVisible;

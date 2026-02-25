@@ -60,6 +60,11 @@ public partial class SensitiveUnlockViewModel : ObservableObject
 
         IsBiometricAvailable = available && enrolled && enabled;
         BiometricDisplayName = _biometricService.BiometricDisplayName;
+
+        if (IsBiometricAvailable)
+        {
+            await AttemptBiometricUnlockAsync();
+        }
     }
 
     [RelayCommand]

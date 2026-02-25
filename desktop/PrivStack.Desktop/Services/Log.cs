@@ -45,8 +45,10 @@ public static class Log
 
                 var logPath = Path.Combine(logFolder, "privstack-.log");
 
+                var minLevel = GetConfiguredMinimumLevel();
+
                 var config = new LoggerConfiguration()
-                    .MinimumLevel.Debug()
+                    .MinimumLevel.Is(minLevel)
                     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
                     .MinimumLevel.Override("System", LogEventLevel.Warning)
                     .Enrich.WithThreadId()
@@ -72,7 +74,7 @@ public static class Log
                 Serilog.Log.Logger = _logger;
                 _isInitialized = true;
 
-                _logger.Information("=== PrivStack Desktop Starting ===");
+                _logger.Information("=== PrivStack Desktop Starting (log level: {LogLevel}) ===", minLevel);
                 _logger.Information("Log folder: {LogFolder}", logFolder);
                 _logger.Information("App version: {Version}", GetAppVersion());
                 _logger.Information("OS: {OS} {Architecture}", Environment.OSVersion, Environment.Is64BitOperatingSystem ? "x64" : "x86");
@@ -82,7 +84,7 @@ public static class Log
             {
                 // Fallback to console-only logging if file logging fails
                 _logger = new LoggerConfiguration()
-                    .MinimumLevel.Debug()
+                    .MinimumLevel.Is(GetConfiguredMinimumLevel())
                     .WriteTo.Console()
                     .CreateLogger();
                 Serilog.Log.Logger = _logger;
@@ -113,8 +115,10 @@ public static class Log
                 _isInitialized = false;
                 _logger = null;
 
+                var minLevel = GetConfiguredMinimumLevel();
+
                 var config = new LoggerConfiguration()
-                    .MinimumLevel.Debug()
+                    .MinimumLevel.Is(minLevel)
                     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
                     .MinimumLevel.Override("System", LogEventLevel.Warning)
                     .Enrich.WithThreadId()
@@ -166,6 +170,20 @@ public static class Log
             _isInitialized = false;
             _logger = null;
         }
+    }
+
+    private static LogEventLevel GetConfiguredMinimumLevel()
+    {
+        var envLevel = Environment.GetEnvironmentVariable("PRIVSTACK_LOG_LEVEL");
+        return envLevel?.ToLowerInvariant() switch
+        {
+            "debug" or "dbg" => LogEventLevel.Debug,
+            "info" or "information" => LogEventLevel.Information,
+            "warn" or "warning" => LogEventLevel.Warning,
+            "error" or "err" => LogEventLevel.Error,
+            "fatal" => LogEventLevel.Fatal,
+            _ => LogEventLevel.Debug
+        };
     }
 
     private static string GetAppVersion()

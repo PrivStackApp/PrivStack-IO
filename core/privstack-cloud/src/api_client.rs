@@ -409,8 +409,7 @@ impl CloudApiClient {
     }
 
     /// Checks a response for 429 status, sets the global pause, and returns
-    /// a `RateLimited` error. Uses 2x the server's Retry-After with a 60-second
-    /// minimum to ensure we don't immediately hit the limit again.
+    /// a `RateLimited` error. Uses the server's Retry-After plus 1 second buffer.
     /// Only extends the deadline, never shortens it.
     async fn check_rate_limit_response(
         &self,
@@ -427,8 +426,8 @@ impl CloudApiClient {
             .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(60);
 
-        // Double the server's retry-after with a 60-second floor.
-        let backoff_secs = (server_retry_after * 2).max(60);
+        // Use the server's retry-after plus a 1-second buffer.
+        let backoff_secs = server_retry_after + 1;
 
         let new_deadline = Instant::now() + Duration::from_secs(backoff_secs);
 
@@ -439,7 +438,7 @@ impl CloudApiClient {
         }
 
         warn!(
-            "429 rate limited — server said {server_retry_after}s, pausing all API requests for {backoff_secs}s (2x with 60s floor)"
+            "429 rate limited — server said {server_retry_after}s, pausing all API requests for {backoff_secs}s (retry-after + 1s)"
         );
         Some(CloudError::RateLimited { retry_after_secs: backoff_secs })
     }

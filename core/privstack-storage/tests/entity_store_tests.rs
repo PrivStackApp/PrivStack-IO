@@ -1731,7 +1731,7 @@ fn compact_reduces_or_maintains_size() {
     for i in 0..50 {
         store.save_entity(&test_entity(&format!("C{i}")), &schema).unwrap();
     }
-    for i in 0..40 {
+    for _i in 0..40 {
         // Delete most entities
         let list = store.list_entities("bookmark", false, Some(1), None).unwrap();
         if let Some(e) = list.first() {
