@@ -11,6 +11,8 @@ fn make_creds(expires_in_secs: i64) -> StsCredentials {
         expires_at: Utc::now() + Duration::seconds(expires_in_secs),
         bucket: "test-bucket".into(),
         region: "us-east-2".into(),
+        prefix: None,
+        endpoint: None,
     }
 }
 
@@ -259,6 +261,10 @@ fn cloud_sync_status_roundtrip() {
         pending_upload_count: 5,
         last_sync_at: Some(Utc::now()),
         connected_devices: 2,
+        is_rate_limited: false,
+        rate_limit_remaining_secs: 0,
+        synced_entity_count: 3,
+        total_entity_count: 5,
     };
     let json = serde_json::to_string(&status).unwrap();
     let de: CloudSyncStatus = serde_json::from_str(&json).unwrap();
@@ -315,15 +321,14 @@ fn register_blob_request_roundtrip() {
 #[test]
 fn pending_changes_roundtrip() {
     let pc = PendingChanges {
-        entities: vec![PendingEntity {
+        pending: vec![PendingEntity {
             entity_id: "e-1".into(),
-            current_cursor: 10,
+            latest_cursor: 10,
             device_cursor: 5,
-            batches: vec![],
         }],
     };
     let json = serde_json::to_string(&pc).unwrap();
     let de: PendingChanges = serde_json::from_str(&json).unwrap();
-    assert_eq!(de.entities.len(), 1);
-    assert_eq!(de.entities[0].current_cursor, 10);
+    assert_eq!(de.pending.len(), 1);
+    assert_eq!(de.pending[0].latest_cursor, 10);
 }

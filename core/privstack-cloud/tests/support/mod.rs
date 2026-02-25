@@ -17,6 +17,8 @@ pub fn fake_minio_creds() -> StsCredentials {
         expires_at: Utc::now() + Duration::hours(1),
         bucket: "privstack-cloud".into(),
         region: "us-east-2".into(),
+        prefix: None,
+        endpoint: Some("http://localhost:9000".into()),
     }
 }
 
@@ -29,6 +31,8 @@ pub fn expired_minio_creds() -> StsCredentials {
         expires_at: Utc::now() - Duration::seconds(10),
         bucket: "privstack-cloud".into(),
         region: "us-east-2".into(),
+        prefix: None,
+        endpoint: Some("http://localhost:9000".into()),
     }
 }
 

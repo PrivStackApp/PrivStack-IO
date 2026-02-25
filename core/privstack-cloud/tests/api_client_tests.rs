@@ -246,7 +246,7 @@ async fn get_pending_changes_success() {
     Mock::given(method("GET"))
         .and(path("/api/cloud/cursors/pending"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-            "entities": [{ "entity_id": "e-1", "current_cursor": 10, "device_cursor": 5, "batches": [] }]
+            "pending": [{ "entity_id": "e-1", "latest_cursor": 10, "device_cursor": 5 }]
         })))
         .mount(&server)
         .await;
@@ -254,7 +254,7 @@ async fn get_pending_changes_success() {
     let client = setup(&server).await;
     client.set_tokens("at".into(), "rt".into(), 1).await;
     let pending = client.get_pending_changes("ws", "dev").await.unwrap();
-    assert_eq!(pending.entities.len(), 1);
+    assert_eq!(pending.pending.len(), 1);
 }
 
 #[tokio::test]

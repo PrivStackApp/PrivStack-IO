@@ -16,6 +16,8 @@ fn make_creds(expires_in_secs: i64) -> StsCredentials {
         expires_at: Utc::now() + Duration::seconds(expires_in_secs),
         bucket: "test-bucket".to_string(),
         region: "us-east-2".to_string(),
+        prefix: None,
+        endpoint: None,
     }
 }
 
@@ -42,6 +44,8 @@ fn is_expired_at_exact_now_boundary() {
         expires_at: Utc::now(), // exactly now
         bucket: "test-bucket".to_string(),
         region: "us-east-2".to_string(),
+        prefix: None,
+        endpoint: None,
     };
     // At exactly now, Utc::now() >= expires_at should be true
     assert!(creds.is_expired());
@@ -147,6 +151,8 @@ fn credentials_far_future_not_expired() {
         expires_at: Utc::now() + Duration::days(365),
         bucket: "bucket".to_string(),
         region: "us-east-2".to_string(),
+        prefix: None,
+        endpoint: None,
     };
 
     assert!(!creds.is_expired());
@@ -162,6 +168,8 @@ fn credentials_far_past_is_expired() {
         expires_at: Utc::now() - Duration::days(365),
         bucket: "bucket".to_string(),
         region: "us-east-2".to_string(),
+        prefix: None,
+        endpoint: None,
     };
 
     assert!(creds.is_expired());
