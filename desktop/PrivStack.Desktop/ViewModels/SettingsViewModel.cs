@@ -13,6 +13,7 @@ using PrivStack.Desktop.Models;
 using PrivStack.Desktop.Native;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
+using PrivStack.Desktop.Services.Biometric;
 using PrivStack.Desktop.Services.Connections;
 using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Sdk;
@@ -218,6 +219,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IDialogService _dialogService;
     private readonly IAuthService _authService;
     private readonly SeedDataService _seedDataService;
+    private readonly IBiometricService _biometricService;
     private Avalonia.Threading.DispatcherTimer? _metricsRefreshTimer;
 
     private readonly ISystemNotificationService _notificationService;
@@ -245,7 +247,8 @@ public partial class SettingsViewModel : ViewModelBase
         IWorkspaceService workspaceService,
         OAuthLoginService oauthLoginService,
         PrivStackApiClient apiClient,
-        IMasterPasswordCache passwordCache)
+        IMasterPasswordCache passwordCache,
+        IBiometricService biometricService)
     {
         _settingsService = settingsService;
         _backupService = backupService;
@@ -258,6 +261,7 @@ public partial class SettingsViewModel : ViewModelBase
         _seedDataService = seedDataService;
         _notificationService = notificationService;
         _customThemeStore = customThemeStore;
+        _biometricService = biometricService;
 
         ThemeEditor = new ThemeEditorViewModel(themeService, customThemeStore, settingsService);
         ThemeEditor.EditorClosed += OnThemeEditorClosed;
@@ -510,6 +514,105 @@ public partial class SettingsViewModel : ViewModelBase
     private LockoutOption? _selectedLockoutOption;
 
     // ========================================
+    // Biometric Unlock
+    // ========================================
+
+    public bool IsBiometricSupported => _biometricService.IsSupported;
+    public string BiometricDisplayName => _biometricService.BiometricDisplayName;
+
+    [ObservableProperty]
+    private bool _biometricUnlockEnabled;
+
+    [ObservableProperty]
+    private bool _isBiometricEnrolling;
+
+    [ObservableProperty]
+    private string _biometricEnrollPassword = string.Empty;
+
+    [ObservableProperty]
+    private bool _showBiometricEnrollPassword;
+
+    [ObservableProperty]
+    private string? _biometricStatus;
+
+    [RelayCommand]
+    private void ToggleBiometric()
+    {
+        if (BiometricUnlockEnabled)
+        {
+            // Enabling — show inline password prompt
+            ShowBiometricEnrollPassword = true;
+            BiometricStatus = null;
+        }
+        else
+        {
+            // Disabling — unenroll immediately
+            _biometricService.Unenroll();
+            _settingsService.Settings.BiometricUnlockEnabled = false;
+            _settingsService.SaveDebounced();
+            ShowBiometricEnrollPassword = false;
+            BiometricEnrollPassword = string.Empty;
+            BiometricStatus = "Biometric unlock disabled.";
+        }
+    }
+
+    [RelayCommand]
+    private async Task ConfirmBiometricEnrollAsync()
+    {
+        if (string.IsNullOrEmpty(BiometricEnrollPassword))
+        {
+            BiometricStatus = "Please enter your master password.";
+            return;
+        }
+
+        if (!_authService.ValidateMasterPassword(BiometricEnrollPassword))
+        {
+            BiometricStatus = "Incorrect password.";
+            return;
+        }
+
+        IsBiometricEnrolling = true;
+        BiometricStatus = null;
+
+        try
+        {
+            var success = await _biometricService.EnrollAsync(BiometricEnrollPassword);
+            if (success)
+            {
+                _settingsService.Settings.BiometricUnlockEnabled = true;
+                _settingsService.SaveDebounced();
+                BiometricUnlockEnabled = true;
+                BiometricStatus = $"{BiometricDisplayName} unlock enabled.";
+                ShowBiometricEnrollPassword = false;
+            }
+            else
+            {
+                BiometricUnlockEnabled = false;
+                BiometricStatus = "Enrollment failed. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            BiometricUnlockEnabled = false;
+            BiometricStatus = $"Enrollment failed: {ex.Message}";
+        }
+        finally
+        {
+            BiometricEnrollPassword = string.Empty;
+            IsBiometricEnrolling = false;
+        }
+    }
+
+    [RelayCommand]
+    private void CancelBiometricEnroll()
+    {
+        ShowBiometricEnrollPassword = false;
+        BiometricEnrollPassword = string.Empty;
+        BiometricUnlockEnabled = false;
+        BiometricStatus = null;
+    }
+
+    // ========================================
     // Logout & Change Password
     // ========================================
 
@@ -605,6 +708,20 @@ public partial class SettingsViewModel : ViewModelBase
         try
         {
             await Task.Run(() => _authService.ChangeAppPassword(CurrentPassword, NewPassword));
+
+            // Re-enroll biometric with new password if active
+            if (_settingsService.Settings.BiometricUnlockEnabled && _biometricService.IsEnrolled)
+            {
+                var reEnrolled = await _biometricService.EnrollAsync(NewPassword);
+                if (!reEnrolled)
+                {
+                    // Disable biometric if re-enrollment fails
+                    _biometricService.Unenroll();
+                    _settingsService.Settings.BiometricUnlockEnabled = false;
+                    BiometricUnlockEnabled = false;
+                    _settingsService.SaveDebounced();
+                }
+            }
 
             ChangePasswordSuccess = true;
             ChangePasswordStatus = "Password changed successfully.";
@@ -1302,6 +1419,9 @@ public partial class SettingsViewModel : ViewModelBase
         var lockoutMinutes = settings.SensitiveLockoutMinutes;
         SelectedLockoutOption = LockoutOptions.FirstOrDefault(o => o.Minutes == lockoutMinutes)
             ?? LockoutOptions.First(o => o.Minutes == 5); // Default to 5 minutes
+
+        // Biometric unlock
+        BiometricUnlockEnabled = settings.BiometricUnlockEnabled && _biometricService.IsEnrolled;
 
         // Set font scale from service (which loaded from settings)
         FontScaleMultiplier = _fontScaleService.ScaleMultiplier;

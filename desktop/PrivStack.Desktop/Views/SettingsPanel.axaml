@@ -1713,6 +1713,70 @@
 
                         <Border Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}"/>
 
+                        <!-- Biometric Unlock -->
+                        <StackPanel Spacing="8" IsVisible="{Binding IsBiometricSupported}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock FontWeight="SemiBold" FontSize="{DynamicResource ThemeFontSizeMd}">
+                                        <TextBlock.Text>
+                                            <MultiBinding StringFormat="{}{0} Unlock">
+                                                <Binding Path="BiometricDisplayName"/>
+                                            </MultiBinding>
+                                        </TextBlock.Text>
+                                    </TextBlock>
+                                    <TextBlock Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                               TextWrapping="Wrap">
+                                        <TextBlock.Text>
+                                            <MultiBinding StringFormat="Use {0} to unlock PrivStack instead of typing your password.">
+                                                <Binding Path="BiometricDisplayName"/>
+                                            </MultiBinding>
+                                        </TextBlock.Text>
+                                    </TextBlock>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding BiometricUnlockEnabled}"
+                                              Command="{Binding ToggleBiometricCommand}"
+                                              VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <!-- Inline password prompt for enrollment -->
+                            <StackPanel Spacing="8" IsVisible="{Binding ShowBiometricEnrollPassword}">
+                                <TextBlock Text="Enter your master password to enable biometric unlock:"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                                <TextBox Watermark="Master password"
+                                         PasswordChar="&#x2022;"
+                                         Text="{Binding BiometricEnrollPassword, Mode=TwoWay}"
+                                         IsEnabled="{Binding !IsBiometricEnrolling}"
+                                         Padding="12,8"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Command="{Binding ConfirmBiometricEnrollCommand}"
+                                            IsEnabled="{Binding !IsBiometricEnrolling}"
+                                            Background="{DynamicResource ThemePrimaryBrush}"
+                                            Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                            Padding="14,8" CornerRadius="8">
+                                        <TextBlock Text="Enable" FontWeight="Medium"
+                                                   IsVisible="{Binding !IsBiometricEnrolling}"/>
+                                    </Button>
+                                    <Button Command="{Binding CancelBiometricEnrollCommand}"
+                                            Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                            Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                            Padding="14,8" CornerRadius="8"
+                                            Content="Cancel"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Status message -->
+                            <TextBlock Text="{Binding BiometricStatus}"
+                                       IsVisible="{Binding BiometricStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       Foreground="{DynamicResource ThemeSuccessBrush}"
+                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                        </StackPanel>
+
+                        <Border Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}"
+                                IsVisible="{Binding IsBiometricSupported}"/>
+
                         <!-- Change password -->
                         <StackPanel Spacing="10">
                             <Button Command="{Binding ToggleChangePasswordCommand}"

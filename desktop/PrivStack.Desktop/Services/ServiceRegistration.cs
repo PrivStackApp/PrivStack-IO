@@ -1,8 +1,10 @@
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Desktop.Native;
 using PrivStack.Desktop.Sdk;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.AI;
+using PrivStack.Desktop.Services.Biometric;
 using PrivStack.Desktop.Services.Connections;
 using PrivStack.Desktop.Services.FileSync;
 using PrivStack.Desktop.Services.Plugin;
@@ -42,6 +44,14 @@ public static class ServiceRegistration
         services.AddSingleton<IBackupService, BackupService>();
         services.AddSingleton<ISensitiveLockService, SensitiveLockService>();
         services.AddSingleton<IMasterPasswordCache, MasterPasswordCache>();
+
+        // Biometric authentication — platform-conditional
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            services.AddSingleton<IBiometricService, MacBiometricService>();
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            services.AddSingleton<IBiometricService, WindowsBiometricService>();
+        else
+            services.AddSingleton<IBiometricService, NullBiometricService>();
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IFontScaleService, FontScaleService>();
         services.AddSingleton<IResponsiveLayoutService, ResponsiveLayoutService>();

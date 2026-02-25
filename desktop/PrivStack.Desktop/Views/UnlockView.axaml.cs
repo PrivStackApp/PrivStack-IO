@@ -33,6 +33,8 @@ public partial class UnlockView : UserControl
         if (DataContext is UnlockViewModel vm)
         {
             vm.PropertyChanged += OnViewModelPropertyChanged;
+            // Initialize biometric check (auto-attempts if available)
+            _ = vm.InitializeBiometricAsync();
         }
     }
 

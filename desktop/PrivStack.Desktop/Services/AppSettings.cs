@@ -90,6 +90,9 @@ public class AppSettings
     [JsonPropertyName("sensitive_lockout_minutes")]
     public int SensitiveLockoutMinutes { get; set; } = 5; // Default 5 minutes
 
+    [JsonPropertyName("biometric_unlock_enabled")]
+    public bool BiometricUnlockEnabled { get; set; }
+
     // Graph view filters
     [JsonPropertyName("graph_show_notes")]
     public bool GraphShowNotes { get; set; } = true;

@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using PrivStack.Desktop.Native;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
+using PrivStack.Desktop.Services.Biometric;
 using Serilog;
 
 namespace PrivStack.Desktop.ViewModels;
@@ -18,6 +19,8 @@ public partial class UnlockViewModel : ViewModelBase
     private readonly IPrivStackRuntime _runtime;
     private readonly IWorkspaceService _workspaceService;
     private readonly IMasterPasswordCache? _passwordCache;
+    private readonly IBiometricService? _biometricService;
+    private readonly IAppSettingsService? _appSettings;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanUnlock))]
@@ -41,6 +44,15 @@ public partial class UnlockViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _hasRecoveryConfigured;
+
+    [ObservableProperty]
+    private bool _isBiometricAvailable;
+
+    [ObservableProperty]
+    private string _biometricDisplayName = string.Empty;
+
+    [ObservableProperty]
+    private bool _isBiometricAuthenticating;
 
     /// <summary>
     /// Whether there's an error to display (for red border styling).
@@ -73,12 +85,16 @@ public partial class UnlockViewModel : ViewModelBase
         IAuthService service,
         IPrivStackRuntime runtime,
         IWorkspaceService workspaceService,
-        IMasterPasswordCache? passwordCache = null)
+        IMasterPasswordCache? passwordCache = null,
+        IBiometricService? biometricService = null,
+        IAppSettingsService? appSettings = null)
     {
         _service = service;
         _runtime = runtime;
         _workspaceService = workspaceService;
         _passwordCache = passwordCache;
+        _biometricService = biometricService;
+        _appSettings = appSettings;
         CheckRecoveryStatus();
     }
 
@@ -91,6 +107,60 @@ public partial class UnlockViewModel : ViewModelBase
         catch
         {
             HasRecoveryConfigured = false;
+        }
+    }
+
+    /// <summary>
+    /// Checks biometric availability and auto-attempts biometric unlock.
+    /// Called from code-behind when the view is loaded.
+    /// </summary>
+    public async Task InitializeBiometricAsync()
+    {
+        if (_biometricService == null || !_biometricService.IsSupported) return;
+
+        var available = await _biometricService.IsAvailableAsync();
+        var enrolled = _biometricService.IsEnrolled;
+        var enabled = _appSettings?.Settings.BiometricUnlockEnabled == true;
+
+        IsBiometricAvailable = available && enrolled && enabled;
+        BiometricDisplayName = _biometricService.BiometricDisplayName;
+
+        if (IsBiometricAvailable)
+        {
+            await AttemptBiometricUnlockAsync();
+        }
+    }
+
+    [RelayCommand]
+    private async Task AttemptBiometricUnlockAsync()
+    {
+        if (_biometricService == null || IsBiometricAuthenticating || IsLoading) return;
+
+        IsBiometricAuthenticating = true;
+        ErrorMessage = string.Empty;
+
+        try
+        {
+            var password = await _biometricService.AuthenticateAsync("Unlock PrivStack");
+            if (password != null)
+            {
+                await Task.Run(() => _service.UnlockApp(password));
+                _passwordCache?.Set(password);
+                AppUnlocked?.Invoke(this, EventArgs.Empty);
+            }
+        }
+        catch (PrivStackException)
+        {
+            ErrorMessage = "Biometric unlock failed. Please enter your password.";
+            _log.Warning("Biometric-retrieved password was incorrect — possible re-enrollment needed");
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Biometric authentication error");
+        }
+        finally
+        {
+            IsBiometricAuthenticating = false;
         }
     }
 

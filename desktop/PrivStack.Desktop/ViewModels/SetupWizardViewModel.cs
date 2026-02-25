@@ -10,6 +10,7 @@ using PrivStack.Desktop.Models;
 using PrivStack.Desktop.Native;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
+using PrivStack.Desktop.Services.Biometric;
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Sdk;
 
@@ -26,6 +27,7 @@ public enum SetupStep
     DataDirectory,     // Storage location — includes PrivStack Cloud when authenticated
     CloudWorkspaces,   // Pick existing cloud workspace or create new
     Password,
+    Biometric,         // Optional biometric unlock enrollment (Touch ID / Windows Hello)
     EmergencyKit,
     Complete
 }
@@ -45,8 +47,10 @@ public partial class SetupWizardViewModel : ViewModelBase
     private readonly PrivStackApiClient _apiClient;
     private readonly OAuthLoginService _oauthService;
     private readonly ICloudSyncService _cloudSync;
+    private readonly IBiometricService _biometricService;
     private CancellationTokenSource? _oauthCts;
     private string? _setupWorkspaceId;
+    private bool _showsBiometricStep;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsWelcomeStep))]
@@ -55,6 +59,7 @@ public partial class SetupWizardViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsLicenseStep))]
     [NotifyPropertyChangedFor(nameof(IsCloudWorkspacesStep))]
     [NotifyPropertyChangedFor(nameof(IsPasswordStep))]
+    [NotifyPropertyChangedFor(nameof(IsBiometricStep))]
     [NotifyPropertyChangedFor(nameof(IsEmergencyKitStep))]
     [NotifyPropertyChangedFor(nameof(IsCompleteStep))]
     [NotifyPropertyChangedFor(nameof(CanGoBack))]
@@ -72,6 +77,7 @@ public partial class SetupWizardViewModel : ViewModelBase
     public bool IsLicenseStep => CurrentStep == SetupStep.License;
     public bool IsCloudWorkspacesStep => CurrentStep == SetupStep.CloudWorkspaces;
     public bool IsPasswordStep => CurrentStep == SetupStep.Password;
+    public bool IsBiometricStep => CurrentStep == SetupStep.Biometric;
     public bool IsEmergencyKitStep => CurrentStep == SetupStep.EmergencyKit;
     public bool IsCompleteStep => CurrentStep == SetupStep.Complete;
 
@@ -293,7 +299,8 @@ public partial class SetupWizardViewModel : ViewModelBase
     // Navigation
     public bool CanGoBack => CurrentStep != SetupStep.Welcome
                           && CurrentStep != SetupStep.Complete
-                          && CurrentStep != SetupStep.EmergencyKit;
+                          && CurrentStep != SetupStep.EmergencyKit
+                          && CurrentStep != SetupStep.Biometric;
 
     public bool CanGoNext => CurrentStep switch
     {
@@ -306,6 +313,7 @@ public partial class SetupWizardViewModel : ViewModelBase
         SetupStep.Password => IsExistingData
             ? !string.IsNullOrWhiteSpace(MasterPassword)
             : !string.IsNullOrWhiteSpace(MasterPassword) && MasterPassword.Length >= 8 && PasswordsMatch,
+        SetupStep.Biometric => true, // Always can skip or proceed
         SetupStep.EmergencyKit => HasDownloadedKit,
         SetupStep.Complete => true,
         _ => false
@@ -314,26 +322,37 @@ public partial class SetupWizardViewModel : ViewModelBase
     public string NextButtonText => CurrentStep switch
     {
         SetupStep.Password => IsExistingData ? "Complete Setup" : "Next",
+        SetupStep.Biometric => "Next",
         SetupStep.EmergencyKit => "Complete Setup",
         SetupStep.Complete => "Get Started",
         _ => "Next"
     };
 
-    public int StepNumber => CurrentStep switch
+    public int StepNumber
     {
-        SetupStep.Welcome => 1,
-        SetupStep.License => 2,
-        SetupStep.Workspace => 3,
-        SetupStep.DataDirectory => 4,
-        SetupStep.CloudWorkspaces => 5,
-        SetupStep.Password => _showsCloudWorkspacesStep ? 6 : 5,
-        SetupStep.EmergencyKit => _showsCloudWorkspacesStep ? 7 : 6,
-        SetupStep.Complete => TotalSteps,
-        _ => 0
-    };
+        get
+        {
+            var baseStep = CurrentStep switch
+            {
+                SetupStep.Welcome => 1,
+                SetupStep.License => 2,
+                SetupStep.Workspace => 3,
+                SetupStep.DataDirectory => 4,
+                SetupStep.CloudWorkspaces => 5,
+                SetupStep.Password => _showsCloudWorkspacesStep ? 6 : 5,
+                SetupStep.Biometric => (_showsCloudWorkspacesStep ? 6 : 5) + 1,
+                SetupStep.EmergencyKit => (_showsCloudWorkspacesStep ? 6 : 5) + (_showsBiometricStep ? 1 : 0) + 1,
+                SetupStep.Complete => TotalSteps,
+                _ => 0
+            };
+            return baseStep;
+        }
+    }
 
     private bool _showsCloudWorkspacesStep;
-    public int TotalSteps => _showsCloudWorkspacesStep ? 8 : 7;
+    public int TotalSteps => 7
+        + (_showsCloudWorkspacesStep ? 1 : 0)
+        + (_showsBiometricStep ? 1 : 0);
 
     public double ProgressWidth => (StepNumber / (double)TotalSteps) * 160;
 
@@ -341,6 +360,12 @@ public partial class SetupWizardViewModel : ViewModelBase
 
     [ObservableProperty]
     private DeviceInfo? _deviceInfo;
+
+    // Biometric step properties
+    public string BiometricDisplayName => _biometricService.BiometricDisplayName;
+
+    [ObservableProperty]
+    private bool _isBiometricEnrolling;
 
     public SetupWizardViewModel(
         IPrivStackRuntime runtime,
@@ -352,7 +377,8 @@ public partial class SetupWizardViewModel : ViewModelBase
         IWorkspaceService workspaceService,
         PrivStackApiClient apiClient,
         OAuthLoginService oauthService,
-        ICloudSyncService cloudSync)
+        ICloudSyncService cloudSync,
+        IBiometricService biometricService)
     {
         _runtime = runtime;
         _authService = authService;
@@ -364,6 +390,7 @@ public partial class SetupWizardViewModel : ViewModelBase
         _apiClient = apiClient;
         _oauthService = oauthService;
         _cloudSync = cloudSync;
+        _biometricService = biometricService;
         LoadDeviceInfo();
 
         SelectedTheme = AvailableThemes.FirstOrDefault(t => t.Theme == AppTheme.Dark);
@@ -419,6 +446,7 @@ public partial class SetupWizardViewModel : ViewModelBase
             SetupStep.DataDirectory => await HandleDataDirectoryNext(),
             SetupStep.CloudWorkspaces => InitializeServiceAndContinue(),
             SetupStep.Password => CompleteSetup(),
+            SetupStep.Biometric => SetupStep.EmergencyKit,
             SetupStep.EmergencyKit => CompleteEmergencyKitStep(),
             SetupStep.Complete => FinishSetup(),
             _ => CurrentStep
@@ -1260,10 +1288,25 @@ public partial class SetupWizardViewModel : ViewModelBase
 
             SavePreferences();
 
-            // For new installs, set up recovery before completing
+            // For new installs, check biometric availability then set up recovery
             if (!IsExistingData)
             {
                 SetupRecoveryMnemonic();
+
+                // Check if biometric step should be shown
+                if (_biometricService.IsSupported)
+                {
+                    var available = _biometricService.IsAvailableAsync().GetAwaiter().GetResult();
+                    if (available)
+                    {
+                        _showsBiometricStep = true;
+                        OnPropertyChanged(nameof(TotalSteps));
+                        OnPropertyChanged(nameof(StepNumber));
+                        OnPropertyChanged(nameof(ProgressWidth));
+                        return SetupStep.Biometric;
+                    }
+                }
+
                 return SetupStep.EmergencyKit;
             }
 
@@ -1290,6 +1333,43 @@ public partial class SetupWizardViewModel : ViewModelBase
     {
         SetupCompleted?.Invoke(this, EventArgs.Empty);
         return SetupStep.Complete;
+    }
+
+    [RelayCommand]
+    private async Task EnableBiometricAsync()
+    {
+        IsBiometricEnrolling = true;
+        try
+        {
+            var success = await _biometricService.EnrollAsync(MasterPassword);
+            if (success)
+            {
+                _appSettings.Settings.BiometricUnlockEnabled = true;
+                _appSettings.SaveDebounced();
+                Log.Information("[Setup] Biometric enrollment successful");
+            }
+            else
+            {
+                Log.Warning("[Setup] Biometric enrollment failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "[Setup] Biometric enrollment error");
+        }
+        finally
+        {
+            IsBiometricEnrolling = false;
+        }
+
+        // Advance to EmergencyKit regardless of result
+        CurrentStep = SetupStep.EmergencyKit;
+    }
+
+    [RelayCommand]
+    private void SkipBiometric()
+    {
+        CurrentStep = SetupStep.EmergencyKit;
     }
 
     private void SavePreferences()
