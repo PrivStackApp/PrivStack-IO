@@ -64,6 +64,62 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool ShowInfoPanelTab => IsInfoPanelAvailable && !(InfoPanelVM?.IsOpen ?? false);
 
     // ============================================================
+    // App Lock Overlay (biometric validation)
+    // ============================================================
+
+    [ObservableProperty]
+    private bool _isAppLocked;
+
+    private AppLockOverlayViewModel? _appLockOverlayVM;
+    public AppLockOverlayViewModel AppLockOverlayVM
+    {
+        get
+        {
+            if (_appLockOverlayVM == null)
+            {
+                _appLockOverlayVM = new AppLockOverlayViewModel(
+                    App.Services.GetRequiredService<IAuthService>(),
+                    App.Services.GetRequiredService<Services.Biometric.IBiometricService>(),
+                    _appSettings,
+                    App.Services.GetService<IMasterPasswordCache>());
+
+                _appLockOverlayVM.Unlocked += OnAppLockUnlocked;
+            }
+            return _appLockOverlayVM;
+        }
+    }
+
+    /// <summary>
+    /// Locks the app with a frosted overlay for biometric validation.
+    /// </summary>
+    public void LockForBiometricValidation()
+    {
+        IsAppLocked = true;
+        _ = AppLockOverlayVM.InitializeAsync();
+    }
+
+    private void OnAppLockUnlocked(bool usedBiometric)
+    {
+        IsAppLocked = false;
+
+        if (usedBiometric)
+        {
+            // Biometric validated — clear pending flag
+            _appSettings.Settings.BiometricPendingValidation = false;
+            _appSettings.Save();
+        }
+        else
+        {
+            // Password used — biometric validation failed, disable it
+            _appSettings.Settings.BiometricPendingValidation = false;
+            _appSettings.Settings.BiometricUnlockEnabled = false;
+            _appSettings.Save();
+            App.Services.GetRequiredService<Services.Biometric.IBiometricService>().Unenroll();
+            Serilog.Log.Information("Biometric validation failed — user used password, biometric disabled");
+        }
+    }
+
+    // ============================================================
     // License Expiration Banner
     // ============================================================
 
@@ -145,6 +201,11 @@ public partial class MainWindowViewModel : ViewModelBase
                     {
                         IsSettingsPanelOpen = false;
                         (App.Current as App)?.RequestLogout();
+                    };
+                    _settingsVM.BiometricValidationLockRequested += (_, _) =>
+                    {
+                        IsSettingsPanelOpen = false;
+                        LockForBiometricValidation();
                     };
                 }
                 catch (Exception ex)

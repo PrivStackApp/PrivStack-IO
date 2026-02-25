@@ -1,0 +1,124 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PrivStack.Desktop.ViewModels"
+             x:Class="PrivStack.Desktop.Views.AppLockOverlay"
+             x:DataType="vm:AppLockOverlayViewModel">
+
+    <!-- Frosted glass overlay covering the entire window -->
+    <Panel>
+        <!-- Dark semi-transparent backdrop with blur simulation -->
+        <Border Background="#C0101018"/>
+
+        <!-- Centered unlock card -->
+        <Border Background="{DynamicResource ThemeSurfaceBrush}"
+                CornerRadius="16" Padding="40,36"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                Width="420"
+                BoxShadow="0 16 48 0 #50000000"
+                BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+                BorderThickness="1">
+            <StackPanel Spacing="20">
+                <!-- Lock Icon -->
+                <Border Background="{DynamicResource ThemeHoverBrush}"
+                        CornerRadius="50" Width="80" Height="80"
+                        HorizontalAlignment="Center">
+                    <PathIcon Data="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.47-5.57 1.41-.24.13-.54.04-.68-.2-.13-.24-.04-.55.2-.68C7.82 2.52 9.86 2 12.01 2c2.13 0 3.99.47 6.03 1.52.25.13.34.43.21.67-.09.18-.26.28-.44.28zM3.5 9.72a.499.499 0 01-.25-.93C5.55 7.15 8.57 5.87 12 5.87c3.41 0 6.74 1.44 8.76 3.07.22.18.25.51.07.73-.18.22-.51.25-.73.07-1.82-1.47-4.96-2.87-8.1-2.87-3.14 0-6.04 1.2-8.25 2.78-.08.05-.16.07-.25.07zm15.02 4.01c-.12 0-.24-.05-.33-.14-.84-.93-1.81-1.62-2.88-2.04-.3-.12-.45-.46-.33-.76.12-.3.46-.45.76-.33 1.22.48 2.33 1.26 3.27 2.33a.5.5 0 01-.49.94zm-3.47 4.69c-.14 0-.27-.06-.37-.17-.55-.6-1.27-.97-2.13-1.09a.513.513 0 01-.44-.56c.04-.28.29-.48.56-.44 1.08.15 2 .63 2.73 1.41a.5.5 0 01-.35.85zM12 16c-.72 0-1.3.58-1.3 1.3 0 .72.58 1.3 1.3 1.3.72 0 1.3-.58 1.3-1.3 0-.72-.58-1.3-1.3-1.3z"
+                               Width="40" Height="40"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                </Border>
+
+                <!-- Title -->
+                <TextBlock Text="Verify Biometric Unlock"
+                           FontSize="{DynamicResource ThemeFontSizeXl}" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+                <!-- Description -->
+                <TextBlock TextAlignment="Center" TextWrapping="Wrap"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           FontSize="{DynamicResource ThemeFontSizeSmMd}">
+                    <TextBlock.Text>
+                        <MultiBinding StringFormat="Use {0} to confirm it's working. If you cancel, biometric unlock will be disabled.">
+                            <Binding Path="BiometricDisplayName"/>
+                        </MultiBinding>
+                    </TextBlock.Text>
+                </TextBlock>
+
+                <!-- Biometric Button -->
+                <Button HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        Command="{Binding AttemptBiometricUnlockCommand}"
+                        IsEnabled="{Binding !IsBiometricAuthenticating}"
+                        IsVisible="{Binding IsBiometricAvailable}"
+                        Background="{DynamicResource ThemePrimaryBrush}"
+                        Foreground="White"
+                        Padding="14,12" CornerRadius="8"
+                        FontWeight="SemiBold">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <PathIcon Data="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.47-5.57 1.41-.24.13-.54.04-.68-.2-.13-.24-.04-.55.2-.68C7.82 2.52 9.86 2 12.01 2c2.13 0 3.99.47 6.03 1.52.25.13.34.43.21.67-.09.18-.26.28-.44.28zM3.5 9.72a.499.499 0 01-.25-.93C5.55 7.15 8.57 5.87 12 5.87c3.41 0 6.74 1.44 8.76 3.07.22.18.25.51.07.73-.18.22-.51.25-.73.07-1.82-1.47-4.96-2.87-8.1-2.87-3.14 0-6.04 1.2-8.25 2.78-.08.05-.16.07-.25.07zm15.02 4.01c-.12 0-.24-.05-.33-.14-.84-.93-1.81-1.62-2.88-2.04-.3-.12-.45-.46-.33-.76.12-.3.46-.45.76-.33 1.22.48 2.33 1.26 3.27 2.33a.5.5 0 01-.49.94zm-3.47 4.69c-.14 0-.27-.06-.37-.17-.55-.6-1.27-.97-2.13-1.09a.513.513 0 01-.44-.56c.04-.28.29-.48.56-.44 1.08.15 2 .63 2.73 1.41a.5.5 0 01-.35.85zM12 16c-.72 0-1.3.58-1.3 1.3 0 .72.58 1.3 1.3 1.3.72 0 1.3-.58 1.3-1.3 0-.72-.58-1.3-1.3-1.3z"
+                                   Width="16" Height="16" Foreground="White"/>
+                        <TextBlock IsVisible="{Binding !IsBiometricAuthenticating}" FontWeight="SemiBold">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="Use {0}">
+                                    <Binding Path="BiometricDisplayName"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                        <TextBlock Text="Authenticating..." IsVisible="{Binding IsBiometricAuthenticating}" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- "or" separator -->
+                <Grid ColumnDefinitions="*,Auto,*" IsVisible="{Binding IsBiometricAvailable}">
+                    <Border Grid.Column="0" Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}"
+                            VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Grid.Column="1" Text="or enter password to disable"
+                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                    <Border Grid.Column="2" Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}"
+                            VerticalAlignment="Center" Margin="8,0,0,0"/>
+                </Grid>
+
+                <!-- Password Input -->
+                <TextBox x:Name="PasswordInput"
+                         PasswordChar="*"
+                         Watermark="Master Password"
+                         Text="{Binding Password, Mode=TwoWay}"
+                         IsEnabled="{Binding !IsUnlocking}"
+                         Classes="themed-input"
+                         Padding="12">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding UnlockWithPasswordCommand}"/>
+                    </TextBox.KeyBindings>
+                </TextBox>
+
+                <!-- Error Message -->
+                <Border Background="{DynamicResource ThemeDangerMutedBrush}" CornerRadius="6" Padding="12,8"
+                        IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="{Binding ErrorMessage}"
+                               Foreground="{DynamicResource ThemeDangerBrush}"
+                               TextAlignment="Center"
+                               FontSize="{DynamicResource ThemeFontSizeSmMd}"/>
+                </Border>
+
+                <!-- Password Unlock Button -->
+                <Button HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        Command="{Binding UnlockWithPasswordCommand}"
+                        IsEnabled="{Binding !IsUnlocking}"
+                        Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                        Padding="12,10" CornerRadius="6">
+                    <TextBlock Text="Unlock with Password" FontWeight="SemiBold"/>
+                </Button>
+
+                <!-- Info text -->
+                <TextBlock Text="Entering your password will disable biometric unlock"
+                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                           TextAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Panel>
+</UserControl>

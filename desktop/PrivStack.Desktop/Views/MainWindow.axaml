@@ -889,5 +889,10 @@
         <!-- Workspace Switcher Overlay -->
         <views:WorkspaceSwitcherOverlay DataContext="{Binding WorkspaceSwitcherVM}" ZIndex="1002"/>
 
+        <!-- App Lock Overlay (biometric validation — frosted glass) -->
+        <views:AppLockOverlay DataContext="{Binding AppLockOverlayVM}"
+                              IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).IsAppLocked}"
+                              ZIndex="2000"/>
+
     </Panel>
 </Window>

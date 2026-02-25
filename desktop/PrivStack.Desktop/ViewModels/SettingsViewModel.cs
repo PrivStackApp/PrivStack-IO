@@ -587,9 +587,8 @@ public partial class SettingsViewModel : ViewModelBase
                 BiometricEnrollPassword = string.Empty;
                 IsBiometricEnrolling = false;
 
-                // Lock the app so the user must validate biometric immediately
-                _authService.LockApp();
-                LogoutRequested?.Invoke(this, EventArgs.Empty);
+                // Lock the UI with a frosted overlay so the user validates biometric
+                BiometricValidationLockRequested?.Invoke(this, EventArgs.Empty);
                 return;
             }
             else
@@ -627,6 +626,12 @@ public partial class SettingsViewModel : ViewModelBase
     /// Fired when the user requests to log out (lock the app).
     /// </summary>
     public event EventHandler? LogoutRequested;
+
+    /// <summary>
+    /// Fired when biometric enrollment succeeds and the app should lock
+    /// with a frosted overlay for validation (not a full logout).
+    /// </summary>
+    public event EventHandler? BiometricValidationLockRequested;
 
     [ObservableProperty]
     private bool _isChangePasswordVisible;
