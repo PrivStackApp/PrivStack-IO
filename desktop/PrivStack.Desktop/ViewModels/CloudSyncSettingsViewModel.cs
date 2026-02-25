@@ -779,13 +779,13 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
 
             if (_cloudSync.IsSyncing) return;
 
-            // Unlock keypair with cached password if needed
+            // Unlock keypair with cached password if needed (S3 download — run off UI thread)
             if (!_cloudSync.HasKeypair)
             {
                 var password = _passwordCache.Get();
                 if (!string.IsNullOrEmpty(password))
                 {
-                    try { _cloudSync.EnterPassphrase(password); }
+                    try { await Task.Run(() => _cloudSync.EnterPassphrase(password)); }
                     catch (Exception ex)
                     {
                         Log.Debug(ex, "Auto-unlock keypair failed — user will need to enter passphrase");

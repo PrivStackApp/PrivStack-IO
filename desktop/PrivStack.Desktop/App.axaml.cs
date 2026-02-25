@@ -275,7 +275,13 @@ public partial class App : Application
             // IMPORTANT: Set the new MainWindow BEFORE closing setup window
             // Otherwise Avalonia shuts down when it sees MainWindow closed
             await ShowMainWindow(desktop, skipPluginInit: true,
-                updateStatus: msg => setupVm.LoadingMessage = msg);
+                updateStatus: msg => setupVm.LoadingMessage = msg,
+                onBeforeTransition: () =>
+                {
+                    setupVm.IsAppLoading = false;
+                    setupVm.LoadingMessage = "Launching...";
+                    // SetupWizardViewModel doesn't have shimmer, just hide the loading state
+                });
             setupWindow.Close();
         };
 
@@ -311,7 +317,14 @@ public partial class App : Application
 
             // The rest must happen on the UI thread (window creation)
             await ShowMainWindow(desktop, skipPluginInit: true,
-                updateStatus: msg => unlockVm.LoadingMessage = msg);
+                updateStatus: msg => unlockVm.LoadingMessage = msg,
+                onBeforeTransition: () =>
+                {
+                    // Stop the shimmer animation before heavy XAML parsing blocks the UI thread.
+                    // A static "Launching..." is better UX than a frozen shimmer.
+                    unlockVm.IsLaunching = true;
+                    unlockVm.LoadingMessage = "Launching...";
+                });
             unlockWindow.Close();
         };
 
@@ -379,7 +392,8 @@ public partial class App : Application
     private async Task ShowMainWindow(
         IClassicDesktopStyleApplicationLifetime desktop,
         bool skipPluginInit = false,
-        Action<string>? updateStatus = null)
+        Action<string>? updateStatus = null,
+        Action? onBeforeTransition = null)
     {
         if (!skipPluginInit)
         {
@@ -418,13 +432,23 @@ public partial class App : Application
         // Yield so the animation can tick between VM resolution and XAML parsing
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
 
+        // Signal callers to stop animations before the heavy UI work begins.
+        // new MainWindow() parses ~900 lines of XAML synchronously on the UI thread,
+        // which freezes any running animation. Transitioning to a static state first
+        // avoids the "frozen shimmer" perception.
+        onBeforeTransition?.Invoke();
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+
         // MainWindow + InitializeComponent must run on the UI thread
-        var mainWindow = new MainWindow
-        {
-            DataContext = mainVm,
-        };
+        var mainWindow = new MainWindow();
 
         // Yield between XAML parse and the layout/show pass
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+
+        // Set DataContext separately — binding resolution is a distinct chunk of work
+        mainWindow.DataContext = mainVm;
+
+        // Yield between binding resolution and window show
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
 
         desktop.MainWindow = mainWindow;

@@ -38,6 +38,13 @@ public partial class UnlockViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isAppLoading;
 
+    /// <summary>
+    /// Final transition state: shows a static message without the shimmer animation.
+    /// Set just before heavy UI-thread work (MainWindow XAML parsing) to avoid a frozen shimmer.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isLaunching;
+
     [ObservableProperty]
     private string _loadingMessage = string.Empty;
 

@@ -157,10 +157,12 @@
                     </Button>
                 </Grid>
 
-                <!-- App Loading State (shown after successful unlock) -->
+                <!-- App Loading State (shown after successful unlock, with animated shimmer) -->
                 <StackPanel IsVisible="{Binding IsAppLoading}" Spacing="16" HorizontalAlignment="Center">
+                    <!-- Shimmer bar (hidden when transitioning to MainWindow to avoid frozen animation) -->
                     <Border Width="200" Height="3" CornerRadius="2" ClipToBounds="True"
-                            Background="{DynamicResource ThemeSurfaceElevatedBrush}">
+                            Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                            IsVisible="{Binding !IsLaunching}">
                         <Border Width="60" Height="3" CornerRadius="2"
                                 HorizontalAlignment="Left"
                                 Classes="shimmer-indicator"
@@ -183,7 +185,7 @@
                                HorizontalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- Info Text (hidden during app loading) -->
+                <!-- Info Text (hidden during app loading and launching) -->
                 <TextBlock Text="Your data is encrypted and stored locally. The master password is required to decrypt your secure data."
                            FontSize="{DynamicResource ThemeFontSizeXsSm}"
                            Foreground="{DynamicResource ThemeTextMutedBrush}"
