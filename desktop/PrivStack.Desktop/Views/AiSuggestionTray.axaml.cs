@@ -18,10 +18,12 @@ public partial class AiSuggestionTray : UserControl
         // Attach TextInput on the ChatInputBox via tunnel routing so we see the event
         // BEFORE the TextBox swallows it. The override OnTextInput never fires because
         // TextBox marks TextInput as handled, preventing bubble propagation.
+        // Also attach KeyDown via tunnel to intercept Enter before AcceptsReturn inserts a newline.
         Loaded += (_, _) =>
         {
             var chatInput = this.FindControl<TextBox>("ChatInputBox");
             chatInput?.AddHandler(TextInputEvent, OnChatInputTextInput, RoutingStrategies.Tunnel);
+            chatInput?.AddHandler(KeyDownEvent, OnChatInputKeyDown, RoutingStrategies.Tunnel);
         };
     }
 
@@ -88,16 +90,22 @@ public partial class AiSuggestionTray : UserControl
             }
         }
 
+    }
+
+    /// <summary>
+    /// Tunnel handler on ChatInputBox for KeyDown. Since AcceptsReturn is true,
+    /// we intercept Enter (without Shift) at tunnel phase to send the message
+    /// instead of inserting a newline. Shift+Enter falls through to the TextBox
+    /// and inserts a newline normally.
+    /// </summary>
+    private void OnChatInputKeyDown(object? sender, KeyEventArgs e)
+    {
         if (e.Key == Key.Enter && !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
-            var input = this.FindControl<TextBox>("ChatInputBox");
-            if (input?.IsFocused == true && DataContext is AiSuggestionTrayViewModel vm)
+            if (_currentVm?.SendChatMessageCommand.CanExecute(null) == true)
             {
-                if (vm.SendChatMessageCommand.CanExecute(null))
-                {
-                    vm.SendChatMessageCommand.Execute(null);
-                    e.Handled = true;
-                }
+                _currentVm.SendChatMessageCommand.Execute(null);
+                e.Handled = true;
             }
         }
     }

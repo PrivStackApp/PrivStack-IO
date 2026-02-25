@@ -420,26 +420,26 @@
                 </Border>
 
                 <!-- Input Row -->
-                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Bottom">
+                <StackPanel Spacing="6" VerticalAlignment="Bottom">
                     <TextBox Name="ChatInputBox"
                              Text="{Binding ChatInputText, Mode=TwoWay}"
                              Watermark="{Binding ChatWatermark}"
                              FontSize="{DynamicResource ThemeFontSizeSm}"
                              CornerRadius="{DynamicResource ThemeRadiusSm}"
                              Padding="8,6"
-                             VerticalAlignment="Center"/>
-                    <Button Grid.Column="1"
-                            Content="Send"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             MaxHeight="200"/>
+                    <Button Content="Send"
                             Command="{Binding SendChatMessageCommand}"
                             Background="{DynamicResource ThemePrimaryBrush}"
                             Foreground="{DynamicResource ThemeTextOnAccentBrush}"
                             Padding="12,6"
-                            Margin="6,0,0,0"
                             FontSize="{DynamicResource ThemeFontSizeSm}"
                             CornerRadius="{DynamicResource ThemeRadiusSm}"
-                            VerticalAlignment="Center"
+                            HorizontalAlignment="Right"
                             Cursor="Hand"/>
-                </Grid>
+                </StackPanel>
             </Panel>
         </Border>
     </Grid>
