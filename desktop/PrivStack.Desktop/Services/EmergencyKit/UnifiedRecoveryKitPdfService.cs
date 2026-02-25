@@ -12,6 +12,10 @@ namespace PrivStack.Desktop.Services.EmergencyKit;
 /// </summary>
 public static class UnifiedRecoveryKitPdfService
 {
+    static UnifiedRecoveryKitPdfService()
+    {
+        QuestPDF.Settings.License = LicenseType.Community;
+    }
     /// <summary>
     /// Generates the unified recovery kit PDF and saves it to <paramref name="outputPath"/>.
     /// </summary>
