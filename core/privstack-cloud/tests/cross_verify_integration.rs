@@ -99,7 +99,7 @@ async fn batch_ordering_by_list() {
             .unwrap();
     }
 
-    let prefix = format!("{user_id}/{workspace_id}/entities/{entity_id}/");
+    let prefix = format!("users/{user_id}/workspaces/{workspace_id}/entities/{entity_id}/");
     let mut keys = transport.list_keys(&creds, &prefix).await.unwrap();
     keys.sort();
 
