@@ -47,7 +47,8 @@
                 </Panel>
 
                 <!-- Biometric Button -->
-                <Button HorizontalAlignment="Stretch"
+                <Button x:Name="BiometricButton"
+                        HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Center"
                         Command="{Binding AttemptBiometricUnlockCommand}"
                         IsEnabled="{Binding !IsBiometricAuthenticating}"

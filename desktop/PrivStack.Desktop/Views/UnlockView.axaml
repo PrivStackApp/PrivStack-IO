@@ -97,7 +97,8 @@
                         <Border Grid.Column="2" Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}"
                                 VerticalAlignment="Center" Margin="8,0,0,0"/>
                     </Grid>
-                    <Button Command="{Binding AttemptBiometricUnlockCommand}"
+                    <Button x:Name="BiometricButton"
+                            Command="{Binding AttemptBiometricUnlockCommand}"
                             HorizontalAlignment="Stretch"
                             HorizontalContentAlignment="Center"
                             Background="{DynamicResource ThemeSurfaceElevatedBrush}"

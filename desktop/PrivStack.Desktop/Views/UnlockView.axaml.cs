@@ -23,8 +23,19 @@ public partial class UnlockView : UserControl
     {
         Dispatcher.UIThread.Post(() =>
         {
-            var passwordBox = this.FindControl<TextBox>("PasswordBox");
-            passwordBox?.Focus();
+            // If biometric is already known available, focus the biometric button;
+            // otherwise default to password box. The property changed handler will
+            // switch focus to biometric if it becomes available after async check.
+            if (DataContext is UnlockViewModel { IsBiometricAvailable: true })
+            {
+                var biometricButton = this.FindControl<Button>("BiometricButton");
+                biometricButton?.Focus();
+            }
+            else
+            {
+                var passwordBox = this.FindControl<TextBox>("PasswordBox");
+                passwordBox?.Focus();
+            }
         }, DispatcherPriority.Loaded);
     }
 
@@ -40,7 +51,18 @@ public partial class UnlockView : UserControl
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(UnlockViewModel.HasError) && sender is UnlockViewModel vm)
+        if (sender is not UnlockViewModel vm) return;
+
+        if (e.PropertyName == nameof(UnlockViewModel.IsBiometricAvailable) && vm.IsBiometricAvailable)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                var biometricButton = this.FindControl<Button>("BiometricButton");
+                biometricButton?.Focus();
+            });
+        }
+
+        if (e.PropertyName == nameof(UnlockViewModel.HasError))
         {
             // Trigger shake when error becomes true (not when it clears)
             if (vm.HasError && !_wasError)
