@@ -205,10 +205,57 @@ public partial class MainWindowViewModel : ViewModelBase
         new IntentSlotEditorViewModel(App.Services.GetRequiredService<IIntentEngine>());
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAiTrayDrawerOpen))]
     private bool _isAiTrayOpen;
 
     [ObservableProperty]
     private double _aiTrayWidth = 400;
+
+    // ── AI Tray Display Mode ──────────────────────────────────────────────
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAiTrayAttachedFull))]
+    [NotifyPropertyChangedFor(nameof(IsAiTrayAttachedHalf))]
+    [NotifyPropertyChangedFor(nameof(IsAiTrayDetached))]
+    [NotifyPropertyChangedFor(nameof(IsAiTrayAttached))]
+    [NotifyPropertyChangedFor(nameof(IsAiTrayDrawerOpen))]
+    private AiTrayDisplayMode _aiTrayDisplayMode = AiTrayDisplayMode.AttachedFull;
+
+    public bool IsAiTrayAttachedFull => AiTrayDisplayMode == AiTrayDisplayMode.AttachedFull;
+    public bool IsAiTrayAttachedHalf => AiTrayDisplayMode == AiTrayDisplayMode.AttachedHalf;
+    public bool IsAiTrayDetached => AiTrayDisplayMode == AiTrayDisplayMode.Detached;
+    public bool IsAiTrayAttached => AiTrayDisplayMode != AiTrayDisplayMode.Detached;
+
+    /// <summary>
+    /// True when the inline drawer should be open (attached mode + tray open).
+    /// </summary>
+    public bool IsAiTrayDrawerOpen => IsAiTrayOpen && IsAiTrayAttached;
+
+    /// <summary>
+    /// Max height for the AI tray drawer. Infinity for full, half window height for half mode.
+    /// Updated by MainWindow.axaml.cs when window size or mode changes.
+    /// </summary>
+    [ObservableProperty]
+    private double _aiTrayMaxHeight = double.PositiveInfinity;
+
+    [RelayCommand]
+    private void SetAiTrayDisplayMode(AiTrayDisplayMode mode)
+    {
+        var previousMode = AiTrayDisplayMode;
+        AiTrayDisplayMode = mode;
+
+        if (mode == AiTrayDisplayMode.Detached)
+        {
+            // Ensure tray is logically "open" when detaching
+            IsAiTrayOpen = true;
+            IsSyncPanelOpen = false;
+            IsSettingsPanelOpen = false;
+        }
+        else if (previousMode == AiTrayDisplayMode.Detached)
+        {
+            // Returning from detached — tray stays open in attached mode
+            IsAiTrayOpen = true;
+        }
+    }
 
     /// <summary>
     /// Opens the unified emoji picker with the given selection callback.
@@ -887,6 +934,13 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void ToggleAiTray()
     {
+        if (AiTrayDisplayMode == AiTrayDisplayMode.Detached && IsAiTrayOpen)
+        {
+            // When detached, toggle brings floating window to front (handled by code-behind)
+            OnPropertyChanged(nameof(IsAiTrayDetached));
+            return;
+        }
+
         IsAiTrayOpen = !IsAiTrayOpen;
         if (IsAiTrayOpen)
         {

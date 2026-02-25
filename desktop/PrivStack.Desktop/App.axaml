@@ -34,6 +34,7 @@
             <converters:LayoutModeToGridLengthConverter x:Key="LayoutModeToGridLength"/>
             <converters:LayoutModeEqualsConverter x:Key="LayoutModeEquals"/>
             <converters:LayoutModeNotEqualsConverter x:Key="LayoutModeNotEquals"/>
+            <converters:HalfValueConverter x:Key="HalfValue"/>
 
             <!-- Responsive layout mode flags (overridden at runtime by ResponsiveLayoutService) -->
             <x:Boolean x:Key="ThemeIsCompactMode">False</x:Boolean>

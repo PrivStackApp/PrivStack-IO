@@ -5,6 +5,7 @@ using Avalonia.Interactivity;
 using AvaloniaEdit;
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Desktop.Controls;
+using PrivStack.Desktop.Models;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.Plugin;
@@ -29,6 +30,8 @@ public partial class MainWindow : Window
     private bool _isResizingAiTray;
     private double _aiTrayResizeStartX;
     private double _aiTrayResizeStartWidth;
+    private AiTrayWindow? _floatingAiWindow;
+    private bool _isReattaching;
 
     public MainWindow()
     {
@@ -175,6 +178,16 @@ public partial class MainWindow : Window
         {
             UpdateContentAreaWidth();
         }
+        else if (e.PropertyName == nameof(MainWindowViewModel.AiTrayDisplayMode))
+        {
+            OnAiTrayDisplayModeChanged();
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.IsAiTrayDetached) &&
+                 DataContext is MainWindowViewModel vm && vm.IsAiTrayDetached && _floatingAiWindow != null)
+        {
+            // Bring floating window to front when toggle is pressed in detached mode
+            _floatingAiWindow.Activate();
+        }
     }
 
     private void UpdateContentAreaWidth()
@@ -207,6 +220,7 @@ public partial class MainWindow : Window
         {
             _settings.UpdateWindowBounds(this);
             UpdateContentAreaWidth();
+            UpdateAiTrayMaxHeight();
         }
     }
 
@@ -214,6 +228,14 @@ public partial class MainWindow : Window
     {
         _settings.UpdateWindowBounds(this);
         _settings.Flush();
+
+        // Close floating AI window if open
+        if (_floatingAiWindow != null)
+        {
+            _isReattaching = true;
+            _floatingAiWindow.Close();
+            _floatingAiWindow = null;
+        }
 
         if (DataContext is MainWindowViewModel vm)
         {
@@ -345,6 +367,127 @@ public partial class MainWindow : Window
     {
         // Prevent backdrop click-through when clicking inside the form
         e.Handled = true;
+    }
+
+    // ========================================================================
+    // AI Tray Display Mode: Detach / Reattach / Half-Height
+    // ========================================================================
+
+    private void OnAiTrayDisplayModeChanged()
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        switch (vm.AiTrayDisplayMode)
+        {
+            case AiTrayDisplayMode.Detached:
+                DetachAiTray(vm);
+                break;
+            case AiTrayDisplayMode.AttachedFull:
+                if (_floatingAiWindow != null) ReattachAiTray(vm);
+                vm.AiTrayMaxHeight = double.PositiveInfinity;
+                break;
+            case AiTrayDisplayMode.AttachedHalf:
+                if (_floatingAiWindow != null) ReattachAiTray(vm);
+                UpdateAiTrayMaxHeight();
+                break;
+        }
+    }
+
+    private void DetachAiTray(MainWindowViewModel vm)
+    {
+        var trayControl = this.FindControl<AiSuggestionTray>("AiSuggestionTrayControl");
+        if (trayControl == null) return;
+
+        // Remove from inline drawer
+        var inlineGrid = trayControl.Parent as Grid;
+        inlineGrid?.Children.Remove(trayControl);
+
+        // Create floating window
+        _floatingAiWindow = new AiTrayWindow
+        {
+            DataContext = vm.AiTrayVM,
+            Content = trayControl
+        };
+
+        // Position near the main window's right edge
+        var mainPos = Position;
+        var mainBounds = Bounds;
+        _floatingAiWindow.Position = new PixelPoint(
+            mainPos.X + (int)mainBounds.Width + 8,
+            mainPos.Y + 40);
+
+        _floatingAiWindow.WindowClosingByUser += OnFloatingAiWindowClosing;
+        _floatingAiWindow.Show();
+    }
+
+    private void ReattachAiTray(MainWindowViewModel vm)
+    {
+        if (_floatingAiWindow == null) return;
+
+        var trayControl = _floatingAiWindow.Content as AiSuggestionTray;
+        _floatingAiWindow.Content = null;
+
+        // Put the tray control back in the inline drawer
+        if (trayControl != null)
+        {
+            var borderContainer = this.FindControl<Border>("AiTrayBorderContainer");
+            var inlineGrid = borderContainer?.Child as Grid;
+            if (inlineGrid != null)
+            {
+                Grid.SetRow(trayControl, 1);
+                trayControl.DataContext = vm.AiTrayVM;
+                inlineGrid.Children.Add(trayControl);
+            }
+        }
+
+        _isReattaching = true;
+        _floatingAiWindow.WindowClosingByUser -= OnFloatingAiWindowClosing;
+        _floatingAiWindow.Close();
+        _floatingAiWindow = null;
+        _isReattaching = false;
+    }
+
+    private void OnFloatingAiWindowClosing(object? sender, EventArgs e)
+    {
+        if (_isReattaching) return;
+
+        // User closed the floating window via OS X button — reattach to main window
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (DataContext is MainWindowViewModel vm)
+            {
+                // Reattach the control before changing mode
+                var trayControl = _floatingAiWindow?.Content as AiSuggestionTray;
+                if (_floatingAiWindow != null)
+                    _floatingAiWindow.Content = null;
+
+                if (trayControl != null)
+                {
+                    var borderContainer = this.FindControl<Border>("AiTrayBorderContainer");
+                    var inlineGrid = borderContainer?.Child as Grid;
+                    if (inlineGrid != null)
+                    {
+                        Grid.SetRow(trayControl, 1);
+                        trayControl.DataContext = vm.AiTrayVM;
+                        inlineGrid.Children.Add(trayControl);
+                    }
+                }
+
+                _floatingAiWindow = null;
+                vm.AiTrayDisplayMode = AiTrayDisplayMode.AttachedFull;
+                vm.AiTrayMaxHeight = double.PositiveInfinity;
+            }
+        });
+    }
+
+    private void UpdateAiTrayMaxHeight()
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        if (vm.AiTrayDisplayMode != AiTrayDisplayMode.AttachedHalf) return;
+
+        // Use the content area height (exclude title bar ~28px and status bar ~32px)
+        var availableHeight = Math.Max(300, Bounds.Height - 60);
+        vm.AiTrayMaxHeight = availableHeight / 2.0;
     }
 
     // ========================================================================

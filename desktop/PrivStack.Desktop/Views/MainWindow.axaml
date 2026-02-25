@@ -7,6 +7,7 @@
         xmlns:services="using:PrivStack.Desktop.Services"
         xmlns:emoji="using:PrivStack.UI.Adaptive.Controls.EmojiPicker"
         xmlns:toast="using:PrivStack.Desktop.Views.Controls"
+        xmlns:models="using:PrivStack.Desktop.Models"
         xmlns:app="using:PrivStack.Desktop"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -87,6 +88,12 @@
             <Setter Property="RenderTransform" Value="translate(0px, 0px)"/>
             <Setter Property="Opacity" Value="1"/>
             <Setter Property="IsHitTestVisible" Value="True"/>
+        </Style>
+        <Style Selector="StackPanel#AiTrayDrawer.half-height">
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+        </Style>
+        <Style Selector="StackPanel#AiTrayDrawer.half-height Border#AiTrayBorderContainer">
+            <Setter Property="CornerRadius" Value="8,0,0,0"/>
         </Style>
 
         <!-- Info panel slide drawer animation -->
@@ -436,18 +443,21 @@
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Right"
                                     VerticalAlignment="Stretch"
+                                    MaxHeight="{Binding AiTrayMaxHeight}"
                                     Margin="0,0,0,0"
                                     ZIndex="12"
                                     IsVisible="{Binding AiTrayVM.IsEnabled}"
-                                    Classes.open="{Binding IsAiTrayOpen}">
+                                    Classes.open="{Binding IsAiTrayDrawerOpen}"
+                                    Classes.half-height="{Binding IsAiTrayAttachedHalf}">
 
-                            <!-- Drag handle (grip indicator) -->
+                            <!-- Drag handle: hidden in half-height mode (height is constrained) -->
                             <Border x:Name="AiTrayDragHandle"
                                     Width="10"
                                     Cursor="SizeWestEast"
                                     Background="Transparent"
                                     Margin="-3,0,-3,0"
-                                    ZIndex="5">
+                                    ZIndex="5"
+                                    IsVisible="{Binding IsAiTrayAttachedFull}">
                                 <Border Width="4" Height="40"
                                         CornerRadius="2"
                                         Background="{DynamicResource ThemeBorderBrush}"
@@ -462,7 +472,8 @@
                                 </Border>
                             </Border>
 
-                            <Border CornerRadius="8,0,0,8"
+                            <Border x:Name="AiTrayBorderContainer"
+                                    CornerRadius="8,0,0,8"
                                     Background="{DynamicResource ThemeSurfaceBrush}"
                                     BorderBrush="{DynamicResource ThemeBorderBrush}"
                                     BorderThickness="1,1,0,1"
@@ -471,24 +482,102 @@
                                     ClipToBounds="True">
                                 <Grid RowDefinitions="Auto,*">
                                     <!-- Header -->
-                                    <Border Grid.Row="0" Padding="16,12"
+                                    <Border Grid.Row="0" Padding="12,8"
                                             BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
                                             BorderThickness="0,0,0,1">
-                                        <Grid ColumnDefinitions="*,Auto,Auto">
+                                        <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                                             <TextBlock Text="{x:Static app:AiPersona.Name}"
                                                        FontWeight="SemiBold"
                                                        FontSize="{DynamicResource ThemeFontSizeMd}"
                                                        VerticalAlignment="Center"/>
-                                            <Button Grid.Column="1"
+
+                                            <!-- Display mode selector -->
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"
+                                                        VerticalAlignment="Center" Margin="0,0,6,0">
+                                                <!-- Full height -->
+                                                <Button Command="{Binding SetAiTrayDisplayModeCommand}"
+                                                        CommandParameter="{x:Static models:AiTrayDisplayMode.AttachedFull}"
+                                                        ToolTip.Tip="Full height"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        Padding="4" MinWidth="24" MinHeight="24"
+                                                        Cursor="Hand"
+                                                        Classes.active="{Binding IsAiTrayAttachedFull}">
+                                                    <Button.Styles>
+                                                        <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                            <Setter Property="Background" Value="{DynamicResource ThemeSecondaryBrush}"/>
+                                                        </Style>
+                                                        <Style Selector="Button.active /template/ ContentPresenter">
+                                                            <Setter Property="Background" Value="{DynamicResource ThemePrimaryBrush}"/>
+                                                            <Setter Property="Opacity" Value="0.2"/>
+                                                        </Style>
+                                                        <Style Selector="Button.active PathIcon">
+                                                            <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryBrush}"/>
+                                                        </Style>
+                                                    </Button.Styles>
+                                                    <PathIcon Data="M3,2 L13,2 L13,18 L3,18 Z"
+                                                              Width="12" Height="12"
+                                                              Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                                </Button>
+                                                <!-- Half height -->
+                                                <Button Command="{Binding SetAiTrayDisplayModeCommand}"
+                                                        CommandParameter="{x:Static models:AiTrayDisplayMode.AttachedHalf}"
+                                                        ToolTip.Tip="Half height"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        Padding="4" MinWidth="24" MinHeight="24"
+                                                        Cursor="Hand"
+                                                        Classes.active="{Binding IsAiTrayAttachedHalf}">
+                                                    <Button.Styles>
+                                                        <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                            <Setter Property="Background" Value="{DynamicResource ThemeSecondaryBrush}"/>
+                                                        </Style>
+                                                        <Style Selector="Button.active /template/ ContentPresenter">
+                                                            <Setter Property="Background" Value="{DynamicResource ThemePrimaryBrush}"/>
+                                                            <Setter Property="Opacity" Value="0.2"/>
+                                                        </Style>
+                                                        <Style Selector="Button.active PathIcon">
+                                                            <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryBrush}"/>
+                                                        </Style>
+                                                    </Button.Styles>
+                                                    <PathIcon Data="M3,10 L13,10 L13,18 L3,18 Z"
+                                                              Width="12" Height="12"
+                                                              Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                                </Button>
+                                                <!-- Detach / Float -->
+                                                <Button Command="{Binding SetAiTrayDisplayModeCommand}"
+                                                        CommandParameter="{x:Static models:AiTrayDisplayMode.Detached}"
+                                                        ToolTip.Tip="Floating window"
+                                                        Background="Transparent" BorderThickness="0"
+                                                        Padding="4" MinWidth="24" MinHeight="24"
+                                                        Cursor="Hand"
+                                                        Classes.active="{Binding IsAiTrayDetached}">
+                                                    <Button.Styles>
+                                                        <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                                            <Setter Property="Background" Value="{DynamicResource ThemeSecondaryBrush}"/>
+                                                        </Style>
+                                                        <Style Selector="Button.active /template/ ContentPresenter">
+                                                            <Setter Property="Background" Value="{DynamicResource ThemePrimaryBrush}"/>
+                                                            <Setter Property="Opacity" Value="0.2"/>
+                                                        </Style>
+                                                        <Style Selector="Button.active PathIcon">
+                                                            <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryBrush}"/>
+                                                        </Style>
+                                                    </Button.Styles>
+                                                    <PathIcon Data="M5,3 L5,7 L1,7 L1,15 L9,15 L9,11 L13,11 L13,3 Z M3,9 L7,9 L7,13 L3,13 Z"
+                                                              Width="12" Height="12"
+                                                              Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                                </Button>
+                                            </StackPanel>
+
+                                            <Button Grid.Column="2"
                                                     Content="Clear All"
                                                     Command="{Binding AiTrayVM.ClearAllCommand}"
                                                     IsVisible="{Binding AiTrayVM.HasCards}"
                                                     Background="Transparent"
                                                     Foreground="{DynamicResource ThemeTextMutedBrush}"
                                                     FontSize="{DynamicResource ThemeFontSizeXs}"
-                                                    Padding="8,4" Margin="0,0,8,0"
+                                                    Padding="8,4" Margin="0,0,4,0"
                                                     VerticalAlignment="Center"/>
-                                            <Button Grid.Column="2"
+                                            <Button Grid.Column="3"
                                                     Content="x"
                                                     Command="{Binding ToggleAiTrayCommand}"
                                                     Background="{DynamicResource ThemeSecondaryBrush}"
@@ -504,7 +593,9 @@
                                                     Cursor="Hand"/>
                                         </Grid>
                                     </Border>
-                                    <views:AiSuggestionTray Grid.Row="1" DataContext="{Binding AiTrayVM}"/>
+                                    <views:AiSuggestionTray x:Name="AiSuggestionTrayControl"
+                                                            Grid.Row="1"
+                                                            DataContext="{Binding AiTrayVM}"/>
                                 </Grid>
                             </Border>
                         </StackPanel>
