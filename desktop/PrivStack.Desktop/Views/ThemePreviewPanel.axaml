@@ -95,6 +95,78 @@
                 </StackPanel>
             </Border>
 
+            <!-- Text Selection -->
+            <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Text Selection" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                    <TextBlock Text="Drag to select text and see your selection color"
+                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                               Margin="0,0,0,4"/>
+                    <!-- Simulated selected text -->
+                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}" CornerRadius="6" Padding="12">
+                        <StackPanel Spacing="6">
+                            <Panel>
+                                <TextBlock Text="The quick brown fox jumps over the lazy dog"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                <!-- Selection highlight overlay on "brown fox jumps" -->
+                                <Border Background="{DynamicResource ThemeSelectionBrush}"
+                                        HorizontalAlignment="Left" VerticalAlignment="Center"
+                                        Margin="68,0,0,0" Padding="0" Height="20" Width="120"
+                                        IsHitTestVisible="False"/>
+                            </Panel>
+                            <SelectableTextBlock Text="Or select this text to test interactively"
+                                                 FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- Highlights -->
+            <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Highlights" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                    <WrapPanel Orientation="Horizontal">
+                        <Border Background="{DynamicResource ThemeHighlightYellowBrush}" CornerRadius="3"
+                                Padding="8,3" Margin="0,0,6,6">
+                            <TextBlock Text="Yellow highlight" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="#1A1A2E"/>
+                        </Border>
+                        <Border Background="{DynamicResource ThemeHighlightBlueBrush}" CornerRadius="3"
+                                Padding="8,3" Margin="0,0,6,6">
+                            <TextBlock Text="Blue highlight" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="#1A1A2E"/>
+                        </Border>
+                        <Border Background="{DynamicResource ThemeHighlightGreenBrush}" CornerRadius="3"
+                                Padding="8,3" Margin="0,0,6,6">
+                            <TextBlock Text="Green highlight" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="#1A1A2E"/>
+                        </Border>
+                        <Border Background="{DynamicResource ThemeHighlightPinkBrush}" CornerRadius="3"
+                                Padding="8,3" Margin="0,0,6,6">
+                            <TextBlock Text="Pink highlight" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="#1A1A2E"/>
+                        </Border>
+                        <Border Background="{DynamicResource ThemeHighlightPurpleBrush}" CornerRadius="3"
+                                Padding="8,3" Margin="0,0,6,6">
+                            <TextBlock Text="Purple highlight" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="#1A1A2E"/>
+                        </Border>
+                        <Border Background="{DynamicResource ThemeHighlightOrangeBrush}" CornerRadius="3"
+                                Padding="8,3" Margin="0,0,6,6">
+                            <TextBlock Text="Orange highlight" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                       Foreground="#1A1A2E"/>
+                        </Border>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
             <!-- Semantic Badges -->
             <Border Background="{DynamicResource ThemeSurfaceBrush}" CornerRadius="8" Padding="16">
                 <StackPanel Spacing="8">

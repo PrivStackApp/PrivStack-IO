@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:PrivStack.Desktop.ViewModels"
              xmlns:views="using:PrivStack.Desktop.Views"
-             mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="780"
+             mc:Ignorable="d" d:DesignWidth="1300" d:DesignHeight="820"
              x:Class="PrivStack.Desktop.Views.ThemeEditorDialog"
              x:DataType="vm:ThemeEditorViewModel"
              IsVisible="{Binding IsOpen, FallbackValue=False}">
@@ -19,7 +19,7 @@
         <!-- Dialog Container -->
         <Border HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Width="1100" MaxHeight="780"
+                Width="1300" MaxHeight="820"
                 Background="{DynamicResource ThemeSurfaceElevatedBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="1"
@@ -29,52 +29,66 @@
 
             <Grid RowDefinitions="Auto,*">
                 <!-- Header -->
-                <Border Grid.Row="0" Padding="20,16"
+                <Border Grid.Row="0" Padding="24,16,24,14"
                         BorderBrush="{DynamicResource ThemeBorderBrush}"
                         BorderThickness="0,0,0,1">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <!-- Left: Theme name + variant toggle -->
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12"
-                                    VerticalAlignment="Center">
+                    <Grid RowDefinitions="Auto,Auto">
+                        <!-- Top row: Title + action buttons -->
+                        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,12">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="Theme Editor"
+                                           FontSize="{DynamicResource ThemeFontSizeLg}"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                <TextBlock Text="Customize colors and preview changes in real time"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                            </StackPanel>
+
+                            <!-- Action buttons -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
+                                        VerticalAlignment="Top">
+                                <Button Content="Reset All"
+                                        Command="{Binding ResetToDefaultCommand}"
+                                        Padding="12,6"
+                                        FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                        ToolTip.Tip="Reset all colors to base theme defaults"/>
+                                <Button Content="Delete"
+                                        Command="{Binding DeleteCommand}"
+                                        IsVisible="{Binding CanDelete}"
+                                        Background="{DynamicResource ThemeDangerBrush}"
+                                        Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                        Padding="12,6"
+                                        FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                                <Button Content="Cancel"
+                                        Command="{Binding CancelCommand}"
+                                        Padding="12,6"
+                                        FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                                <Button Content="Save Theme"
+                                        Command="{Binding SaveCommand}"
+                                        Background="{DynamicResource ThemePrimaryBrush}"
+                                        Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+                                        Padding="16,6"
+                                        FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                        FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Bottom row: Theme name + variant toggle -->
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="16">
                             <TextBox Text="{Binding ThemeName}"
                                      Watermark="Theme Name"
-                                     Width="200" Padding="8,6"
-                                     FontSize="{DynamicResource ThemeFontSizeMd}"/>
+                                     Width="240" Padding="10,7"
+                                     FontSize="{DynamicResource ThemeFontSizeSm}"/>
                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                <TextBlock Text="Light" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                <TextBlock Text="Light variant"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
                                            Foreground="{DynamicResource ThemeTextMutedBrush}"
                                            VerticalAlignment="Center"/>
                                 <ToggleSwitch IsChecked="{Binding IsLightVariant}"
                                               OnContent="" OffContent=""
                                               VerticalAlignment="Center" Margin="0,-2,0,0"/>
                             </StackPanel>
-                        </StackPanel>
-
-                        <!-- Right: Action buttons -->
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                            <Button Content="Reset"
-                                    Command="{Binding ResetToDefaultCommand}"
-                                    Padding="10,6"
-                                    FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                    ToolTip.Tip="Reset all colors to base theme defaults"/>
-                            <Button Content="Delete"
-                                    Command="{Binding DeleteCommand}"
-                                    IsVisible="{Binding CanDelete}"
-                                    Background="{DynamicResource ThemeDangerBrush}"
-                                    Foreground="{DynamicResource ThemeTextOnAccentBrush}"
-                                    Padding="10,6"
-                                    FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                            <Button Content="Cancel"
-                                    Command="{Binding CancelCommand}"
-                                    Padding="10,6"
-                                    FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
-                            <Button Content="Save"
-                                    Command="{Binding SaveCommand}"
-                                    Background="{DynamicResource ThemePrimaryBrush}"
-                                    Foreground="{DynamicResource ThemeTextOnAccentBrush}"
-                                    Padding="14,6"
-                                    FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                    FontWeight="SemiBold"/>
                         </StackPanel>
                     </Grid>
                 </Border>

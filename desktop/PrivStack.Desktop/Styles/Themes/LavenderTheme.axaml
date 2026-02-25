@@ -90,7 +90,7 @@
     <!-- SPECIAL COLORS                                                           -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
-    <Color x:Key="ThemeSelection">#407B5EA7</Color>
+    <Color x:Key="ThemeSelection">#207B5EA7</Color>
     <Color x:Key="ThemeScrollTrack">#EEEAF4</Color>
     <Color x:Key="ThemeScrollThumb">#AEA4BE</Color>
     <Color x:Key="ThemeScrollThumbHover">#8E8498</Color>

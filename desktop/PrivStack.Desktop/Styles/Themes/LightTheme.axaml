@@ -132,7 +132,7 @@
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
     <!-- Selection highlight (text selection) -->
-    <Color x:Key="ThemeSelection">#304F46E5</Color>
+    <Color x:Key="ThemeSelection">#184F46E5</Color>
 
     <!-- Scrollbar track -->
     <Color x:Key="ThemeScrollTrack">#ECEEF2</Color>
