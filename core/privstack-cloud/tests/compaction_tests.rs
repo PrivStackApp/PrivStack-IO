@@ -45,6 +45,12 @@ fn private_key_s3_key_format() {
 }
 
 #[test]
+fn recovery_key_s3_key_format() {
+    let key = recovery_key_s3_key(42, "ws-abc");
+    assert_eq!(key, "users/42/workspaces/ws-abc/keys/private_key_recovery.enc");
+}
+
+#[test]
 fn s3_key_with_special_chars_in_ids() {
     let key = snapshot_s3_key(1, "ws-with-dashes", "ent-with-dashes", 999);
     assert_eq!(key, "users/1/workspaces/ws-with-dashes/entities/ent-with-dashes/snapshot_999.enc");

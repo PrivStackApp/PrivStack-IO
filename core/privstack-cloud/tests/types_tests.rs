@@ -1,4 +1,4 @@
-use chrono::{Duration, Utc};
+use chrono::{Datelike, Duration, Utc};
 use privstack_cloud::*;
 
 // --- StsCredentials ---
@@ -331,4 +331,119 @@ fn pending_changes_roundtrip() {
     let de: PendingChanges = serde_json::from_str(&json).unwrap();
     assert_eq!(de.pending.len(), 1);
     assert_eq!(de.pending[0].latest_cursor, 10);
+}
+
+// --- RateLimitConfig ---
+
+#[test]
+fn rate_limit_config_defaults() {
+    let config = RateLimitConfig::default();
+    assert_eq!(config.window_seconds, 60);
+    assert_eq!(config.max_requests_per_window, 600);
+    assert_eq!(config.recommended_poll_interval_secs, 30);
+    assert_eq!(config.flush_batch_size, 25);
+    assert_eq!(config.inter_entity_delay_ms, 120);
+}
+
+#[test]
+fn rate_limit_config_roundtrip() {
+    let config = RateLimitConfig {
+        window_seconds: 120,
+        max_requests_per_window: 300,
+        recommended_poll_interval_secs: 60,
+        flush_batch_size: 10,
+        inter_entity_delay_ms: 250,
+    };
+    let json = serde_json::to_string(&config).unwrap();
+    let de: RateLimitConfig = serde_json::from_str(&json).unwrap();
+    assert_eq!(de.window_seconds, 120);
+    assert_eq!(de.flush_batch_size, 10);
+}
+
+#[test]
+fn rate_limit_config_deserialize_from_server() {
+    // Simulate server JSON response
+    let json = r#"{"window_seconds":60,"max_requests_per_window":600,"recommended_poll_interval_secs":30,"flush_batch_size":25,"inter_entity_delay_ms":120}"#;
+    let config: RateLimitConfig = serde_json::from_str(json).unwrap();
+    assert_eq!(config.max_requests_per_window, 600);
+}
+
+// --- SyncProgress ---
+
+#[test]
+fn sync_progress_default() {
+    let progress = SyncProgress::default();
+    assert_eq!(progress.synced_count, 0);
+    assert_eq!(progress.total_count, 0);
+}
+
+// --- CloudSyncStatus rate-limit fields ---
+
+#[test]
+fn cloud_sync_status_rate_limit_defaults() {
+    // When deserializing old JSON without rate-limit fields, defaults should kick in
+    let json = r#"{"is_syncing":false,"is_authenticated":true,"active_workspace":"ws","pending_upload_count":0,"last_sync_at":null,"connected_devices":1}"#;
+    let status: CloudSyncStatus = serde_json::from_str(json).unwrap();
+    assert!(!status.is_rate_limited);
+    assert_eq!(status.rate_limit_remaining_secs, 0);
+    assert_eq!(status.synced_entity_count, 0);
+    assert_eq!(status.total_entity_count, 0);
+}
+
+// --- StsCredentials prefix/endpoint ---
+
+#[test]
+fn sts_credentials_deserialize_without_optional_fields() {
+    // API responses before prefix/endpoint were added
+    let json = r#"{"access_key_id":"AK","secret_access_key":"SK","session_token":"ST","expires_at":"2026-01-01T00:00:00Z","bucket":"b","region":"us-east-2"}"#;
+    let creds: StsCredentials = serde_json::from_str(json).unwrap();
+    assert!(creds.prefix.is_none());
+    assert!(creds.endpoint.is_none());
+}
+
+#[test]
+fn sts_credentials_deserialize_with_optional_fields() {
+    let json = r#"{"access_key_id":"AK","secret_access_key":"SK","session_token":"ST","expires_at":"2026-01-01T00:00:00Z","bucket":"b","region":"us-east-2","prefix":"users/1/ws/abc","endpoint":"http://localhost:9000"}"#;
+    let creds: StsCredentials = serde_json::from_str(json).unwrap();
+    assert_eq!(creds.prefix.as_deref(), Some("users/1/ws/abc"));
+    assert_eq!(creds.endpoint.as_deref(), Some("http://localhost:9000"));
+}
+
+// --- StsCredentials expiration alias ---
+
+#[test]
+fn sts_credentials_expiration_alias() {
+    // API returns "expiration" but we alias it to "expires_at"
+    let json = r#"{"access_key_id":"AK","secret_access_key":"SK","session_token":"ST","expiration":"2026-06-01T00:00:00Z","bucket":"b","region":"us-east-2"}"#;
+    let creds: StsCredentials = serde_json::from_str(json).unwrap();
+    assert_eq!(creds.expires_at.year(), 2026);
+}
+
+// --- BatchMeta is_snapshot deserialization ---
+
+#[test]
+fn batch_meta_is_snapshot_from_int() {
+    let json = r#"{"s3_key":"k","cursor_start":0,"cursor_end":10,"size_bytes":512,"event_count":5,"is_snapshot":1}"#;
+    let meta: BatchMeta = serde_json::from_str(json).unwrap();
+    assert!(meta.is_snapshot);
+
+    let json0 = r#"{"s3_key":"k","cursor_start":0,"cursor_end":10,"size_bytes":512,"event_count":5,"is_snapshot":0}"#;
+    let meta0: BatchMeta = serde_json::from_str(json0).unwrap();
+    assert!(!meta0.is_snapshot);
+}
+
+// --- QuotaInfo usage_percent from string ---
+
+#[test]
+fn quota_info_usage_percent_from_string() {
+    let json = r#"{"storage_used_bytes":500,"storage_quota_bytes":1000,"usage_percent":"50.00"}"#;
+    let qi: QuotaInfo = serde_json::from_str(json).unwrap();
+    assert!((qi.usage_percent - 50.0).abs() < f64::EPSILON);
+}
+
+#[test]
+fn quota_info_usage_percent_from_number() {
+    let json = r#"{"storage_used_bytes":500,"storage_quota_bytes":1000,"usage_percent":50.0}"#;
+    let qi: QuotaInfo = serde_json::from_str(json).unwrap();
+    assert!((qi.usage_percent - 50.0).abs() < f64::EPSILON);
 }
