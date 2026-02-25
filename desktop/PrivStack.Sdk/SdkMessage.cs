@@ -43,6 +43,14 @@ public sealed record SdkMessage
     /// </summary>
     [JsonPropertyName("parameters")]
     public Dictionary<string, string>? Parameters { get; init; }
+
+    /// <summary>
+    /// When true, the SDK host will skip broadcasting <see cref="Messaging.EntitySyncedMessage"/>
+    /// after the mutation. Sync outbound snapshots are still recorded. Use this for batch
+    /// operations that send a single summary notification after all items are processed.
+    /// </summary>
+    [JsonIgnore]
+    public bool SuppressChangeNotification { get; init; }
 }
 
 /// <summary>

@@ -683,13 +683,18 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
         // Prefer full entity from response; fall back to request payload
         _syncOutbound.NotifyEntityChanged(entityId, message.EntityType, snapshotPayload ?? message.Payload);
 
-        // Notify RAG index service of the local mutation so embeddings stay current
-        WeakReferenceMessenger.Default.Send(new EntitySyncedMessage
+        // Notify RAG index service of the local mutation so embeddings stay current.
+        // Batch operations set SuppressChangeNotification to avoid per-entity broadcast storms —
+        // the caller sends a single summary notification after the batch completes.
+        if (!message.SuppressChangeNotification)
         {
-            EntityId = entityId,
-            EntityType = message.EntityType,
-            IsRemoval = message.Action is SdkAction.Delete or SdkAction.Trash,
-        });
+            WeakReferenceMessenger.Default.Send(new EntitySyncedMessage
+            {
+                EntityId = entityId,
+                EntityType = message.EntityType,
+                IsRemoval = message.Action is SdkAction.Delete or SdkAction.Trash,
+            });
+        }
     }
 
     public void Dispose()

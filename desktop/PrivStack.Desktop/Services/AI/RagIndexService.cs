@@ -15,19 +15,25 @@ namespace PrivStack.Desktop.Services.AI;
 /// Background worker that maintains the RAG vector index.
 /// Listens for EntitySyncedMessage to incrementally re-index changed entities,
 /// and performs a full index on startup if the embedding model is available.
-/// Follows the Channel&lt;T&gt; bounded worker pattern from <see cref="IntentEngine"/>.
+///
+/// Uses a batch-coalescing debounce: incoming requests are queued and a single
+/// timer resets on each arrival. When the timer fires, all queued requests are
+/// deduplicated and dispatched as a single batch — calling each provider at most
+/// once per batch instead of once per entity.
 /// </summary>
 internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDisposable
 {
     private static readonly ILogger _log = Log.ForContext<RagIndexService>();
-    private const int QueueCapacity = 50;
+    private const int QueueCapacity = 20;
     private static readonly TimeSpan DebounceInterval = TimeSpan.FromMilliseconds(500);
 
     private readonly EmbeddingService _embeddingService;
     private readonly IPluginRegistry _pluginRegistry;
-    private readonly Channel<RagIndexRequest> _channel;
-    private readonly ConcurrentDictionary<string, System.Threading.Timer> _debounceTimers = new();
+    private readonly Channel<List<RagIndexRequest>> _channel;
+    private readonly ConcurrentQueue<RagIndexRequest> _pendingQueue = new();
+    private readonly object _timerLock = new();
     private readonly CancellationTokenSource _disposeCts = new();
+    private System.Threading.Timer? _coalescingTimer;
     private Task? _consumerTask;
     private bool _disposed;
 
@@ -35,7 +41,7 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
     {
         _embeddingService = embeddingService;
         _pluginRegistry = pluginRegistry;
-        _channel = Channel.CreateBounded<RagIndexRequest>(
+        _channel = Channel.CreateBounded<List<RagIndexRequest>>(
             new BoundedChannelOptions(QueueCapacity)
             {
                 FullMode = BoundedChannelFullMode.DropOldest,
@@ -73,27 +79,39 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
     {
         if (!_embeddingService.IsReady) return;
 
-        var request = new RagIndexRequest
+        _pendingQueue.Enqueue(new RagIndexRequest
         {
             EntityId = message.EntityId,
             EntityType = message.EntityType,
             IsRemoval = message.IsRemoval,
-        };
+        });
 
-        // Debounce: if we get rapid-fire updates for the same entity, only process the last one
-        var key = message.EntityId;
-        if (_debounceTimers.TryGetValue(key, out var existingTimer))
+        // Reset the coalescing timer — extends the window while changes keep arriving
+        lock (_timerLock)
         {
-            existingTimer.Dispose();
+            _coalescingTimer?.Dispose();
+            _coalescingTimer = new System.Threading.Timer(
+                _ => FlushPendingQueue(),
+                null,
+                DebounceInterval,
+                Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    private void FlushPendingQueue()
+    {
+        var batch = new Dictionary<string, RagIndexRequest>();
+        while (_pendingQueue.TryDequeue(out var req))
+        {
+            // Keep the last request per EntityId (dedup rapid updates)
+            batch[req.EntityId] = req;
         }
 
-        var timer = new System.Threading.Timer(_ =>
+        if (batch.Count > 0)
         {
-            _debounceTimers.TryRemove(key, out System.Threading.Timer? _);
-            _channel.Writer.TryWrite(request);
-        }, null, DebounceInterval, Timeout.InfiniteTimeSpan);
-
-        _debounceTimers[key] = timer;
+            _log.Debug("RAG batch coalesced: {Count} unique entities from queue", batch.Count);
+            _channel.Writer.TryWrite(batch.Values.ToList());
+        }
     }
 
     /// <summary>
@@ -170,17 +188,11 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
 
     private async Task ConsumeAsync(CancellationToken ct)
     {
-        await foreach (var request in _channel.Reader.ReadAllAsync(ct))
+        await foreach (var batch in _channel.Reader.ReadAllAsync(ct))
         {
             try
             {
-                if (request.IsRemoval)
-                {
-                    DeleteVectors(request.EntityId);
-                    continue;
-                }
-
-                await ProcessEntityAsync(request, ct);
+                await ProcessBatchAsync(batch, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -188,36 +200,56 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
             }
             catch (Exception ex)
             {
-                _log.Error(ex, "Failed to process RAG index request for {EntityId}", request.EntityId);
+                _log.Error(ex, "Failed to process RAG index batch ({Count} entities)", batch.Count);
             }
         }
     }
 
-    private async Task ProcessEntityAsync(RagIndexRequest request, CancellationToken ct)
+    private async Task ProcessBatchAsync(List<RagIndexRequest> batch, CancellationToken ct)
     {
         if (!_embeddingService.IsReady) return;
 
-        // Find the provider that handles this entity type
+        // Split into removals and upserts
+        var removals = batch.Where(r => r.IsRemoval).ToList();
+        var upserts = batch.Where(r => !r.IsRemoval).ToList();
+
+        // Handle removals
+        foreach (var removal in removals)
+        {
+            DeleteVectors(removal.EntityId);
+        }
+
+        if (upserts.Count == 0) return;
+
+        // Build lookup of entity IDs we need to index, grouped by entity type
+        var targetIds = new HashSet<string>(upserts.Select(u => u.EntityId));
+
+        // Load existing hashes ONCE for the entire batch
+        var existingHashes = LoadExistingHashes();
+
         var providers = _pluginRegistry.GetCapabilityProviders<IIndexableContentProvider>();
+        var matchedIds = new HashSet<string>();
 
         foreach (var provider in providers)
         {
+            if (matchedIds.Count >= targetIds.Count)
+                break; // All entity IDs accounted for — skip remaining providers
+
             try
             {
                 var result = await provider.GetIndexableContentAsync(
                     new IndexableContentRequest { ModifiedSince = null, BatchSize = 0 }, ct);
 
-                var chunks = result.Chunks
-                    .Where(c => c.EntityId == request.EntityId)
+                var relevantChunks = result.Chunks
+                    .Where(c => targetIds.Contains(c.EntityId))
                     .ToList();
 
-                if (chunks.Count == 0) continue;
+                if (relevantChunks.Count == 0) continue;
 
-                // Load existing hashes for this entity
-                var existingHashes = LoadExistingHashes();
-
-                foreach (var chunk in chunks)
+                foreach (var chunk in relevantChunks)
                 {
+                    matchedIds.Add(chunk.EntityId);
+
                     var hashKey = $"{chunk.EntityId}:{chunk.ChunkPath}";
                     if (existingHashes.TryGetValue(hashKey, out var existingHash) &&
                         existingHash == chunk.ContentHash)
@@ -227,13 +259,11 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
 
                     await IndexChunkAsync(chunk, ct);
                 }
-
-                return; // Found the provider, done
             }
             catch (Exception ex)
             {
-                _log.Debug(ex, "Provider {Provider} did not contain entity {EntityId}",
-                    provider.GetType().Name, request.EntityId);
+                _log.Debug(ex, "Provider {Provider} failed during batch processing",
+                    provider.GetType().Name);
             }
         }
     }
@@ -317,9 +347,10 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
         _disposeCts.Cancel();
         _channel.Writer.Complete();
 
-        foreach (var timer in _debounceTimers.Values)
-            timer.Dispose();
-        _debounceTimers.Clear();
+        lock (_timerLock)
+        {
+            _coalescingTimer?.Dispose();
+        }
 
         _disposeCts.Dispose();
     }
