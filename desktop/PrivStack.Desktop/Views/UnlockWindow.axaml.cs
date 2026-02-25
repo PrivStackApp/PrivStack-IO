@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Controls;
 using PrivStack.Desktop.ViewModels;
 
@@ -8,10 +9,16 @@ public partial class UnlockWindow : Window
     public UnlockWindow()
     {
         InitializeComponent();
+        Opened += OnOpened;
     }
 
     public UnlockWindow(UnlockViewModel viewModel) : this()
     {
         DataContext = viewModel;
+    }
+
+    private void OnOpened(object? sender, EventArgs e)
+    {
+        Activate();
     }
 }

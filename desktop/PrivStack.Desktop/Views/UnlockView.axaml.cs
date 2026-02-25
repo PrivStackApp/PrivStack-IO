@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -15,6 +16,16 @@ public partial class UnlockView : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        AttachedToVisualTree += OnAttachedToVisualTree;
+    }
+
+    private void OnAttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            var passwordBox = this.FindControl<TextBox>("PasswordBox");
+            passwordBox?.Focus();
+        }, DispatcherPriority.Loaded);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
