@@ -9,4 +9,10 @@ public interface ISpellCheckService
     bool Check(string word);
     IEnumerable<string> Suggest(string word, int maxSuggestions = 5);
     void AddToUserDictionary(string word);
+
+    /// <summary>
+    /// Raised when a word is added to (or removed from) the user dictionary.
+    /// Consumers should invalidate cached spell-check results.
+    /// </summary>
+    event Action? DictionaryChanged;
 }

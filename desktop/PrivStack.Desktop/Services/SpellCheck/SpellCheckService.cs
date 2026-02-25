@@ -13,6 +13,9 @@ public sealed class SpellCheckService : ISpellCheckService
     private static SpellCheckService? _instance;
     private static readonly object _instanceLock = new();
 
+    /// <inheritdoc />
+    public event Action? DictionaryChanged;
+
     private WordList? _dictionary;
     private readonly UserDictionaryService _userDictionary;
     private bool _isLoading;
@@ -97,6 +100,7 @@ public sealed class SpellCheckService : ISpellCheckService
     public void AddToUserDictionary(string word)
     {
         _userDictionary.AddWord(word);
+        DictionaryChanged?.Invoke();
     }
 
     /// <summary>
@@ -106,6 +110,7 @@ public sealed class SpellCheckService : ISpellCheckService
     public void RemoveFromUserDictionary(string word)
     {
         _userDictionary.RemoveWord(word);
+        DictionaryChanged?.Invoke();
     }
 
     /// <summary>

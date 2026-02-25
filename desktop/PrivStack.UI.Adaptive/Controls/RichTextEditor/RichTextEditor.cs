@@ -18,7 +18,7 @@ namespace PrivStack.UI.Adaptive.Controls.RichTextEditor;
 /// A single-block rich text editor. Each block (paragraph, heading) gets one instance.
 /// Set <see cref="Markdown"/> to populate, read it back to persist.
 /// </summary>
-public sealed class RichTextEditor : Control
+public sealed partial class RichTextEditor : Control
 {
     private TextDocument _doc = new();
     private readonly TextLayoutEngine _layout = new();
@@ -338,6 +338,7 @@ public sealed class RichTextEditor : Control
         Cursor = new Cursor(StandardCursorType.Ibeam);
 
         AddHandler(ContextRequestedEvent, OnContextRequested, RoutingStrategies.Tunnel);
+        InitSpellCheck();
     }
 
     private void OnContextRequested(object? sender, ContextRequestedEventArgs e)
@@ -354,10 +355,12 @@ public sealed class RichTextEditor : Control
         base.OnAttachedToVisualTree(e);
         if (Application.Current is { } app)
             app.ActualThemeVariantChanged += OnThemeVariantChanged;
+        SubscribeSpellCheck();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        UnsubscribeSpellCheck();
         if (Application.Current is { } app)
             app.ActualThemeVariantChanged -= OnThemeVariantChanged;
         base.OnDetachedFromVisualTree(e);
@@ -370,6 +373,7 @@ public sealed class RichTextEditor : Control
         _doc = TextDocument.FromMarkdown(Markdown);
         SnapshotInternalLinks();
         Relayout();
+        ScheduleSpellCheck();
     }
 
     private void Relayout()
@@ -622,7 +626,10 @@ public sealed class RichTextEditor : Control
             }
         }
 
-        // 3. Caret
+        // 3. Spell check underlines (after text, before caret)
+        RenderSpellCheckUnderlines(ctx);
+
+        // 4. Caret
         if (_isFocused && _caret.IsVisible && !_caret.HasSelection)
         {
             var caretRect = _layout.GetCaretRect(_caret.Position);
@@ -693,6 +700,13 @@ public sealed class RichTextEditor : Control
             {
                 _suppressContextMenu = true;
                 LinkEditRequested?.Invoke(this, l.Start, l.Length, l.Text, l.Url);
+                return;
+            }
+
+            // Spell check context menu for non-link words
+            if (TryShowSpellCheckContextMenu(charIndex))
+            {
+                _suppressContextMenu = true;
                 return;
             }
         }
@@ -917,6 +931,9 @@ public sealed class RichTextEditor : Control
             LinkPickerRequested?.Invoke(_blockId);
             return;
         }
+
+        // Autocorrect: check previous word on boundary chars
+        TryAutoCorrect();
 
         OnContentChanged();
     }
@@ -1420,6 +1437,7 @@ public sealed class RichTextEditor : Control
         UpdateActiveStyle();
         CheckForRemovedLinks();
         DebounceSave();
+        ScheduleSpellCheck();
     }
 
     private void SnapshotInternalLinks()
