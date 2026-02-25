@@ -20,5 +20,12 @@ public partial class UnlockWindow : Window
     private void OnOpened(object? sender, EventArgs e)
     {
         Activate();
+
+        // Trigger biometric after the window is activated so the Touch ID
+        // system dialog appears in the foreground with proper focus
+        if (Content is UnlockView view)
+        {
+            view.InitializeBiometric();
+        }
     }
 }

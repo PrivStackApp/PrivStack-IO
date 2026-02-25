@@ -23,9 +23,6 @@ public partial class UnlockView : UserControl
     {
         Dispatcher.UIThread.Post(() =>
         {
-            // If biometric is already known available, focus the biometric button;
-            // otherwise default to password box. The property changed handler will
-            // switch focus to biometric if it becomes available after async check.
             if (DataContext is UnlockViewModel { IsBiometricAvailable: true })
             {
                 var biometricButton = this.FindControl<Button>("BiometricButton");
@@ -44,7 +41,19 @@ public partial class UnlockView : UserControl
         if (DataContext is UnlockViewModel vm)
         {
             vm.PropertyChanged += OnViewModelPropertyChanged;
-            // Initialize biometric check (auto-attempts if available)
+            // Biometric init is triggered by UnlockWindow.OnOpened after Activate(),
+            // not here — triggering here is too early (window not yet visible/active)
+        }
+    }
+
+    /// <summary>
+    /// Called by UnlockWindow after the window is opened and activated,
+    /// ensuring the Touch ID dialog gets proper foreground focus.
+    /// </summary>
+    public void InitializeBiometric()
+    {
+        if (DataContext is UnlockViewModel vm)
+        {
             _ = vm.InitializeBiometricAsync();
         }
     }

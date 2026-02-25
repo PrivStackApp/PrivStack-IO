@@ -392,6 +392,9 @@ public class MacBiometricService : IBiometricService
 
     private async Task<string?> ModernAuthenticateAsync(string reason)
     {
+        // Activate the app so Touch ID dialog appears in foreground
+        EnsureAppActivated();
+
         return await Task.Run(() =>
         {
             try
@@ -593,11 +596,41 @@ public class MacBiometricService : IBiometricService
     // =====================================================================
 
     /// <summary>
+    /// Ensures the app is the active (foreground) application before triggering
+    /// Touch ID. Without this, the system biometric dialog may appear without
+    /// focus, requiring the user to click it manually.
+    /// Must be called from the main/UI thread.
+    /// </summary>
+    private static void EnsureAppActivated()
+    {
+        try
+        {
+            var nsApp = objc_msgSend_ReturnIntPtr(
+                objc_getClass("NSApplication"),
+                sel_registerName("sharedApplication"));
+            if (nsApp != IntPtr.Zero)
+            {
+                objc_msgSend_Void_Byte(nsApp, sel_registerName("activateIgnoringOtherApps:"), 1);
+            }
+        }
+        catch
+        {
+            // Non-critical — Touch ID will still work, just might not have focus
+        }
+    }
+
+    [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+    private static extern void objc_msgSend_Void_Byte(IntPtr target, IntPtr selector, byte arg);
+
+    /// <summary>
     /// Evaluates Touch ID via LAContext.evaluatePolicy:localizedReason:reply:
     /// Uses a ManualResetEventSlim to bridge the async ObjC callback.
     /// </summary>
     private static async Task<bool> EvaluateBiometricPolicyAsync(string reason)
     {
+        // Activate the app so Touch ID dialog appears in foreground
+        EnsureAppActivated();
+
         return await Task.Run(() =>
         {
             var context = objc_msgSend_ReturnIntPtr(

@@ -288,7 +288,9 @@ public partial class App : Application
             Services.GetRequiredService<IAuthService>(),
             Services.GetRequiredService<IPrivStackRuntime>(),
             Services.GetRequiredService<IWorkspaceService>(),
-            Services.GetRequiredService<IMasterPasswordCache>());
+            Services.GetRequiredService<IMasterPasswordCache>(),
+            Services.GetRequiredService<Services.Biometric.IBiometricService>(),
+            Services.GetRequiredService<IAppSettingsService>());
         var unlockWindow = new UnlockWindow(unlockVm);
 
         unlockVm.AppUnlocked += async (_, _) =>
@@ -409,11 +411,22 @@ public partial class App : Application
         updateStatus?.Invoke("Preparing workspace...");
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
 
-        // Show window immediately — deferred services start afterward
+        // Resolve the ViewModel on a background thread — its constructor is UI-independent
+        // but the full DI graph resolution can take 50-200ms which freezes the loading animation.
+        var mainVm = await Task.Run(() => Services.GetRequiredService<MainWindowViewModel>());
+
+        // Yield so the animation can tick between VM resolution and XAML parsing
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+
+        // MainWindow + InitializeComponent must run on the UI thread
         var mainWindow = new MainWindow
         {
-            DataContext = Services.GetRequiredService<MainWindowViewModel>(),
+            DataContext = mainVm,
         };
+
+        // Yield between XAML parse and the layout/show pass
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+
         desktop.MainWindow = mainWindow;
         mainWindow.Show();
 
