@@ -837,9 +837,33 @@ where
 }
 
 /// Shuts down the PrivStack runtime and frees resources.
+/// Checkpoints all DuckDB databases to flush WAL files before dropping connections.
 #[unsafe(no_mangle)]
 pub extern "C" fn privstack_shutdown() {
     let mut handle = HANDLE.lock().unwrap();
+
+    // Flush WAL files before dropping connections so they don't persist on disk.
+    if let Some(h) = handle.as_ref() {
+        if let Err(e) = h.entity_store.checkpoint() {
+            ffi_warn!("[shutdown] entity store checkpoint failed: {e}");
+        }
+        if let Err(e) = h.event_store.checkpoint() {
+            ffi_warn!("[shutdown] event store checkpoint failed: {e}");
+        }
+        if let Err(e) = h.blob_store.checkpoint() {
+            ffi_warn!("[shutdown] blob store checkpoint failed: {e}");
+        }
+        if let Err(e) = h.vault_manager.checkpoint() {
+            ffi_warn!("[shutdown] vault checkpoint failed: {e}");
+        }
+        if let Some(ds) = &h.dataset_store {
+            if let Err(e) = ds.checkpoint() {
+                ffi_warn!("[shutdown] dataset store checkpoint failed: {e}");
+            }
+        }
+        ffi_info!("[shutdown] all databases checkpointed");
+    }
+
     *handle = None;
 }
 

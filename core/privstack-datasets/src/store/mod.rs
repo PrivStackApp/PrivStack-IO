@@ -50,10 +50,15 @@ impl DatasetStore {
         })
     }
 
-    /// Run VACUUM / CHECKPOINT for maintenance.
-    pub fn maintenance(&self) -> DatasetResult<()> {
+    /// Flushes the WAL to the main database file.
+    pub fn checkpoint(&self) -> DatasetResult<()> {
         let conn = self.lock_conn();
         conn.execute_batch("CHECKPOINT")?;
         Ok(())
+    }
+
+    /// Run VACUUM / CHECKPOINT for maintenance.
+    pub fn maintenance(&self) -> DatasetResult<()> {
+        self.checkpoint()
     }
 }

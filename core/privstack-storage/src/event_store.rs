@@ -31,6 +31,13 @@ impl EventStore {
         })
     }
 
+    /// Flushes the WAL to the main database file.
+    pub fn checkpoint(&self) -> StorageResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch("CHECKPOINT;")?;
+        Ok(())
+    }
+
     /// Saves an event.
     pub fn save_event(&self, event: &Event) -> StorageResult<()> {
         let conn = self.conn.lock().unwrap();

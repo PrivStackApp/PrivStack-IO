@@ -483,6 +483,14 @@ impl VaultManager {
         })
     }
 
+    /// Flushes the WAL to the main database file.
+    pub fn checkpoint(&self) -> VaultResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch("CHECKPOINT;")
+            .map_err(|e| VaultError::Storage(e.to_string()))?;
+        Ok(())
+    }
+
     /// Open a vault manager with an in-memory database.
     pub fn open_in_memory() -> VaultResult<Self> {
         let conn =

@@ -812,6 +812,14 @@ impl EntityStore {
         Ok(())
     }
 
+    /// Flushes the WAL to the main database file.
+    /// Call on graceful shutdown to avoid stale WAL files on next startup.
+    pub fn checkpoint(&self) -> StorageResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch("CHECKPOINT;")?;
+        Ok(())
+    }
+
     /// Runs database maintenance: purge orphaned/transient data, then checkpoint to reclaim space.
     /// Only cleans auxiliary tables — never touches real entity data.
     /// Note: DuckDB's VACUUM does NOT reclaim space. CHECKPOINT is the correct approach.

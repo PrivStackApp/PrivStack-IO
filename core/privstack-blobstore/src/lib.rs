@@ -76,6 +76,14 @@ impl BlobStore {
         Ok(store)
     }
 
+    /// Flushes the WAL to the main database file.
+    pub fn checkpoint(&self) -> BlobStoreResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch("CHECKPOINT;")
+            .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
+        Ok(())
+    }
+
     /// Open with an existing shared connection (no encryption).
     pub fn open_with_conn(conn: Arc<Mutex<Connection>>) -> BlobStoreResult<Self> {
         let store = Self {
