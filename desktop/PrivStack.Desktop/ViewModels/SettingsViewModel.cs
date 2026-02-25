@@ -580,10 +580,17 @@ public partial class SettingsViewModel : ViewModelBase
             if (success)
             {
                 _settingsService.Settings.BiometricUnlockEnabled = true;
-                _settingsService.SaveDebounced();
+                _settingsService.Settings.BiometricPendingValidation = true;
+                _settingsService.Save();
                 BiometricUnlockEnabled = true;
-                BiometricStatus = $"{BiometricDisplayName} unlock enabled.";
                 ShowBiometricEnrollPassword = false;
+                BiometricEnrollPassword = string.Empty;
+                IsBiometricEnrolling = false;
+
+                // Lock the app so the user must validate biometric immediately
+                _authService.LockApp();
+                LogoutRequested?.Invoke(this, EventArgs.Empty);
+                return;
             }
             else
             {

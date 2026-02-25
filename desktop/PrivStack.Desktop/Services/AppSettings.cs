@@ -93,6 +93,9 @@ public class AppSettings
     [JsonPropertyName("biometric_unlock_enabled")]
     public bool BiometricUnlockEnabled { get; set; }
 
+    [JsonPropertyName("biometric_pending_validation")]
+    public bool BiometricPendingValidation { get; set; }
+
     // Graph view filters
     [JsonPropertyName("graph_show_notes")]
     public bool GraphShowNotes { get; set; } = true;

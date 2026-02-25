@@ -146,7 +146,20 @@ public partial class UnlockViewModel : ViewModelBase
             {
                 await Task.Run(() => _service.UnlockApp(password));
                 _passwordCache?.Set(password);
+
+                // Biometric validation succeeded — clear pending flag
+                if (_appSettings?.Settings.BiometricPendingValidation == true)
+                {
+                    _appSettings.Settings.BiometricPendingValidation = false;
+                    _appSettings.Save();
+                }
+
                 AppUnlocked?.Invoke(this, EventArgs.Empty);
+            }
+            else if (_appSettings?.Settings.BiometricPendingValidation == true)
+            {
+                // User cancelled biometric during validation — they must use password
+                ErrorMessage = $"{BiometricDisplayName} cancelled. Enter your password to continue.";
             }
         }
         catch (PrivStackException)
@@ -179,6 +192,16 @@ public partial class UnlockViewModel : ViewModelBase
 
             // Cache password for seamless workspace switching before clearing
             _passwordCache?.Set(password);
+
+            // If biometric was pending validation and user typed password instead, disable biometric
+            if (_appSettings?.Settings.BiometricPendingValidation == true)
+            {
+                _appSettings.Settings.BiometricPendingValidation = false;
+                _appSettings.Settings.BiometricUnlockEnabled = false;
+                _appSettings.Save();
+                _biometricService?.Unenroll();
+                _log.Information("Biometric validation failed — user used password, biometric disabled");
+            }
 
             // Clear password from memory
             MasterPassword = string.Empty;
