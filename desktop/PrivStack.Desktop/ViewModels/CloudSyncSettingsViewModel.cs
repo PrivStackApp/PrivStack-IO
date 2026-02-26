@@ -345,7 +345,7 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
             }
 
             // 3. Start syncing (keypair already exists from prior setup)
-            await StartSyncForWorkspace(workspace);
+            await StartSyncForWorkspace(workspace, pushAllEntities: true);
         }
         catch (Exception ex)
         {
@@ -372,7 +372,7 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
             var workspace = _workspaceService.GetActiveWorkspace();
             if (workspace == null) return;
 
-            await StartSyncForWorkspace(workspace);
+            await StartSyncForWorkspace(workspace, pushAllEntities: true);
         }
         catch (Exception ex)
         {
@@ -606,7 +606,7 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
             await RefreshStatusAsync();
 
             if (workspace.SyncTier == SyncTier.PrivStackCloud)
-                await StartSyncForWorkspace(workspace);
+                await StartSyncForWorkspace(workspace, pushAllEntities: true);
         }
         catch (Exception ex)
         {
@@ -649,7 +649,7 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
             await RefreshStatusAsync();
 
             if (workspace.SyncTier == SyncTier.PrivStackCloud)
-                await StartSyncForWorkspace(workspace);
+                await StartSyncForWorkspace(workspace, pushAllEntities: true);
         }
         catch (Exception ex)
         {
@@ -686,7 +686,7 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
         AuthError = "Cloud session expired. Please reconnect.";
     }
 
-    private async Task StartSyncForWorkspace(Workspace workspace)
+    private async Task StartSyncForWorkspace(Workspace workspace, bool pushAllEntities = false)
     {
         if (_cloudSync.IsSyncing)
         {
@@ -701,19 +701,23 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
         OnPropertyChanged(nameof(ShowEnableForWorkspace));
         OnPropertyChanged(nameof(IsWorkspaceCloudEnabled));
 
-        // Push all existing entities as snapshots so the cloud has full state
-        _ = Task.Run(() =>
+        // Only push all entities on first-time sync setup (not on every app restart).
+        // Subsequent changes are pushed incrementally via SyncOutboundService.PushEvent.
+        if (pushAllEntities)
         {
-            try
+            _ = Task.Run(() =>
             {
-                var count = _cloudSync.PushAllEntities();
-                Log.Information("Pushed {Count} entities for initial cloud sync", count);
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(ex, "Failed to push existing entities for initial cloud sync");
-            }
-        });
+                try
+                {
+                    var count = _cloudSync.PushAllEntities();
+                    Log.Information("Pushed {Count} entities for initial cloud sync", count);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Failed to push existing entities for initial cloud sync");
+                }
+            });
+        }
 
         await RefreshStatusAsync();
         StartStatusRefreshTimer();
