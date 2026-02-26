@@ -580,6 +580,9 @@ internal static partial class NativeLibrary
     [LibraryImport(LibraryName, EntryPoint = "privstack_cloudsync_force_flush")]
     public static partial PrivStackError CloudSyncForceFlush();
 
+    [LibraryImport(LibraryName, EntryPoint = "privstack_cloudsync_clear_cursors")]
+    public static partial PrivStackError CloudSyncClearCursors();
+
     [LibraryImport(LibraryName, EntryPoint = "privstack_cloudsync_push_event", StringMarshalling = StringMarshalling.Utf8)]
     public static partial PrivStackError CloudSyncPushEvent(string entityId, string entityType, string jsonData);
 

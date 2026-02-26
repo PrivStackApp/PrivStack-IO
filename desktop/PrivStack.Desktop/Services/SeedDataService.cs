@@ -276,6 +276,11 @@ public sealed class SeedDataService
             _log.Information(
                 "Cloud workspace purged during data wipe: {DeletedObjects} objects, {FreedBytes} bytes freed",
                 result.DeletedObjects, result.FreedBytes);
+
+            // Clear local cursor state so stale cursors don't cause phantom
+            // re-uploads when sync restarts after the wipe.
+            _cloudSync.ClearCursors();
+            _log.Debug("Cleared local cloud sync cursors after purge");
         }
         catch (Exception ex)
         {

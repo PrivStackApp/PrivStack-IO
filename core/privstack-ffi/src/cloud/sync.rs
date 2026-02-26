@@ -245,6 +245,20 @@ pub extern "C" fn privstack_cloudsync_force_flush() -> PrivStackError {
     }
 }
 
+/// Clears all local cloud sync cursors (used after purging cloud data to prevent
+/// stale cursor state from re-uploading phantom entities on next sync start).
+#[unsafe(no_mangle)]
+pub extern "C" fn privstack_cloudsync_clear_cursors() -> PrivStackError {
+    let handle = HANDLE.lock().unwrap();
+    match handle.as_ref() {
+        Some(h) => match h.entity_store.clear_cloud_cursors() {
+            Ok(()) => PrivStackError::Ok,
+            Err(_) => PrivStackError::StorageError,
+        },
+        None => PrivStackError::NotInitialized,
+    }
+}
+
 // ── Event Submission ──
 
 /// Pushes a local entity snapshot event into the cloud sync engine's outbox.

@@ -37,6 +37,7 @@ public interface ICloudSyncService
     bool IsSyncing { get; }
     CloudSyncStatus GetStatus();
     void ForceFlush();
+    void ClearCursors();
     void PushEvent(string entityId, string entityType, string jsonData);
     uint PushAllEntities();
 
