@@ -1005,6 +1005,10 @@ public sealed partial class RichTextEditor : Control
                 e.Handled = true;
                 break;
 
+            case Key.Tab when ctrl:
+                // Ctrl+Tab / Ctrl+Shift+Tab: let it bubble up for block-level indent
+                break;
+
             case Key.Tab when shift:
                 OutdentRequested?.Invoke(_blockId);
                 e.Handled = true;
