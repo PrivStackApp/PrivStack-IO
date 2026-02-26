@@ -234,9 +234,11 @@ public sealed class CodeBlockEditor : Border
         {
             if (_langLabel.IsHitTestVisible) _langLabel.Opacity = 0.7;
         };
-        _langLabel.PointerReleased += (_, e) =>
+        _langLabel.PointerPressed += (_, e) =>
         {
             // Hide pill, show autocomplete
+            // Use PointerPressed (not Released) because the code editor's TextEditor
+            // captures the pointer on press, preventing Released from reaching the pill.
             _langLabel.Opacity = 0;
             _langLabel.IsHitTestVisible = false;
             _languagePicker.Opacity = 1;
