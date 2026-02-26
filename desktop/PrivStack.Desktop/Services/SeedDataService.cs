@@ -1,4 +1,5 @@
 using System.Text.Json;
+using PrivStack.Desktop.Native;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.AI;
 using PrivStack.Desktop.Services.Connections;
@@ -26,6 +27,9 @@ public sealed class SeedDataService
     private readonly ConnectionService _connectionService;
     private readonly AiConversationStore _conversationStore;
     private readonly AiMemoryService _memoryService;
+    private readonly ICloudSyncService _cloudSync;
+    private readonly IWorkspaceService _workspaceService;
+    private readonly PrivStackApiClient _apiClient;
 
     /// <summary>
     /// System-level entity types that the host owns (not any plugin).
@@ -46,7 +50,10 @@ public sealed class SeedDataService
         EntityMetadataService entityMetadata,
         ConnectionService connectionService,
         AiConversationStore conversationStore,
-        AiMemoryService memoryService)
+        AiMemoryService memoryService,
+        ICloudSyncService cloudSync,
+        IWorkspaceService workspaceService,
+        PrivStackApiClient apiClient)
     {
         _sdk = sdk;
         _appSettings = appSettings;
@@ -55,6 +62,9 @@ public sealed class SeedDataService
         _connectionService = connectionService;
         _conversationStore = conversationStore;
         _memoryService = memoryService;
+        _cloudSync = cloudSync;
+        _workspaceService = workspaceService;
+        _apiClient = apiClient;
     }
 
     /// <summary>
@@ -138,6 +148,10 @@ public sealed class SeedDataService
     /// </summary>
     private async Task WipeAllPluginDataAsync()
     {
+        // 0. Purge cloud workspace data (batches, cursors, snapshots, blobs, S3 objects)
+        //    so the server doesn't report stale batches as "pending" after local wipe.
+        await PurgeCloudWorkspaceIfConnectedAsync();
+
         // 1. Wipe system metadata
         foreach (var (pluginId, entityType) in SystemWipeTargets)
             await SeedHelper.DeleteAllEntitiesAsync(_sdk, pluginId, entityType);
@@ -237,6 +251,35 @@ public sealed class SeedDataService
             {
                 _log.Warning(ex, "Failed to disconnect {Provider} during wipe", provider);
             }
+        }
+    }
+
+    /// <summary>
+    /// If cloud sync is active, stops the sync engine and purges all server-side data
+    /// (batches, cursors, snapshots, blobs, S3 objects) so stale batches aren't
+    /// re-downloaded after the local wipe completes.
+    /// </summary>
+    private async Task PurgeCloudWorkspaceIfConnectedAsync()
+    {
+        try
+        {
+            var workspace = _workspaceService.GetActiveWorkspace();
+            var token = _appSettings.Settings.CloudSyncAccessToken;
+
+            if (workspace?.CloudWorkspaceId == null || string.IsNullOrEmpty(token))
+                return;
+
+            if (_cloudSync.IsSyncing)
+                _cloudSync.StopSync();
+
+            var result = await _apiClient.PurgeCloudWorkspaceAsync(token, workspace.CloudWorkspaceId);
+            _log.Information(
+                "Cloud workspace purged during data wipe: {DeletedObjects} objects, {FreedBytes} bytes freed",
+                result.DeletedObjects, result.FreedBytes);
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Failed to purge cloud workspace during data wipe (continuing local wipe)");
         }
     }
 

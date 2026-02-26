@@ -1219,7 +1219,7 @@ public partial class SetupWizardViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void ConfirmResetData()
+    private async Task ConfirmResetDataAsync()
     {
         ShowResetConfirmation = false;
         SetupError = string.Empty;
@@ -1228,6 +1228,9 @@ public partial class SetupWizardViewModel : ViewModelBase
         {
             var dbPath = _workspaceService.GetActiveDataPath();
             Log.Warning("[Reset] User requested data wipe for: {Path}", dbPath);
+
+            // Purge cloud workspace data before shutting down runtime
+            await PurgeCloudWorkspaceAsync();
 
             // Shut down the runtime so the DB file is released
             if (_runtime.IsInitialized)
@@ -1261,6 +1264,29 @@ public partial class SetupWizardViewModel : ViewModelBase
         {
             Log.Error(ex, "[Reset] Failed to wipe data");
             SetupError = $"Failed to reset data: {ex.Message}";
+        }
+    }
+
+    private async Task PurgeCloudWorkspaceAsync()
+    {
+        try
+        {
+            var workspace = _workspaceService.GetActiveWorkspace();
+            var token = _appSettings.Settings.CloudSyncAccessToken;
+
+            if (workspace?.CloudWorkspaceId == null || string.IsNullOrEmpty(token))
+                return;
+
+            if (_cloudSync.IsSyncing)
+                _cloudSync.StopSync();
+
+            var result = await _apiClient.PurgeCloudWorkspaceAsync(token, workspace.CloudWorkspaceId);
+            Log.Information("[Reset] Cloud workspace purged: {DeletedObjects} objects, {FreedBytes} bytes freed",
+                result.DeletedObjects, result.FreedBytes);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[Reset] Failed to purge cloud workspace (continuing local reset)");
         }
     }
 
