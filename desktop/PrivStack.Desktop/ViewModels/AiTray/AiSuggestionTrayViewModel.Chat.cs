@@ -337,6 +337,17 @@ public partial class AiSuggestionTrayViewModel
 
     private bool CanSendChat() => !string.IsNullOrWhiteSpace(ChatInputText) && !IsSendingChat;
 
+    /// <summary>
+    /// Entry point for Whisper voice commands when no text input is focused.
+    /// Sets ChatInputText and triggers the standard send pipeline.
+    /// </summary>
+    public async Task SendVoiceMessageAsync(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text) || IsSendingChat) return;
+        ChatInputText = text;
+        await SendChatMessageAsync();
+    }
+
     partial void OnChatInputTextChanged(string? value) => SendChatMessageCommand.NotifyCanExecuteChanged();
     partial void OnIsSendingChatChanged(bool value) => SendChatMessageCommand.NotifyCanExecuteChanged();
 

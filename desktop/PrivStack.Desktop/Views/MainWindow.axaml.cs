@@ -96,7 +96,7 @@ public partial class MainWindow : Window
 
     private void OnTranscriptionReady(object? sender, string transcription)
     {
-        if (string.IsNullOrWhiteSpace(transcription) || _speechTargetControl == null)
+        if (string.IsNullOrWhiteSpace(transcription))
         {
             _speechTargetControl = null;
             return;
@@ -104,19 +104,29 @@ public partial class MainWindow : Window
 
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            switch (_speechTargetControl)
+            if (_speechTargetControl != null)
             {
-                case TextBox textBox:
-                    InsertTextIntoTextBox(textBox, transcription);
-                    break;
-                case TextEditor editor:
-                    InsertTextIntoEditor(editor, transcription);
-                    break;
-                case RichTextEditorControl rte:
-                    rte.InsertTranscription(transcription);
-                    rte.Focus();
-                    break;
+                switch (_speechTargetControl)
+                {
+                    case TextBox textBox:
+                        InsertTextIntoTextBox(textBox, transcription);
+                        break;
+                    case TextEditor editor:
+                        InsertTextIntoEditor(editor, transcription);
+                        break;
+                    case RichTextEditorControl rte:
+                        rte.InsertTranscription(transcription);
+                        rte.Focus();
+                        break;
+                }
             }
+            else if (DataContext is MainWindowViewModel vm)
+            {
+                // No text input focused — route voice transcription to Duncan AI tray
+                _ = vm.AiTrayVM.SendVoiceMessageAsync(transcription);
+                vm.IsAiTrayOpen = true;
+            }
+
             _speechTargetControl = null;
         });
     }

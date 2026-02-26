@@ -25,13 +25,8 @@ public partial class MainWindow
             return;
 
         var focusedElement = FocusManager?.GetFocusedElement();
-        var targetControl = FindTextInputControl(focusedElement);
-
-        if (targetControl != null)
-        {
-            _speechTargetControl = targetControl;
-            await speechVm.TryStartAsync();
-        }
+        _speechTargetControl = FindTextInputControl(focusedElement);
+        await speechVm.TryStartAsync();
     }
 
     private static Control? FindTextInputControl(object? focusedElement)
