@@ -371,6 +371,13 @@
                     <!-- Main Content Area + Info Panel overlay -->
                         <ContentControl Content="{Binding CurrentViewModel}" ClipToBounds="True"/>
 
+                        <!-- Toast Notification Container (centered on plugin content area) -->
+                        <toast:ToastContainer ZIndex="1100"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Top"
+                                              Margin="0,8,0,0"
+                                              IsHitTestVisible="True"/>
+
                         <!-- Info Panel: Collapsed side tab (visible when panel is closed and not on Graph/Nexus) -->
                         <!-- Hover region: wider hit-test area that fades in the tab button -->
                         <Border Classes="info-tab-hover-zone"
@@ -693,12 +700,7 @@
             </Button>
         </Border>
 
-        <!-- Toast Notification Container (top-center, above all content) -->
-        <toast:ToastContainer ZIndex="1100"
-                              HorizontalAlignment="Center"
-                              VerticalAlignment="Top"
-                              Margin="0,40,0,0"
-                              IsHitTestVisible="True"/>
+        <!-- Toast container moved into content area panel for plugin-centered alignment -->
 
         <!-- ============================================== -->
         <!-- FLOATING OVERLAYS - Outside main Grid layout  -->

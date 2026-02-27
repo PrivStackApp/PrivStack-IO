@@ -82,7 +82,7 @@
 
                         <!-- Type icon — stroke-based via IconControl -->
                         <Panel Grid.Column="1" Width="16" Height="16"
-                               VerticalAlignment="Top" Margin="12,12,10,0">
+                               VerticalAlignment="Center" Margin="12,0,10,0">
                             <controls:IconControl Icon="Check"
                                                   Size="16" StrokeThickness="2"
                                                   Stroke="{DynamicResource ThemeSuccessBrush}"
@@ -133,20 +133,22 @@
                                 Cursor="Hand"
                                 Click="OnActionClick"/>
 
-                        <!-- Dismiss button -->
+                        <!-- Dismiss button — symmetric with type icon on left -->
                         <Button Grid.Column="4"
                                 Classes="toast-dismiss"
                                 Background="Transparent"
                                 BorderThickness="0"
-                                Padding="4"
-                                Margin="6,0,8,0"
+                                Padding="0"
+                                Margin="10,0,12,0"
                                 MinHeight="0" MinWidth="0"
-                                VerticalAlignment="Top"
+                                VerticalAlignment="Center"
                                 Cursor="Hand"
                                 Click="OnDismissClick">
-                            <controls:IconControl Icon="X"
-                                                  Size="12" StrokeThickness="1.5"
-                                                  Stroke="{DynamicResource ThemeTextMutedBrush}"/>
+                            <Panel Width="16" Height="16">
+                                <controls:IconControl Icon="X"
+                                                      Size="16" StrokeThickness="2"
+                                                      Stroke="{DynamicResource ThemeTextMutedBrush}"/>
+                            </Panel>
                         </Button>
                     </Grid>
                 </Border>
