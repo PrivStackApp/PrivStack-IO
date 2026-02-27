@@ -39,6 +39,22 @@ public sealed class ApiRouteDescriptor
     /// Human-readable description shown in the /api/v1/routes listing.
     /// </summary>
     public string? Description { get; init; }
+
+    /// <summary>
+    /// Example JSON request body (for POST/PATCH). Shown in API docs.
+    /// </summary>
+    public string? RequestExample { get; init; }
+
+    /// <summary>
+    /// Example JSON response body. Shown in API docs.
+    /// </summary>
+    public string? ResponseExample { get; init; }
+
+    /// <summary>
+    /// Documented query parameters (for GET routes).
+    /// Each entry: "param_name: description".
+    /// </summary>
+    public IReadOnlyList<string>? QueryParamDocs { get; init; }
 }
 
 /// <summary>

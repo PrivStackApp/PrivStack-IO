@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using PrivStack.Desktop.Services.Plugin;
@@ -34,6 +35,10 @@ public partial class ApiDocsWindow : Window
                     : $"/api/v1/{provider.ApiSlug}/{r.Path}",
                 Description = r.Description ?? "",
                 MethodBrush = ResolveMethodBrush(r.Method),
+                RequestExample = NormalizeJson(r.RequestExample),
+                ResponseExample = NormalizeJson(r.ResponseExample),
+                QueryParamDocs = r.QueryParamDocs,
+                HasDetail = r.RequestExample != null || r.ResponseExample != null || r.QueryParamDocs is { Count: > 0 },
             }).ToList();
 
             sections.Add(new ApiPluginSection
@@ -45,6 +50,15 @@ public partial class ApiDocsWindow : Window
 
         PluginSections.ItemsSource = sections;
         NoPluginEndpoints.IsVisible = sections.Count == 0;
+    }
+
+    private static string? NormalizeJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        // Trim uniform leading whitespace from multi-line const strings
+        var lines = json.Split('\n');
+        var trimmed = lines.Select(l => l.TrimStart()).Where(l => l.Length > 0);
+        return string.Join("\n", trimmed);
     }
 
     private IBrush ResolveMethodBrush(ApiMethod method)
@@ -69,6 +83,15 @@ public partial class ApiDocsWindow : Window
     {
         Close();
     }
+
+    private void OnRouteClick(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is Control { DataContext: ApiRouteItem route } && route.HasDetail)
+        {
+            var detail = new ApiRouteDetailWindow(route);
+            detail.ShowDialog(this);
+        }
+    }
 }
 
 public class ApiPluginSection
@@ -84,5 +107,9 @@ public class ApiRouteItem
     public string Path { get; init; } = "";
     public string Description { get; init; } = "";
     public IBrush MethodBrush { get; init; } = Brushes.Gray;
+    public string? RequestExample { get; init; }
+    public string? ResponseExample { get; init; }
+    public IReadOnlyList<string>? QueryParamDocs { get; init; }
+    public bool HasDetail { get; init; }
     public string DescriptionSuffix => string.IsNullOrEmpty(Description) ? "" : $"  {Description}";
 }

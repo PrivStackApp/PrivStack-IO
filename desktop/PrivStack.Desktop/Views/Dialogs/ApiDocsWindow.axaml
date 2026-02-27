@@ -173,18 +173,28 @@ curl -H "X-API-Key: YOUR_KEY" \
                                             <ItemsControl ItemsSource="{Binding Routes}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="dialogs:ApiRouteItem">
-                                                        <Grid ColumnDefinitions="50,*" Margin="0,3">
-                                                            <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                                                       Text="{Binding Method}"
-                                                                       Foreground="{Binding MethodBrush}"/>
-                                                            <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                                                                       TextWrapping="Wrap">
-                                                                <Run Text="{Binding Path}"/>
-                                                                <Run Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                                                     Text="{Binding DescriptionSuffix}"/>
-                                                            </TextBlock>
-                                                        </Grid>
+                                                        <Border Margin="0,1" Padding="4,3" CornerRadius="4"
+                                                                Cursor="Hand"
+                                                                PointerPressed="OnRouteClick"
+                                                                Background="Transparent">
+                                                            <Border.Styles>
+                                                                <Style Selector="Border:pointerover">
+                                                                    <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
+                                                                </Style>
+                                                            </Border.Styles>
+                                                            <Grid ColumnDefinitions="50,*">
+                                                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                                                           Text="{Binding Method}"
+                                                                           Foreground="{Binding MethodBrush}"/>
+                                                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                                           TextWrapping="Wrap">
+                                                                    <Run Text="{Binding Path}"/>
+                                                                    <Run Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                                         Text="{Binding DescriptionSuffix}"/>
+                                                                </TextBlock>
+                                                            </Grid>
+                                                        </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
