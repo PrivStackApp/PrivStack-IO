@@ -1068,6 +1068,35 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task ExportOpenApiJsonAsync() => await ExportOpenApiAsync("json");
+
+    [RelayCommand]
+    private async Task ExportOpenApiYamlAsync() => await ExportOpenApiAsync("yaml");
+
+    private async Task ExportOpenApiAsync(string format)
+    {
+        var port = ApiPort > 0 ? ApiPort : 9720;
+        var spec = OpenApiSpecGenerator.Generate(_pluginRegistry, port);
+
+        var (ext, filterName) = format == "yaml"
+            ? ("*.yaml", "YAML")
+            : ("*.json", "JSON");
+
+        var path = await _dialogService.ShowSaveFileDialogAsync(
+            "Export OpenAPI Spec",
+            $"privstack-api.{(format == "yaml" ? "yaml" : "json")}",
+            [(filterName, ext)]);
+
+        if (path == null) return;
+
+        var content = format == "yaml"
+            ? OpenApiSpecGenerator.GenerateYaml(spec)
+            : OpenApiSpecGenerator.GenerateJson(spec);
+
+        await File.WriteAllTextAsync(path, content);
+    }
+
+    [RelayCommand]
     private async Task CopyApiKeyAsync()
     {
         if (string.IsNullOrEmpty(ApiKey)) return;

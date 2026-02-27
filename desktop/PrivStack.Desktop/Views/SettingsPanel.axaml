@@ -1976,6 +1976,28 @@
                                            FontSize="{DynamicResource ThemeFontSizeXs}"
                                            Foreground="{DynamicResource ThemePrimaryBrush}"/>
                             </Button>
+                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
+                                <TextBlock Text="OpenAPI V3 Spec"
+                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           VerticalAlignment="Center"/>
+                                <Button Command="{Binding ExportOpenApiJsonCommand}"
+                                        Background="Transparent" Padding="0" Cursor="Hand">
+                                    <TextBlock Text="(JSON)"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                                </Button>
+                                <TextBlock Text="|"
+                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           VerticalAlignment="Center"/>
+                                <Button Command="{Binding ExportOpenApiYamlCommand}"
+                                        Background="Transparent" Padding="0" Cursor="Hand">
+                                    <TextBlock Text="(YAML)"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                                </Button>
+                            </StackPanel>
                         </StackPanel>
 
                         <!-- Enable API -->
