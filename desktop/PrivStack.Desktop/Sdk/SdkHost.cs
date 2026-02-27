@@ -115,7 +115,7 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
                         NotifySyncIfMutation(message, responseJson);
                     return Task.FromResult(response ?? SdkResponse<TResult>.Fail("json_error", "Failed to deserialize response"));
                 }
-                catch (JsonException ex)
+                catch (Exception ex) when (ex is JsonException or NotSupportedException)
                 {
                     _log.Error(ex, "SDK deserialization failed for {EntityType}.{Action} -> {TargetType}. Response: {Response}",
                         message.EntityType, message.Action, typeof(TResult).Name,
