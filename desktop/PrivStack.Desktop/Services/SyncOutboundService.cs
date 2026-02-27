@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using PrivStack.Desktop.Native;
 using PrivStack.Desktop.Services.Abstractions;
 using Serilog;
@@ -52,6 +53,9 @@ internal sealed class SyncOutboundService : ISyncOutboundService, IDisposable
 
         // Skip all sync for excluded entity types (e.g. email — fetched from IMAP per-device)
         if (SyncExcludedTypes.Contains(entityType)) return;
+
+        // Skip entities marked local_only (e.g. CalDAV/ICS events where the remote is source of truth)
+        if (IsLocalOnly(payload)) return;
 
         EnqueueSync(entityId, entityType, payload);
     }
@@ -153,6 +157,25 @@ internal sealed class SyncOutboundService : ISyncOutboundService, IDisposable
         if (_disposed) return;
         _disposed = true;
         CancelAll();
+    }
+
+    /// <summary>
+    /// Checks if the entity payload contains "local_only": true, indicating it should
+    /// never be synced to cloud or P2P (belongs to an external source like CalDAV/ICS).
+    /// </summary>
+    private static bool IsLocalOnly(string? payload)
+    {
+        if (string.IsNullOrEmpty(payload)) return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(payload);
+            return doc.RootElement.TryGetProperty("local_only", out var prop)
+                && prop.ValueKind == JsonValueKind.True;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private sealed class DebounceEntry

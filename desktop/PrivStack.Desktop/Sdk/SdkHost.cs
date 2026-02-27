@@ -634,6 +634,13 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
         if (_syncOutbound == null || !IsMutationAction(message.Action))
             return;
 
+        // local_only entities must never be synced to cloud or P2P — they belong to
+        // external sources (CalDAV, ICS subscriptions) where the remote is the source of truth.
+        var isLocalOnly = message.Parameters != null
+            && message.Parameters.TryGetValue("local_only", out var lo) && lo == "true";
+        if (isLocalOnly)
+            return;
+
         var entityId = message.EntityId;
 
         // Try to extract the full entity from the response "data" field.
