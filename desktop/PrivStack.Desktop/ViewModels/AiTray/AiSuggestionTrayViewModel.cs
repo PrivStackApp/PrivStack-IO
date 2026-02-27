@@ -8,6 +8,7 @@ using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.AI;
 using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Sdk;
+using PrivStack.Sdk.Capabilities;
 using PrivStack.Sdk.Messaging;
 using PrivStack.Sdk.Services;
 using Serilog;
@@ -39,6 +40,7 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
     private readonly IPluginRegistry _pluginRegistry;
     private readonly IPrivStackSdk _sdk;
     private readonly RagSearchService _ragSearchService;
+    private readonly IDatasetService _datasetService;
 
     /// <summary>
     /// Set by MainWindowViewModel to enable source entity navigation without coupling.
@@ -56,7 +58,8 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         InfoPanelService infoPanelService,
         IPluginRegistry pluginRegistry,
         IPrivStackSdk sdk,
-        RagSearchService ragSearchService)
+        RagSearchService ragSearchService,
+        IDatasetService datasetService)
     {
         _intentEngine = intentEngine;
         _dispatcher = dispatcher;
@@ -69,6 +72,7 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         _pluginRegistry = pluginRegistry;
         _sdk = sdk;
         _ragSearchService = ragSearchService;
+        _datasetService = datasetService;
 
         // Subscribe to IntentEngine events
         _intentEngine.SuggestionAdded += OnIntentSuggestionAdded;
@@ -151,6 +155,7 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
     private string? _activeItemContextShort;
     private string? _activeItemContextFull;
     private string? _activePluginContext;
+    private bool _hasEmbeddedDatasets;
 
     private void OnActivePluginChanged()
     {
@@ -182,8 +187,11 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         {
             _activeItemContextShort = null;
             _activeItemContextFull = null;
+            _hasEmbeddedDatasets = false;
             return;
         }
+
+        _hasEmbeddedDatasets = false;
 
         _activeItemContextShort = $"Currently viewing: {title} ({linkType})";
         _activeItemContextFull = _activeItemContextShort; // default until entity loads
@@ -359,6 +367,22 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
                     var label = dataRef.Title ?? dataRef.DatasetId ?? dataRef.ProviderQueryKey ?? "unknown";
                     sb.AppendLine();
                     sb.AppendLine($"\n--- Embedded Table: {label} ({result.TotalCount} total rows) ---");
+
+                    // If dataset-backed, fetch full schema metadata for SQL querying
+                    if (dataRef.DatasetId != null)
+                    {
+                        var datasetInfo = await _datasetService.GetDatasetAsync(dataRef.DatasetId);
+                        if (datasetInfo != null)
+                        {
+                            _hasEmbeddedDatasets = true;
+                            sb.AppendLine($"Dataset Name: {datasetInfo.Name} (use source:\"{datasetInfo.Name}\" in SQL)");
+                            sb.AppendLine($"Total Rows: {datasetInfo.RowCount}");
+                            sb.AppendLine("Schema:");
+                            foreach (var col in datasetInfo.Columns)
+                                sb.AppendLine($"  - {col.Name} ({col.ColumnType})");
+                        }
+                    }
+
                     sb.AppendLine($"Columns: {string.Join(", ", result.Columns)}");
                     foreach (var row in result.Rows)
                     {

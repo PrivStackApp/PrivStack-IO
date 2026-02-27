@@ -105,6 +105,7 @@ public partial class AiSuggestionTrayViewModel
             var activePluginCtx = _activePluginContext;
             var activeItemCtxFull = _activeItemContextFull;
             var activeItemCtxShort = _activeItemContextShort;
+            var hasEmbeddedDatasets = _hasEmbeddedDatasets;
 
             // Capture conversational entity tracking state
             var lastEntityId = _lastActionEntityId;
@@ -164,6 +165,10 @@ public partial class AiSuggestionTrayViewModel
                     // If RAG found intent_action chunks, inject the ACTION format header
                     if (hasIntentActions)
                         systemPrompt += $"\n\n{ActionFormatHeader}";
+
+                    // If embedded datasets are present, inject the QUERY format header
+                    if (hasEmbeddedDatasets)
+                        systemPrompt += $"\n\n{QueryFormatHeader}";
 
                     req = new AiRequest
                     {
@@ -236,10 +241,11 @@ public partial class AiSuggestionTrayViewModel
                 _log.Debug("Raw AI response ({Length} chars): {Content}",
                     response.Content.Length, response.Content);
 
-                // Parse action blocks before sanitization (sanitize strips them)
-                var (cleanContent, actions) = ParseActionBlocks(response.Content);
-                _log.Debug("Chat response: {ActionCount} action blocks parsed from response ({ResponseLength} chars)",
-                    actions.Count, response.Content.Length);
+                // Parse action blocks and query blocks before sanitization (sanitize strips them)
+                var (afterActions, actions) = ParseActionBlocks(response.Content);
+                var (cleanContent, queries) = ParseQueryBlocks(afterActions);
+                _log.Debug("Chat response: {ActionCount} action blocks, {QueryCount} query blocks parsed ({ResponseLength} chars)",
+                    actions.Count, queries.Count, response.Content.Length);
                 if (actions.Count == 0 && response.Content.Contains("[ACTION]", StringComparison.OrdinalIgnoreCase))
                     _log.Warning("Response contained [ACTION] text but parsing found 0 blocks — possible format issue");
                 var content = AiPersona.Sanitize(cleanContent, tier, isCloud: isCloud);
@@ -309,6 +315,137 @@ public partial class AiSuggestionTrayViewModel
                     var resultsSummary = "[Action Results]\n" +
                         string.Join("\n", actionResults);
                     _conversationStore.AddMessage(ActiveSessionId!, "assistant", resultsSummary);
+                }
+
+                // Execute query blocks and trigger follow-up analysis (cloud-only)
+                if (queries.Count > 0 && isCloud)
+                {
+                    var queryResultsSb = new StringBuilder();
+                    var queryCount = 0;
+
+                    foreach (var sql in queries)
+                    {
+                        var validationError = ValidateReadOnlySql(sql);
+                        if (validationError != null)
+                        {
+                            ChatMessages.Add(new AiChatMessageViewModel(ChatMessageRole.Assistant)
+                            {
+                                Content = $"\u2717 Query rejected: {validationError}",
+                                State = ChatMessageState.Error,
+                            });
+                            queryResultsSb.AppendLine($"Query rejected: {validationError}");
+                            continue;
+                        }
+
+                        // Show intermediate status
+                        var queryStatusMsg = new AiChatMessageViewModel(ChatMessageRole.Assistant)
+                        {
+                            Content = "Querying dataset...",
+                            State = ChatMessageState.Loading,
+                        };
+                        ChatMessages.Add(queryStatusMsg);
+                        RequestScrollToBottom();
+
+                        try
+                        {
+                            var sqlResponse = await _datasetService.ExecuteSqlV2Async(
+                                sql, page: 0, pageSize: 100);
+
+                            if (sqlResponse.Error != null)
+                            {
+                                queryStatusMsg.Content = $"\u2717 Query error: {sqlResponse.Error}";
+                                queryStatusMsg.State = ChatMessageState.Error;
+                                queryResultsSb.AppendLine($"Query: {sql}");
+                                queryResultsSb.AppendLine($"Error: {sqlResponse.Error}");
+                            }
+                            else if (sqlResponse.Query != null)
+                            {
+                                var formatted = FormatQueryResults(sqlResponse.Query);
+                                queryStatusMsg.Content = $"Query returned {sqlResponse.Query.TotalCount} row(s)";
+                                queryStatusMsg.State = ChatMessageState.Applied;
+                                queryResultsSb.AppendLine($"Query: {sql}");
+                                queryResultsSb.AppendLine(formatted);
+                                queryCount++;
+                            }
+                            else
+                            {
+                                queryStatusMsg.Content = "\u2717 Unexpected response format";
+                                queryStatusMsg.State = ChatMessageState.Error;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.Warning(ex, "Failed to execute dataset query: {Sql}", sql);
+                            queryStatusMsg.Content = $"\u2717 Query failed: {ex.Message}";
+                            queryStatusMsg.State = ChatMessageState.Error;
+                            queryResultsSb.AppendLine($"Query: {sql}");
+                            queryResultsSb.AppendLine($"Error: {ex.Message}");
+                        }
+                    }
+
+                    // Inject query results into history and make a follow-up AI call
+                    if (queryResultsSb.Length > 0)
+                    {
+                        var queryResultsText = "[Query Results]\n" + queryResultsSb.ToString().TrimEnd();
+                        _conversationStore.AddMessage(ActiveSessionId!, "assistant", queryResultsText);
+
+                        // Only do follow-up if at least one query succeeded
+                        if (queryCount > 0)
+                        {
+                            var followUpMsg = new AiChatMessageViewModel(ChatMessageRole.Assistant)
+                            {
+                                State = ChatMessageState.Loading,
+                            };
+                            ChatMessages.Add(followUpMsg);
+                            RequestScrollToBottom();
+
+                            try
+                            {
+                                var followUpResponse = await Task.Run(async () =>
+                                {
+                                    // Rebuild conversation history including query results
+                                    var followUpHistory = _conversationStore
+                                        .GetSession(ActiveSessionId!)?.Messages
+                                        .TakeLast(MaxHistoryMessages)
+                                        .Select(m => new AiChatMessage { Role = m.Role, Content = m.Content })
+                                        .ToList();
+
+                                    // Remove the last entry (which is the query results) and use it as context
+                                    // The system prompt already has dataset schema, so just re-send with full history
+                                    return await _aiService.CompleteAsync(new AiRequest
+                                    {
+                                        SystemPrompt = request.SystemPrompt,
+                                        UserPrompt = "Analyze the query results above and provide a clear, concise answer to the user's question.",
+                                        MaxTokens = request.MaxTokens,
+                                        Temperature = 0.4,
+                                        FeatureId = "tray.chat.query_followup",
+                                        ConversationHistory = followUpHistory
+                                    });
+                                });
+
+                                if (followUpResponse.Success && !string.IsNullOrEmpty(followUpResponse.Content))
+                                {
+                                    var (followUpClean, _) = ParseActionBlocks(followUpResponse.Content);
+                                    var (finalClean, _) = ParseQueryBlocks(followUpClean);
+                                    var followUpContent = AiPersona.Sanitize(finalClean, tier, isCloud: true);
+                                    followUpMsg.Content = followUpContent;
+                                    followUpMsg.State = ChatMessageState.Ready;
+                                    _conversationStore.AddMessage(ActiveSessionId!, "assistant", followUpContent);
+                                }
+                                else
+                                {
+                                    followUpMsg.Content = followUpResponse.ErrorMessage ?? "Follow-up analysis failed";
+                                    followUpMsg.State = ChatMessageState.Error;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _log.Warning(ex, "Follow-up query analysis failed");
+                                followUpMsg.Content = $"Analysis failed: {ex.Message}";
+                                followUpMsg.State = ChatMessageState.Error;
+                            }
+                        }
+                    }
                 }
 
                 // Fire-and-forget memory extraction for cloud responses
@@ -750,4 +887,102 @@ public partial class AiSuggestionTrayViewModel
     }
 
     private sealed record ParsedAction(string IntentId, Dictionary<string, string> Slots);
+
+    // ── QUERY Format Header (injected when embedded datasets are present, cloud-only) ──
+
+    private const string QueryFormatHeader = """
+        You can run READ-ONLY SQL queries against datasets embedded in this page using [QUERY] blocks.
+        Format: [QUERY]SELECT ... FROM source:"Dataset Name"[/QUERY]
+        RULES:
+        - Use the source:"Dataset Name" syntax to reference datasets — the name is listed in the dataset metadata above.
+        - Only SELECT and WITH (for CTEs) statements are allowed. INSERT/UPDATE/DELETE/DROP/ALTER/CREATE will be rejected.
+        - Use DuckDB SQL dialect (standard SQL plus DuckDB extensions like UNNEST, list functions, etc.).
+        - Column names and types are listed in the dataset schema above — use exact column names.
+        - Results will be injected back into the conversation and you will get a follow-up turn to analyze them.
+        - You may include up to 3 [QUERY] blocks per response. Results are capped at 100 rows per query.
+        - Place [QUERY] blocks at the END of your response, after your conversational message.
+        - When the user asks questions about dataset data (counts, averages, filters, groupings), USE a [QUERY] block to get the real answer — do NOT guess from the preview rows.
+        """;
+
+    // ── Query Block Parsing ─────────────────────────────────────────
+
+    private static readonly Regex StrayQueryTags = new(
+        @"\[/?QUERY\]",
+        RegexOptions.Compiled);
+
+    private const int MaxQueriesPerResponse = 3;
+
+    /// <summary>
+    /// Extracts SQL statements between [QUERY]...[/QUERY] tags.
+    /// Returns the cleaned text (tags stripped) and the list of SQL strings.
+    /// </summary>
+    private static (string CleanText, List<string> Queries) ParseQueryBlocks(string text)
+    {
+        var queries = new List<string>();
+        var spans = new List<(int Start, int End)>();
+
+        var searchFrom = 0;
+        while (searchFrom < text.Length && queries.Count < MaxQueriesPerResponse)
+        {
+            var tagStart = text.IndexOf("[QUERY]", searchFrom, StringComparison.OrdinalIgnoreCase);
+            if (tagStart < 0) break;
+
+            var sqlStart = tagStart + "[QUERY]".Length;
+            var tagEnd = text.IndexOf("[/QUERY]", sqlStart, StringComparison.OrdinalIgnoreCase);
+            if (tagEnd < 0) break;
+
+            var sql = text[sqlStart..tagEnd].Trim();
+            if (sql.Length > 0)
+                queries.Add(sql);
+
+            var regionEnd = tagEnd + "[/QUERY]".Length;
+            spans.Add((tagStart, regionEnd));
+            searchFrom = regionEnd;
+        }
+
+        // Strip matched regions in reverse order
+        var clean = text;
+        for (var i = spans.Count - 1; i >= 0; i--)
+            clean = clean.Remove(spans[i].Start, spans[i].End - spans[i].Start);
+        clean = StrayQueryTags.Replace(clean, "");
+        clean = clean.Trim();
+        return (clean, queries);
+    }
+
+    /// <summary>
+    /// Validates that a SQL statement is read-only (SELECT or WITH only).
+    /// Returns null if valid, or an error message if the statement is rejected.
+    /// </summary>
+    private static string? ValidateReadOnlySql(string sql)
+    {
+        var trimmed = sql.TrimStart();
+        if (trimmed.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("WITH", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        return "Only SELECT and WITH (CTE) statements are allowed. Mutation queries (INSERT, UPDATE, DELETE, DROP, ALTER, CREATE) are rejected for safety.";
+    }
+
+    /// <summary>
+    /// Formats a DatasetQueryResult as a readable text table for injection into conversation history.
+    /// </summary>
+    private static string FormatQueryResults(DatasetQueryResult result)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"| {string.Join(" | ", result.Columns)} |");
+        sb.AppendLine($"| {string.Join(" | ", result.Columns.Select(_ => "---"))} |");
+
+        foreach (var row in result.Rows)
+        {
+            var cells = new List<string>();
+            for (var i = 0; i < Math.Min(row.Count, result.Columns.Count); i++)
+                cells.Add(row[i]?.ToString() ?? "NULL");
+            sb.AppendLine($"| {string.Join(" | ", cells)} |");
+        }
+
+        if (result.TotalCount > result.Rows.Count)
+            sb.AppendLine($"({result.TotalCount} total rows, showing first {result.Rows.Count})");
+
+        return sb.ToString();
+    }
 }
