@@ -573,7 +573,15 @@ public partial class SettingsViewModel
                 if (!unlocked) { AiApiKeyStatus = "Vault unlock required"; return; }
             }
 
-            await sdk.VaultBlobDelete("ai-vault", info.BlobId);
+            try
+            {
+                await sdk.VaultBlobDelete("ai-vault", info.BlobId);
+            }
+            catch
+            {
+                // Blob may already be gone (data wipe, profile change) — that's fine,
+                // we still need to clean up the settings hint below.
+            }
 
             _settingsService.Settings.AiSavedKeyHints.Remove(entry.ProviderId);
             _settingsService.SaveDebounced();
