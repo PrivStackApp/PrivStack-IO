@@ -242,7 +242,7 @@ public partial class AiSuggestionTrayViewModel
                     actions.Count, response.Content.Length);
                 if (actions.Count == 0 && response.Content.Contains("[ACTION]", StringComparison.OrdinalIgnoreCase))
                     _log.Warning("Response contained [ACTION] text but parsing found 0 blocks — possible format issue");
-                var content = AiPersona.Sanitize(cleanContent, tier);
+                var content = AiPersona.Sanitize(cleanContent, tier, isCloud: isCloud);
 
                 assistantMsg.Content = content;
                 assistantMsg.State = ChatMessageState.Ready;

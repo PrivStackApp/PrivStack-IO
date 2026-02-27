@@ -34,17 +34,12 @@ public static partial class AiPersona
     };
 
     /// <summary>
-    /// Token budget per tier for cloud models. Cloud providers handle their own limits
-    /// and bill per token, so we use generous ceilings to avoid truncation errors.
-    /// The system prompt's length guidance still controls actual verbosity.
+    /// Token budget for cloud models. Cloud providers bill per token and the user
+    /// is paying with their own API key, so we set a single generous ceiling and
+    /// let the model decide response length naturally. The system prompt's brevity
+    /// hint is sufficient guidance — no artificial truncation.
     /// </summary>
-    public static int CloudMaxTokensFor(ResponseTier tier) => tier switch
-    {
-        ResponseTier.Short  => 1024,
-        ResponseTier.Medium => 4096,
-        ResponseTier.Long   => 8192,
-        _ => 4096,
-    };
+    public static int CloudMaxTokensFor(ResponseTier _) => 16384;
 
     /// <summary>Max sentences to keep per tier during post-processing truncation.</summary>
     private static int MaxSentences(ResponseTier tier) => tier switch
@@ -245,7 +240,9 @@ public static partial class AiPersona
     /// Strips chat tokens, markdown, role prefixes, self-referential lines,
     /// and enforces sentence count limits per tier.
     /// </summary>
-    public static string Sanitize(string response, ResponseTier tier = ResponseTier.Medium)
+    /// <param name="isCloud">When true, skips sentence truncation and markdown stripping.
+    /// Cloud models self-regulate length and the user is paying for output.</param>
+    public static string Sanitize(string response, ResponseTier tier = ResponseTier.Medium, bool isCloud = false)
     {
         if (string.IsNullOrEmpty(response)) return response;
 
@@ -256,22 +253,22 @@ public static partial class AiPersona
         // Strip entire lines that are role prefixes or "**Note:**" disclaimers
         cleaned = RolePrefixLinePattern().Replace(cleaned, "");
 
-        // Strip markdown bold/italic
-        cleaned = MarkdownBoldPattern().Replace(cleaned, "$1");
-
-        // Strip markdown headers
-        cleaned = MarkdownHeaderPattern().Replace(cleaned, "");
-
-        // Strip bullet prefixes (convert to plain sentences)
-        cleaned = BulletPrefixPattern().Replace(cleaned, "");
+        if (!isCloud)
+        {
+            // Local models need aggressive cleanup — they can't self-regulate
+            cleaned = MarkdownBoldPattern().Replace(cleaned, "$1");
+            cleaned = MarkdownHeaderPattern().Replace(cleaned, "");
+            cleaned = BulletPrefixPattern().Replace(cleaned, "");
+        }
 
         // Collapse excessive newlines
         cleaned = ExcessiveNewlines().Replace(cleaned, "\n\n");
 
         cleaned = cleaned.Trim();
 
-        // Hard sentence-count cap per tier
-        cleaned = TruncateToSentences(cleaned, MaxSentences(tier));
+        // Sentence truncation only for local models
+        if (!isCloud)
+            cleaned = TruncateToSentences(cleaned, MaxSentences(tier));
 
         return cleaned;
     }
