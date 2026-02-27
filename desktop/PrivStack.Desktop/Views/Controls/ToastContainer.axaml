@@ -7,20 +7,25 @@
              IsHitTestVisible="True">
 
     <UserControl.Styles>
-        <!-- Toast card entrance animation -->
+        <!-- Toast card entrance animation — starts off-screen above, bounces into place -->
         <Style Selector="Border.toast-card">
-            <Setter Property="RenderTransform" Value="translate(0px, -12px)"/>
+            <Setter Property="RenderTransform" Value="translate(0px, -40px)"/>
             <Setter Property="Opacity" Value="0"/>
             <Setter Property="Transitions">
                 <Transitions>
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.25" Easing="CubicEaseOut"/>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.25" Easing="CubicEaseOut"/>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.3" Easing="CubicEaseOut"/>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.4" Easing="BounceEaseOut"/>
                 </Transitions>
             </Setter>
         </Style>
         <Style Selector="Border.toast-card.visible">
             <Setter Property="RenderTransform" Value="translate(0px, 0px)"/>
             <Setter Property="Opacity" Value="1"/>
+        </Style>
+        <!-- Toast card dismiss animation — slide up and fade out -->
+        <Style Selector="Border.toast-card.dismissing">
+            <Setter Property="RenderTransform" Value="translate(0px, -30px)"/>
+            <Setter Property="Opacity" Value="0"/>
         </Style>
 
         <!-- Dismiss button hover -->

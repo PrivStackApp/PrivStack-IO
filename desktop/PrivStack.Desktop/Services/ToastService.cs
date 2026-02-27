@@ -36,6 +36,12 @@ public sealed class ToastService : IToastService
     private readonly ObservableCollection<ActiveToast> _toasts = [];
     private readonly IUiDispatcher _dispatcher;
 
+    /// <summary>
+    /// Raised when a toast should begin its dismiss animation.
+    /// The container subscribes to this to animate out before removal.
+    /// </summary>
+    public event Action<ActiveToast>? DismissRequested;
+
     public ReadOnlyObservableCollection<ActiveToast> Toasts { get; }
 
     public ToastService(IUiDispatcher dispatcher)
@@ -54,9 +60,25 @@ public sealed class ToastService : IToastService
         ShowInternal(message, type, actionLabel, action);
     }
 
+    /// <summary>
+    /// Immediately removes the toast from the collection (no animation).
+    /// Called after the exit animation completes.
+    /// </summary>
     public void Dismiss(ActiveToast toast)
     {
         _dispatcher.Post(() => _toasts.Remove(toast));
+    }
+
+    /// <summary>
+    /// Requests an animated dismiss. If the container is listening,
+    /// it will animate out then call Dismiss(). Otherwise falls back to immediate removal.
+    /// </summary>
+    public void RequestDismiss(ActiveToast toast)
+    {
+        if (DismissRequested != null)
+            _dispatcher.Post(() => DismissRequested.Invoke(toast));
+        else
+            Dismiss(toast);
     }
 
     private void ShowInternal(string message, ToastType type, string? actionLabel, Action? action)
@@ -79,9 +101,9 @@ public sealed class ToastService : IToastService
                 _toasts.RemoveAt(_toasts.Count - 1);
         });
 
-        // Schedule auto-dismiss
+        // Schedule auto-dismiss with animation
         var delay = GetDismissDelay(type);
-        _ = Task.Delay(delay).ContinueWith(_ => Dismiss(toast), TaskScheduler.Default);
+        _ = Task.Delay(delay).ContinueWith(_ => RequestDismiss(toast), TaskScheduler.Default);
     }
 
     public static string GetDisplayLabel(ToastType type) => type switch
