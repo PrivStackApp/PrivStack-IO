@@ -35,7 +35,7 @@
         </Border>
 
         <!-- Scrollable body -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="24,16,24,0">
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="24,16,24,16">
             <StackPanel x:Name="DetailContent" Spacing="20"/>
         </ScrollViewer>
 
