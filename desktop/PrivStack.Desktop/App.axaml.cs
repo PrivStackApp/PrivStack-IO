@@ -475,10 +475,6 @@ public partial class App : Application
                 // Eagerly resolve RAG index service so its auto-init task runs on startup
                 _ = Services.GetRequiredService<Services.AI.RagIndexService>();
 
-                // Deferred AI availability recheck — the sync vault read during
-                // DI resolution can timeout before the vault is ready, leaving
-                // Duncan disabled. By this point EnsureStandardVaults has run.
-                Services.GetRequiredService<Services.AI.AiService>().RecheckAvailability();
 
                 var bridgePath = FindBridgePath();
                 if (bridgePath != null)

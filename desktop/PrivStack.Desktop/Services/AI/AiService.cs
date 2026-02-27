@@ -19,12 +19,6 @@ internal sealed class AiService : IAiService
 
     private Dictionary<string, IAiProvider>? _providers;
 
-    /// <summary>
-    /// Raised when <see cref="IsAvailable"/> transitions from false to true (or vice versa).
-    /// Used by the AI tray to re-evaluate visibility after the vault becomes ready.
-    /// </summary>
-    public event Action? AvailabilityChanged;
-
     public AiService(IAppSettingsService appSettings, IPrivStackSdk sdk, AiModelManager modelManager)
     {
         _appSettings = appSettings;
@@ -37,38 +31,22 @@ internal sealed class AiService : IAiService
         get
         {
             if (!_appSettings.Settings.AiEnabled) return false;
-            var provider = GetActiveProvider();
-            return provider?.IsConfigured == true;
-        }
-    }
 
-    /// <summary>
-    /// Called after the main window is shown. Re-checks provider availability
-    /// now that the vault has been unlocked by the normal auth flow.
-    /// The synchronous <c>GetApiKeySync()</c> at startup can timeout if the vault
-    /// wasn't ready yet during DI resolution.
-    /// </summary>
-    internal void RecheckAvailability()
-    {
-        if (!_appSettings.Settings.AiEnabled) return;
+            var providerId = _appSettings.Settings.AiProvider;
+            if (string.IsNullOrEmpty(providerId) || providerId == "none")
+                return false;
 
-        var provider = GetActiveProvider();
-        if (provider == null || provider.IsConfigured) return;
+            // For cloud providers, use the settings-stored key hint as the fast check.
+            // The actual vault read happens at request time via the async path.
+            // This avoids a synchronous vault read that can fail during startup
+            // before the vault is fully initialized.
+            if (providerId == "local")
+            {
+                var provider = GetActiveProvider();
+                return provider?.IsConfigured == true;
+            }
 
-        // The vault should be unlocked by now (EnsureStandardVaults runs during auth).
-        // Re-checking IsConfigured will retry the sync vault read which should succeed
-        // now that the vault is ready. If it still fails, we just stay unavailable.
-        _log.Information("AI provider {Provider} not configured at startup — rechecking after vault init", provider.Id);
-
-        // IsConfigured calls GetApiKeySync() which caches on success
-        if (provider.IsConfigured)
-        {
-            _log.Information("AI provider {Provider} became available after deferred recheck", provider.Id);
-            AvailabilityChanged?.Invoke();
-        }
-        else
-        {
-            _log.Warning("AI provider {Provider} still not configured after deferred recheck", provider.Id);
+            return _appSettings.Settings.AiSavedKeyHints.ContainsKey(providerId);
         }
     }
 
