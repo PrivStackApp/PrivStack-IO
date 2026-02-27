@@ -415,17 +415,24 @@ if [ "$RUN_AFTER" = true ]; then
         *) APP_LOG_LEVEL="info" ;;
     esac
 
+    # Forward SIGINT/SIGTERM to the child process so Ctrl+C kills the app
+    trap 'kill -TERM "$APP_PID" 2>/dev/null; wait "$APP_PID" 2>/dev/null; exit 0' INT TERM
+
     if [ "$WITH_PLUGINS" = true ]; then
         # Isolated test instance — separate data directory from live
         mkdir -p "$TEST_DATA_DIR"
         log_info "==> Launching PrivStack Desktop (test mode — isolated data at $TEST_DATA_DIR)..."
         PRIVSTACK_DATA_DIR="$TEST_DATA_DIR" PRIVSTACK_LOG_LEVEL="$APP_LOG_LEVEL" \
-            dotnet run --project "$DESKTOP_DIR/PrivStack.Desktop/PrivStack.Desktop.csproj" -c "$DOTNET_CONFIG" --no-build
+            dotnet run --project "$DESKTOP_DIR/PrivStack.Desktop/PrivStack.Desktop.csproj" -c "$DOTNET_CONFIG" --no-build &
     else
         log_info "==> Launching PrivStack Desktop..."
         PRIVSTACK_LOG_LEVEL="$APP_LOG_LEVEL" \
-            dotnet run --project "$DESKTOP_DIR/PrivStack.Desktop/PrivStack.Desktop.csproj" -c "$DOTNET_CONFIG" --no-build
+            dotnet run --project "$DESKTOP_DIR/PrivStack.Desktop/PrivStack.Desktop.csproj" -c "$DOTNET_CONFIG" --no-build &
     fi
+
+    APP_PID=$!
+    wait "$APP_PID" 2>/dev/null
+    exit 0
 fi
 
 log_info "==> Done."
