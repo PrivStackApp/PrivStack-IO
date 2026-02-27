@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Desktop.Native;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
+using PrivStack.Desktop.Services.Api;
 using PrivStack.Desktop.Services.FileSync;
 using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Sdk.Capabilities;
@@ -471,6 +472,19 @@ public partial class App : Application
 
                 Services.GetRequiredService<ReminderSchedulerService>().Start();
                 Services.GetRequiredService<IIpcServer>().Start();
+
+                // Start local HTTP API server if enabled
+                if (appSettings.Settings.ApiEnabled)
+                {
+                    try
+                    {
+                        await Services.GetRequiredService<ILocalApiServer>().StartAsync();
+                    }
+                    catch (Exception apiEx)
+                    {
+                        Log.Error(apiEx, "Failed to start local API server");
+                    }
+                }
 
                 // Eagerly resolve RAG index service so its auto-init task runs on startup
                 _ = Services.GetRequiredService<Services.AI.RagIndexService>();

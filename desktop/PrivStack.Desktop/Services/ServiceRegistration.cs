@@ -8,6 +8,7 @@ using PrivStack.Desktop.Services.Biometric;
 using PrivStack.Desktop.Services.Connections;
 using PrivStack.Desktop.Services.FileSync;
 using PrivStack.Desktop.Services.Plugin;
+using PrivStack.Desktop.Services.Api;
 using PrivStack.Desktop.Services.Ipc;
 using PrivStack.Desktop.Services.Update;
 using PrivStack.Desktop.ViewModels;
@@ -121,6 +122,10 @@ public static class ServiceRegistration
         services.AddSingleton<IpcMessageRouter>();
         services.AddSingleton<IpcServer>();
         services.AddSingleton<IIpcServer>(sp => sp.GetRequiredService<IpcServer>());
+
+        // Local HTTP API server
+        services.AddSingleton<LocalApiServer>();
+        services.AddSingleton<ILocalApiServer>(sp => sp.GetRequiredService<LocalApiServer>());
 
         // ViewModels (transient — created fresh each resolution)
         services.AddTransient<MainWindowViewModel>();

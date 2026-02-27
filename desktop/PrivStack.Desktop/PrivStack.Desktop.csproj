@@ -43,6 +43,11 @@
   </PropertyGroup>
 
 
+  <!-- Kestrel for local HTTP API server (no extra NuGet — part of .NET shared framework) -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\PrivStack.Sdk\PrivStack.Sdk.csproj" />
     <ProjectReference Include="..\PrivStack.UI.Adaptive\PrivStack.UI.Adaptive.csproj" />

@@ -297,6 +297,16 @@ public class AppSettings
     [JsonPropertyName("bridge_auth_token")]
     public string? BridgeAuthToken { get; set; }
 
+    // Local HTTP API settings
+    [JsonPropertyName("api_enabled")]
+    public bool ApiEnabled { get; set; }
+
+    [JsonPropertyName("api_port")]
+    public int ApiPort { get; set; } = 9720;
+
+    [JsonPropertyName("api_key")]
+    public string? ApiKey { get; set; }
+
     [JsonPropertyName("plugin_settings")]
     public Dictionary<string, string> PluginSettings { get; set; } = [];
 

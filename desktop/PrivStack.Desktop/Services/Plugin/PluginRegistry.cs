@@ -1756,6 +1756,12 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
                 HostFactory.CapabilityBroker.Register<IIndexableContentProvider>(indexableContentProvider);
             }
 
+            // Auto-register API providers with the capability broker
+            if (plugin is IApiProvider apiProvider)
+            {
+                HostFactory.CapabilityBroker.Register<IApiProvider>(apiProvider);
+            }
+
             _log.Debug("Plugin activated: {PluginId}", plugin.Metadata.Id);
             RaisePluginStateChanged(plugin, PluginState.Active);
         }
