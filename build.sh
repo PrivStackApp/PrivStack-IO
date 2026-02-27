@@ -295,14 +295,32 @@ if [ "$WITH_PLUGINS" = true ]; then
 
         # Skip unchanged plugins: if the output DLL exists and no source file
         # (.cs, .csproj, .axaml, .xaml) is newer than it, skip the rebuild.
+        # Also check shared dependencies (SDK, UI.Adaptive) — if those were
+        # rebuilt, the plugin output needs republishing to pick up new DLLs.
         if [ "$REBUILD" = false ] && [ -f "$plugin_dll" ]; then
             NEEDS_BUILD=false
+
+            # Check plugin source files
             while IFS= read -r -d '' src_file; do
                 if [ "$src_file" -nt "$plugin_dll" ]; then
                     NEEDS_BUILD=true
                     break
                 fi
             done < <(find "$plugin_dir" \( -name "*.cs" -o -name "*.csproj" -o -name "*.axaml" -o -name "*.xaml" \) -not -path "*/bin/*" -not -path "*/obj/*" -print0)
+
+            # Check shared SDK/UI dependencies — if their build output is newer,
+            # the plugin needs republishing to pick up the updated DLLs
+            if [ "$NEEDS_BUILD" = false ]; then
+                for dep_dll in \
+                    "$DESKTOP_DIR/PrivStack.Sdk/bin/$DOTNET_CONFIG/net9.0/PrivStack.Sdk.dll" \
+                    "$DESKTOP_DIR/PrivStack.UI.Adaptive/bin/$DOTNET_CONFIG/net9.0/PrivStack.UI.Adaptive.dll"; do
+                    if [ -f "$dep_dll" ] && [ "$dep_dll" -nt "$plugin_dll" ]; then
+                        NEEDS_BUILD=true
+                        log_debug "    $plugin_name: dependency $(basename "$dep_dll") is newer, rebuilding..."
+                        break
+                    fi
+                done
+            fi
 
             if [ "$NEEDS_BUILD" = false ]; then
                 PLUGIN_SKIPPED=$((PLUGIN_SKIPPED + 1))
