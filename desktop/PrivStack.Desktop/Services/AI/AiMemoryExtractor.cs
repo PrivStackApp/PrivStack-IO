@@ -49,7 +49,7 @@ internal sealed class AiMemoryExtractor
             {
                 SystemPrompt = "You extract personal facts from conversations. Output only valid JSON.",
                 UserPrompt = prompt,
-                MaxTokens = 256,
+                MaxTokens = 512,
                 Temperature = 0.1,
                 FeatureId = "ai.memory_extract"
             };
