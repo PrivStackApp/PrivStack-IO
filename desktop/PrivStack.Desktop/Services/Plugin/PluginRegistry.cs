@@ -889,7 +889,8 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
             try
             {
                 var fullPath = Path.GetFullPath(dllPath);
-                var context = new PluginLoadContext(fullPath);
+                var hostAssembly = typeof(PluginRegistry).Assembly.Location;
+                var context = new PluginLoadContext(fullPath, hostAssembly);
                 _pluginContexts.Add(context);
 
                 var assembly = context.LoadFromAssemblyPath(fullPath);
@@ -916,17 +917,19 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
 
     /// <summary>
     /// Custom AssemblyLoadContext for C# plugins. Delegates resolution of assemblies
-    /// already loaded by the host (SDK, Avalonia, CommunityToolkit, etc.) to the default
-    /// context so that shared types like IAppPlugin have a single identity. Plugin-specific
-    /// dependencies are resolved from the plugin's directory.
+    /// provided by the host (SDK, Avalonia, LiveCharts, etc.) to the default context
+    /// so that shared types have a single identity across host and plugins.
+    /// Plugin-specific dependencies are resolved from the plugin's directory.
     /// </summary>
     private sealed class PluginLoadContext : AssemblyLoadContext
     {
         private readonly AssemblyDependencyResolver _resolver;
+        private readonly AssemblyDependencyResolver _hostResolver;
 
-        public PluginLoadContext(string pluginPath) : base(isCollectible: false)
+        public PluginLoadContext(string pluginPath, string hostPath) : base(isCollectible: false)
         {
             _resolver = new AssemblyDependencyResolver(pluginPath);
+            _hostResolver = new AssemblyDependencyResolver(hostPath);
         }
 
         protected override Assembly? Load(AssemblyName assemblyName)
@@ -939,6 +942,13 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
                 if (string.Equals(loaded.GetName().Name, assemblyName.Name, StringComparison.OrdinalIgnoreCase))
                     return null;
             }
+
+            // If the host CAN provide this assembly (it's in the host's deps graph),
+            // load it into the default context to maintain type identity. This handles
+            // assemblies the host ships but hasn't loaded yet (e.g. LiveCharts).
+            var hostPath = _hostResolver.ResolveAssemblyToPath(assemblyName);
+            if (hostPath != null)
+                return Default.LoadFromAssemblyPath(hostPath);
 
             // Plugin-specific dependency: resolve from plugin directory
             var path = _resolver.ResolveAssemblyToPath(assemblyName);
