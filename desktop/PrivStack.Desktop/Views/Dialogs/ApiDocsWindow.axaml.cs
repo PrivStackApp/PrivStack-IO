@@ -89,10 +89,7 @@ public partial class ApiDocsWindow : Window
         if (sender is Control { DataContext: ApiRouteItem route })
         {
             var detail = new ApiRouteDetailWindow(route);
-            // Parent to the main window instead of this docs window —
-            // macOS constrains child dialogs to the parent's bounds.
-            var mainWindow = Owner as Window ?? this;
-            detail.ShowDialog(mainWindow);
+            detail.ShowDialog(this);
         }
     }
 }
