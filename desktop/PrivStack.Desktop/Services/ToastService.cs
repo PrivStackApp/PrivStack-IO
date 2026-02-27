@@ -87,7 +87,7 @@ public sealed class ToastService : IToastService
     public static string GetDisplayLabel(ToastType type) => type switch
     {
         ToastType.Success => "All Set",
-        ToastType.Info => "FYI",
+        ToastType.Info => "",
         ToastType.Warning => "Heads Up",
         ToastType.Error => "Action Needed",
         _ => "Notice"

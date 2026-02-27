@@ -59,7 +59,7 @@ public class ToastServiceTests
 
     [Theory]
     [InlineData(ToastType.Success, "All Set")]
-    [InlineData(ToastType.Info, "FYI")]
+    [InlineData(ToastType.Info, "")]
     [InlineData(ToastType.Warning, "Heads Up")]
     [InlineData(ToastType.Error, "Action Needed")]
     public void GetDisplayLabel_returns_correct_label(ToastType type, string expected)
