@@ -157,7 +157,14 @@ public sealed class PluginToolbar : Border
         _subtitleBlock.Bind(TextBlock.ForegroundProperty,
             _subtitleBlock.GetResourceObservable("ThemeTextMutedBrush"));
 
-        var row0 = new Grid { MinHeight = 32 };
+        var row0 = new Grid
+        {
+            MinHeight = 32,
+            ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"),
+        };
+        Grid.SetColumn(_titleBlock, 0);
+        Grid.SetColumn(_searchNormalPill, 1);
+        Grid.SetColumn(_actionsHost, 2);
         row0.Children.Add(_titleBlock);
         row0.Children.Add(_searchNormalPill);
         row0.Children.Add(_actionsHost);
