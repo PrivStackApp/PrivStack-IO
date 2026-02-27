@@ -944,11 +944,12 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
             }
 
             // If the host CAN provide this assembly (it's in the host's deps graph),
-            // load it into the default context to maintain type identity. This handles
-            // assemblies the host ships but hasn't loaded yet (e.g. LiveCharts).
-            var hostPath = _hostResolver.ResolveAssemblyToPath(assemblyName);
-            if (hostPath != null)
-                return Default.LoadFromAssemblyPath(hostPath);
+            // delegate to the runtime's default probing. The runtime will find the DLL
+            // in the app's output directory and load it into the Default context,
+            // maintaining type identity for assemblies the host ships but hasn't
+            // loaded yet (e.g. LiveCharts via UI.Adaptive).
+            if (_hostResolver.ResolveAssemblyToPath(assemblyName) != null)
+                return null;
 
             // Plugin-specific dependency: resolve from plugin directory
             var path = _resolver.ResolveAssemblyToPath(assemblyName);
