@@ -443,6 +443,10 @@ public partial class App : Application
         // MainWindow + InitializeComponent must run on the UI thread
         var mainWindow = new MainWindow();
 
+#if DEBUG
+        mainWindow.AttachDevTools();
+#endif
+
         // Yield between XAML parse and the layout/show pass
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
 
