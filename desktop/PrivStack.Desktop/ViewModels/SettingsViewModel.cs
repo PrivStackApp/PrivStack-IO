@@ -1063,6 +1063,7 @@ public partial class SettingsViewModel : ViewModelBase
         var owner = _dialogService is DialogService ds ? ds.Owner : null;
         if (owner == null) return;
         var dialog = new Views.Dialogs.ApiDocsWindow();
+        dialog.LoadRoutes(_pluginRegistry);
         await dialog.ShowDialog<object?>(owner);
     }
 

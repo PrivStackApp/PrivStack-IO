@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:dialogs="clr-namespace:PrivStack.Desktop.Views.Dialogs"
         x:Class="PrivStack.Desktop.Views.Dialogs.ApiDocsWindow"
         Title="Local API Documentation"
         Width="600" Height="680"
@@ -124,7 +125,7 @@ curl -H "X-API-Key: YOUR_KEY" \
                                FontSize="{DynamicResource ThemeFontSizeMd}"
                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
 
-                    <!-- Shell endpoints -->
+                    <!-- Shell endpoints (always present) -->
                     <TextBlock Text="Shell" FontWeight="Medium"
                                FontSize="{DynamicResource ThemeFontSizeSmMd}"
                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
@@ -153,93 +154,50 @@ curl -H "X-API-Key: YOUR_KEY" \
                         </StackPanel>
                     </Border>
 
-                    <!-- Tasks endpoints -->
-                    <TextBlock Text="Tasks" FontWeight="Medium"
-                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
-                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                               Margin="0,8,0,0"/>
-                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
-                            CornerRadius="6" Padding="14,10">
-                        <StackPanel Spacing="6">
-                            <Grid ColumnDefinitions="90,*">
-                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
-                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="90,*">
-                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
-                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/{id}"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="90,*">
-                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemePrimaryBrush}" Text="POST"/>
-                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="90,*">
-                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeWarningBrush}" Text="PATCH"/>
-                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/{id}"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="90,*">
-                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeDangerBrush}" Text="DELETE"/>
-                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/{id}"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="90,*">
-                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
-                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/search?q="/>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
+                    <!-- Dynamic plugin endpoints -->
+                    <ItemsControl x:Name="PluginSections">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="dialogs:ApiPluginSection">
+                                <StackPanel Spacing="4" Margin="0,8,0,0">
+                                    <Expander IsExpanded="True">
+                                        <Expander.Header>
+                                            <TextBlock Text="{Binding Header}" FontWeight="Medium"
+                                                       FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                        </Expander.Header>
+                                        <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                                CornerRadius="6" Padding="14,10" Margin="0,4,0,0">
+                                            <ItemsControl ItemsSource="{Binding Routes}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="dialogs:ApiRouteItem">
+                                                        <Grid ColumnDefinitions="90,*" Margin="0,3">
+                                                            <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                                                       Text="{Binding Method}"
+                                                                       Foreground="{Binding MethodBrush}"/>
+                                                            <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                                                                <Run Text="{Binding Path}"/>
+                                                                <Run Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                                     Text="{Binding DescriptionSuffix}"/>
+                                                            </TextBlock>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Border>
+                                    </Expander>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
-                    <!-- Projects endpoints -->
-                    <TextBlock Text="Projects" FontWeight="Medium"
-                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
-                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                               Margin="0,8,0,0"/>
-                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
-                            CornerRadius="6" Padding="14,10">
-                        <StackPanel Spacing="6">
-                            <Grid ColumnDefinitions="90,*">
-                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
-                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/projects"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="90,*">
-                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
-                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/projects/{id}"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="90,*">
-                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemePrimaryBrush}" Text="POST"/>
-                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/projects"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="90,*">
-                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeWarningBrush}" Text="PATCH"/>
-                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/projects/{id}"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="90,*">
-                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeDangerBrush}" Text="DELETE"/>
-                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/projects/{id}"/>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
+                    <!-- Empty state when no plugins provide APIs -->
+                    <TextBlock x:Name="NoPluginEndpoints"
+                               Text="No plugins have registered API endpoints yet."
+                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                               FontStyle="Italic" Margin="0,4,0,0"
+                               IsVisible="False"/>
                 </StackPanel>
 
                 <!-- Examples -->
