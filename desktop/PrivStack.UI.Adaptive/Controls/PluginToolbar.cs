@@ -163,10 +163,15 @@ public sealed class PluginToolbar : Border
             ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"),
         };
         Grid.SetColumn(_titleBlock, 0);
-        Grid.SetColumn(_searchNormalPill, 1);
         Grid.SetColumn(_actionsHost, 2);
-        row0.Children.Add(_titleBlock);
+        // Search pill spans all columns and centers on the full toolbar width,
+        // not the leftover space between title and actions. This keeps it
+        // dead-center regardless of how wide the title or actions are.
+        Grid.SetColumn(_searchNormalPill, 0);
+        Grid.SetColumnSpan(_searchNormalPill, 3);
+        _searchNormalPill.IsHitTestVisible = true;
         row0.Children.Add(_searchNormalPill);
+        row0.Children.Add(_titleBlock);
         row0.Children.Add(_actionsHost);
 
         var grid = new Grid();
