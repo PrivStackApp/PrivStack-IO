@@ -176,6 +176,13 @@ public sealed class SplitPaneLayout : Control
         _handle.Arrange(new Rect(pane1Width, 0, handleWidth, finalSize.Height));
         Pane2?.Arrange(new Rect(pane1Width + handleWidth, 0, pane2Width, finalSize.Height));
 
+        // Force clip regions on each pane so content that overflows its
+        // arranged bounds doesn't bleed into the adjacent pane.
+        if (Pane1 != null)
+            Pane1.Clip = new RectangleGeometry(new Rect(0, 0, pane1Width, finalSize.Height));
+        if (Pane2 != null)
+            Pane2.Clip = new RectangleGeometry(new Rect(0, 0, pane2Width, finalSize.Height));
+
         return finalSize;
     }
 
