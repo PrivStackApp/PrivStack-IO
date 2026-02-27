@@ -916,14 +916,20 @@ public partial class AiSuggestionTrayViewModel
     // repeat format rules — just list the available intents and chart syntax.
 
     private const string DatasetActionReference = """
-        Available dataset/note actions:
-        notes.create_note — slots: title*, content (block syntax), tags
-        notes.update_note — slots: page_id or page_title, content* (block syntax), mode (replace|append)
-        data.generate_insights — slots: dataset_name* (full AI report with charts as suggestion card)
-        Block syntax in content: # headings, - bullets, 1. numbered, - [ ] tasks, > quotes, ``` code ```, ---, | tables |
-        Chart block: [CHART: type=bar | title=T | x=col | y=col | dataset_id=UUID | agg=sum | group=col]
-        Types: bar, line, pie, donut, area, scatter, stacked_bar, grouped_bar, horizontal_bar
-        Use dataset_id from the dataset metadata above. Use page_id from active item context for updates.
+        You have these actions for notes and datasets. Copy the examples exactly, replacing values:
+
+        CREATE a note with charts:
+        [ACTION]{"intent_id": "notes.create_note", "slots": {"title": "My Analysis", "content": "# Summary\n\nHere are the results.\n\n[CHART: type=bar | title=Sales by Region | x=region | y=revenue | dataset_id=PASTE_DATASET_ID_HERE | agg=sum]\n\n## Details\n\n| Region | Revenue |\n| --- | --- |\n| East | 50000 |\n| West | 72000 |"}}[/ACTION]
+
+        UPDATE an existing note (use page_id from context, or page_title to search):
+        [ACTION]{"intent_id": "notes.update_note", "slots": {"page_title": "My Analysis", "content": "## New Section\n\n[CHART: type=pie | title=Distribution | x=category | y=amount | dataset_id=PASTE_DATASET_ID_HERE]", "mode": "append"}}[/ACTION]
+
+        GENERATE full AI insights report:
+        [ACTION]{"intent_id": "data.generate_insights", "slots": {"dataset_name": "people-100"}}[/ACTION]
+
+        Chart types: bar, line, pie, donut, area, scatter, stacked_bar, grouped_bar, horizontal_bar
+        Chart agg: sum, count, avg, min, max. Optional group= for stacked/grouped charts.
+        Content blocks: # heading, - bullet, 1. numbered, - [ ] task, > quote, ``` code ```, ---, | table |
         """;
 
     // ── Query Block Parsing ─────────────────────────────────────────
