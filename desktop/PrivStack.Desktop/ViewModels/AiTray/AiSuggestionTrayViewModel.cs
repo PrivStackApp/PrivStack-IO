@@ -83,6 +83,9 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         WeakReferenceMessenger.Default.Register<ContentSuggestionDismissedMessage>(this);
         WeakReferenceMessenger.Default.Register<ContentSuggestionActionRequestedMessage>(this);
 
+        // Re-evaluate IsEnabled when the AI service becomes available (e.g., vault unlocked)
+        _aiService.AvailabilityChanged += () => _dispatcher.Post(() => OnPropertyChanged(nameof(IsEnabled)));
+
         // Subscribe to active item and plugin changes for context injection
         _infoPanelService.ActiveItemChanged += OnActiveItemChanged;
         _infoPanelService.ActivePluginChanged += OnActivePluginChanged;
