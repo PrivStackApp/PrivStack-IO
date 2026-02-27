@@ -166,9 +166,15 @@ public partial class AiSuggestionTrayViewModel
                     if (hasIntentActions)
                         systemPrompt += $"\n\n{ActionFormatHeader}";
 
-                    // If embedded datasets are present, inject the QUERY format header
+                    // If embedded datasets are present, inject QUERY + ACTION headers
+                    // so Duncan can both query data and create/update notes with charts
                     if (hasEmbeddedDatasets)
+                    {
                         systemPrompt += $"\n\n{QueryFormatHeader}";
+                        if (!hasIntentActions)
+                            systemPrompt += $"\n\n{ActionFormatHeader}";
+                        systemPrompt += $"\n\n{DatasetActionReference}";
+                    }
 
                     req = new AiRequest
                     {
@@ -902,6 +908,22 @@ public partial class AiSuggestionTrayViewModel
         - You may include up to 3 [QUERY] blocks per response. Results are capped at 100 rows per query.
         - Place [QUERY] blocks at the END of your response, after your conversational message.
         - When the user asks questions about dataset data (counts, averages, filters, groupings), USE a [QUERY] block to get the real answer — do NOT guess from the preview rows.
+        """;
+
+    // ── Dataset-Context Action Catalog ─────────────────────────────
+    // Compact intent listing injected when embedded datasets are present.
+    // ActionFormatHeader is always injected alongside this, so no need to
+    // repeat format rules — just list the available intents and chart syntax.
+
+    private const string DatasetActionReference = """
+        Available dataset/note actions:
+        notes.create_note — slots: title*, content (block syntax), tags
+        notes.update_note — slots: page_id or page_title, content* (block syntax), mode (replace|append)
+        data.generate_insights — slots: dataset_name* (full AI report with charts as suggestion card)
+        Block syntax in content: # headings, - bullets, 1. numbered, - [ ] tasks, > quotes, ``` code ```, ---, | tables |
+        Chart block: [CHART: type=bar | title=T | x=col | y=col | dataset_id=UUID | agg=sum | group=col]
+        Types: bar, line, pie, donut, area, scatter, stacked_bar, grouped_bar, horizontal_bar
+        Use dataset_id from the dataset metadata above. Use page_id from active item context for updates.
         """;
 
     // ── Query Block Parsing ─────────────────────────────────────────
