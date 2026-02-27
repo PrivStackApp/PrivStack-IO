@@ -134,6 +134,27 @@ public sealed class PrivStackApiClient
     }
 
     /// <summary>
+    /// Refreshes an expired access token using a stored refresh token.
+    /// Returns null if the refresh token is also invalid/expired.
+    /// </summary>
+    public async Task<RefreshTokenResponse?> RefreshAccessTokenAsync(string refreshToken, CancellationToken ct = default)
+    {
+        var payload = JsonSerializer.Serialize(new { refresh_token = refreshToken }, JsonOptions);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{ApiBaseUrl}/api/auth/refresh")
+        {
+            Content = new StringContent(payload, Encoding.UTF8, "application/json")
+        };
+        request.Headers.Add("X-Client-Type", "desktop");
+
+        using var response = await Http.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var body = await response.Content.ReadAsStringAsync(ct);
+        return JsonSerializer.Deserialize<RefreshTokenResponse>(body, JsonOptions);
+    }
+
+    /// <summary>
     /// Exchanges an OAuth2 authorization code for access and refresh tokens.
     /// </summary>
     public async Task<OAuthTokenResponse> ExchangeCodeForTokenAsync(
@@ -486,6 +507,15 @@ public record CloudWorkspaceActionResponse
 
     [JsonPropertyName("freed_bytes")]
     public long FreedBytes { get; init; }
+}
+
+public record RefreshTokenResponse
+{
+    [JsonPropertyName("access_token")]
+    public string AccessToken { get; init; } = string.Empty;
+
+    [JsonPropertyName("refresh_token")]
+    public string? RefreshToken { get; init; }
 }
 
 public record TrialResponse

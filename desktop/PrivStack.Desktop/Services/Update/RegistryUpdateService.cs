@@ -118,7 +118,17 @@ public sealed class RegistryUpdateService : IUpdateService
             }
 
             Logger.Information("Fetching account release artifacts...");
-            var accountReleases = await _apiClient.GetAccountReleasesAsync(token, ct);
+            AccountReleasesResponse? accountReleases;
+            try
+            {
+                accountReleases = await _apiClient.GetAccountReleasesAsync(token, ct);
+            }
+            catch (PrivStackApiException)
+            {
+                // Token likely expired — attempt silent refresh
+                accountReleases = await TryRefreshTokenAndRetryAsync(ct);
+            }
+
             if (accountReleases == null || accountReleases.Releases.Count == 0)
             {
                 Logger.Warning("No downloadable releases returned from account API");
@@ -199,6 +209,39 @@ public sealed class RegistryUpdateService : IUpdateService
             UpdateError?.Invoke(this, ex);
             return false;
         }
+    }
+
+    /// <summary>
+    /// Attempts to refresh the stored access token and retry the account releases fetch.
+    /// Persists new tokens on success. Returns null if refresh fails.
+    /// </summary>
+    private async Task<AccountReleasesResponse?> TryRefreshTokenAndRetryAsync(CancellationToken ct)
+    {
+        var refreshToken = _appSettings.Settings.RefreshToken;
+        if (string.IsNullOrEmpty(refreshToken))
+        {
+            Logger.Warning("No refresh token available — user must re-authenticate");
+            return null;
+        }
+
+        Logger.Information("Access token rejected, attempting token refresh...");
+        var refreshResult = await _apiClient.RefreshAccessTokenAsync(refreshToken, ct);
+        if (refreshResult == null || string.IsNullOrEmpty(refreshResult.AccessToken))
+        {
+            Logger.Warning("Token refresh failed — user must re-authenticate");
+            _appSettings.Settings.AccessToken = null;
+            _appSettings.Save();
+            return null;
+        }
+
+        // Persist refreshed tokens
+        _appSettings.Settings.AccessToken = refreshResult.AccessToken;
+        if (!string.IsNullOrEmpty(refreshResult.RefreshToken))
+            _appSettings.Settings.RefreshToken = refreshResult.RefreshToken;
+        _appSettings.Save();
+
+        Logger.Information("Token refreshed successfully, retrying release fetch...");
+        return await _apiClient.GetAccountReleasesAsync(refreshResult.AccessToken, ct);
     }
 
     // ── Private helpers ──────────────────────────────────────────────────

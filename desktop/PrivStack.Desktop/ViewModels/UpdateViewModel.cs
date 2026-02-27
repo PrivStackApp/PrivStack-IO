@@ -217,7 +217,16 @@ public partial class UpdateViewModel : ViewModelBase
             }
             else
             {
-                StatusMessage = "Download failed";
+                // If token was cleared during refresh failure, prompt re-auth
+                if (string.IsNullOrEmpty(_appSettings.Settings.AccessToken))
+                {
+                    NeedsAuthentication = true;
+                    StatusMessage = "Session expired — please sign in again to download updates";
+                }
+                else
+                {
+                    StatusMessage = "Download failed";
+                }
             }
         }
         finally
