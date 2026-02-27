@@ -933,6 +933,19 @@
         <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusMd}"/>
         <Setter Property="Padding" Value="4"/>
         <Setter Property="MinWidth" Value="180"/>
+        <Setter Property="RenderTransformOrigin" Value="0.5,0"/>
+        <Style.Animations>
+            <Animation Duration="0:0:0.12" Easing="CubicEaseOut" FillMode="Forward">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Opacity" Value="0"/>
+                    <Setter Property="TranslateTransform.Y" Value="-4"/>
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Opacity" Value="1"/>
+                    <Setter Property="TranslateTransform.Y" Value="0"/>
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
     </Style>
     <Style Selector="MenuFlyoutPresenter /template/ Border">
         <Setter Property="BoxShadow" Value="0 8 24 0 #40000000, 0 2 6 0 #28000000"/>
@@ -947,6 +960,19 @@
         <Setter Property="Padding" Value="4"/>
         <Setter Property="MinWidth" Value="180"/>
         <Setter Property="MaxWidth" Value="320"/>
+        <Setter Property="RenderTransformOrigin" Value="0.5,0"/>
+        <Style.Animations>
+            <Animation Duration="0:0:0.12" Easing="CubicEaseOut" FillMode="Forward">
+                <KeyFrame Cue="0%">
+                    <Setter Property="Opacity" Value="0"/>
+                    <Setter Property="TranslateTransform.Y" Value="-4"/>
+                </KeyFrame>
+                <KeyFrame Cue="100%">
+                    <Setter Property="Opacity" Value="1"/>
+                    <Setter Property="TranslateTransform.Y" Value="0"/>
+                </KeyFrame>
+            </Animation>
+        </Style.Animations>
     </Style>
     <Style Selector="ContextMenu /template/ Border">
         <Setter Property="BoxShadow" Value="0 8 24 0 #40000000, 0 2 6 0 #28000000"/>
