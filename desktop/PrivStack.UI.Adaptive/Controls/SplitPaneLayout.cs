@@ -8,6 +8,7 @@
 
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -20,7 +21,7 @@ namespace PrivStack.UI.Adaptive.Controls;
 /// <see cref="Ratio"/> controls the fraction of width given to <see cref="Pane2"/> (right).
 /// Bind <see cref="Ratio"/> OneWay and listen to <see cref="RatioChanged"/> to persist on release.
 /// </summary>
-public sealed class SplitPaneLayout : Border
+public sealed class SplitPaneLayout : Control
 {
     // ── Styled Properties ──────────────────────────────────────────
 
@@ -62,24 +63,22 @@ public sealed class SplitPaneLayout : Border
 
     // ── Private State ──────────────────────────────────────────────
 
-    private readonly Border _pane1Host;
-    private readonly Border _pane2Host;
     private readonly Border _handle;
-    private readonly SplitPanel _panel;
 
     private bool _isResizing;
     private Point _resizeStart;
     private double _resizeStartRatio;
     private double _dragRatio = double.NaN;
 
+    // Cached pane sizes from the last arrange pass, used for measure constraints
+    private double _lastPane1Width;
+    private double _lastPane2Width;
+
     // ── Constructor ────────────────────────────────────────────────
 
     public SplitPaneLayout()
     {
         ClipToBounds = true;
-
-        _pane1Host = new Border { ClipToBounds = true };
-        _pane2Host = new Border { ClipToBounds = true };
 
         var handlePill = new Border
         {
@@ -89,7 +88,7 @@ public sealed class SplitPaneLayout : Border
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
         };
-        handlePill.Bind(BackgroundProperty,
+        handlePill.Bind(Border.BackgroundProperty,
             handlePill.GetResourceObservable("ThemeBorderSubtleBrush"));
 
         _handle = new Border
@@ -102,12 +101,8 @@ public sealed class SplitPaneLayout : Border
         _handle.PointerMoved += OnResizeMoved;
         _handle.PointerReleased += OnResizeReleased;
 
-        _panel = new SplitPanel(this);
-        _panel.Children.Add(_pane1Host);
-        _panel.Children.Add(_handle);
-        _panel.Children.Add(_pane2Host);
-
-        Child = _panel;
+        LogicalChildren.Add(_handle);
+        VisualChildren.Add(_handle);
     }
 
     // ── Property Changed ───────────────────────────────────────────
@@ -116,15 +111,72 @@ public sealed class SplitPaneLayout : Border
     {
         base.OnPropertyChanged(change);
 
-        if (change.Property == Pane1Property)
-            _pane1Host.Child = Pane1;
-        else if (change.Property == Pane2Property)
-            _pane2Host.Child = Pane2;
+        if (change.Property == Pane1Property || change.Property == Pane2Property)
+        {
+            var oldControl = change.OldValue as Control;
+            var newControl = change.NewValue as Control;
+
+            if (oldControl != null)
+            {
+                LogicalChildren.Remove(oldControl);
+                VisualChildren.Remove(oldControl);
+            }
+
+            if (newControl != null)
+            {
+                LogicalChildren.Add(newControl);
+                VisualChildren.Add(newControl);
+            }
+
+            InvalidateMeasure();
+        }
         else if (change.Property == RatioProperty ||
                  change.Property == MinRatioProperty ||
                  change.Property == MaxRatioProperty ||
                  change.Property == HandleSizeProperty)
-            _panel.InvalidateArrange();
+        {
+            InvalidateMeasure();
+        }
+    }
+
+    // ── Layout ─────────────────────────────────────────────────────
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        var w = double.IsFinite(availableSize.Width) ? availableSize.Width : 800;
+        var h = double.IsFinite(availableSize.Height) ? availableSize.Height : 600;
+
+        var handleWidth = HandleSize;
+        var contentWidth = Math.Max(0, w - handleWidth);
+        var ratio = ActiveRatio;
+
+        var pane2W = contentWidth * ratio;
+        var pane1W = contentWidth - pane2W;
+
+        _lastPane1Width = pane1W;
+        _lastPane2Width = pane2W;
+
+        Pane1?.Measure(new Size(pane1W, h));
+        _handle.Measure(new Size(handleWidth, h));
+        Pane2?.Measure(new Size(pane2W, h));
+
+        return new Size(w, h);
+    }
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        var handleWidth = HandleSize;
+        var availableWidth = finalSize.Width - handleWidth;
+        var ratio = ActiveRatio;
+
+        var pane2Width = Math.Max(0, availableWidth * ratio);
+        var pane1Width = Math.Max(0, availableWidth - pane2Width);
+
+        Pane1?.Arrange(new Rect(0, 0, pane1Width, finalSize.Height));
+        _handle.Arrange(new Rect(pane1Width, 0, handleWidth, finalSize.Height));
+        Pane2?.Arrange(new Rect(pane1Width + handleWidth, 0, pane2Width, finalSize.Height));
+
+        return finalSize;
     }
 
     // ── Resize Interaction ─────────────────────────────────────────
@@ -159,7 +211,7 @@ public sealed class SplitPaneLayout : Border
         if (!double.IsFinite(newRatio)) return;
 
         _dragRatio = Math.Clamp(newRatio, MinRatio, MaxRatio);
-        _panel.InvalidateArrange();
+        InvalidateMeasure();
         e.Handled = true;
     }
 
@@ -190,61 +242,6 @@ public sealed class SplitPaneLayout : Border
             var r = _isResizing && double.IsFinite(_dragRatio) ? _dragRatio : Ratio;
             if (!double.IsFinite(r)) r = 0.5;
             return Math.Clamp(r, MinRatio, MaxRatio);
-        }
-    }
-
-    // ── Custom Layout Panel ────────────────────────────────────────
-
-    /// <summary>
-    /// Inner panel that arranges [pane1Host, handle, pane2Host] using ratio-based
-    /// math instead of Grid columns, avoiding star-column minimum width issues.
-    /// </summary>
-    private sealed class SplitPanel : Panel
-    {
-        private readonly SplitPaneLayout _owner;
-        public SplitPanel(SplitPaneLayout owner) => _owner = owner;
-
-        protected override Size MeasureOverride(Size availableSize)
-        {
-            var w = double.IsFinite(availableSize.Width) ? availableSize.Width : 0;
-            var h = double.IsFinite(availableSize.Height) ? availableSize.Height : 0;
-
-            if (Children.Count >= 3)
-            {
-                var handleWidth = _owner.HandleSize;
-                var contentWidth = Math.Max(0, w - handleWidth);
-                var ratio = _owner.ActiveRatio;
-                var pane2W = contentWidth * ratio;
-                var pane1W = contentWidth - pane2W;
-
-                Children[0].Measure(new Size(pane1W, h));
-                Children[1].Measure(new Size(handleWidth, h));
-                Children[2].Measure(new Size(pane2W, h));
-            }
-
-            return new Size(w, h);
-        }
-
-        protected override Size ArrangeOverride(Size finalSize)
-        {
-            if (Children.Count < 3) return finalSize;
-
-            var pane1 = Children[0];
-            var handle = Children[1];
-            var pane2 = Children[2];
-
-            var handleWidth = _owner.HandleSize;
-            var availableWidth = finalSize.Width - handleWidth;
-            var ratio = _owner.ActiveRatio;
-
-            var pane2Width = Math.Max(0, availableWidth * ratio);
-            var pane1Width = Math.Max(0, availableWidth - pane2Width);
-
-            pane1.Arrange(new Rect(0, 0, pane1Width, finalSize.Height));
-            handle.Arrange(new Rect(pane1Width, 0, handleWidth, finalSize.Height));
-            pane2.Arrange(new Rect(pane1Width + handleWidth, 0, pane2Width, finalSize.Height));
-
-            return finalSize;
         }
     }
 }
