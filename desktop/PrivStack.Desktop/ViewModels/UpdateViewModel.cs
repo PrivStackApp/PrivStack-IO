@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using PrivStack.Desktop.Models;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
+using Serilog;
 
 namespace PrivStack.Desktop.ViewModels;
 
@@ -12,12 +13,17 @@ namespace PrivStack.Desktop.ViewModels;
 /// </summary>
 public partial class UpdateViewModel : ViewModelBase
 {
+    private static readonly ILogger Logger = Serilog.Log.ForContext<UpdateViewModel>();
+
     private readonly IUpdateService _updateService;
     private readonly IDialogService _dialogService;
     private readonly IUiDispatcher _dispatcher;
     private readonly IAppSettingsService _appSettings;
+    private readonly OAuthLoginService _oauthLoginService;
+    private readonly PrivStackApiClient _apiClient;
     private System.Timers.Timer? _autoCheckTimer;
     private System.Timers.Timer? _upToDateDismissTimer;
+    private CancellationTokenSource? _oauthCts;
     private bool _startupCheckComplete;
 
     [ObservableProperty]
@@ -47,6 +53,9 @@ public partial class UpdateViewModel : ViewModelBase
     [ObservableProperty]
     private bool _needsAuthentication;
 
+    [ObservableProperty]
+    private bool _isAuthenticating;
+
     // ── Status bar properties ──────────────────────────────────────────
 
     [ObservableProperty]
@@ -65,12 +74,16 @@ public partial class UpdateViewModel : ViewModelBase
         IUpdateService updateService,
         IDialogService dialogService,
         IUiDispatcher dispatcher,
-        IAppSettingsService appSettings)
+        IAppSettingsService appSettings,
+        OAuthLoginService oauthLoginService,
+        PrivStackApiClient apiClient)
     {
         _updateService = updateService;
         _dialogService = dialogService;
         _dispatcher = dispatcher;
         _appSettings = appSettings;
+        _oauthLoginService = oauthLoginService;
+        _apiClient = apiClient;
 
         CurrentVersion = _updateService.CurrentVersion;
 
@@ -236,6 +249,61 @@ public partial class UpdateViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task SignInAsync()
+    {
+        if (IsAuthenticating) return;
+
+        IsAuthenticating = true;
+        StatusMessage = "Opening browser for sign in...";
+        _oauthCts = new CancellationTokenSource();
+
+        try
+        {
+            var codeVerifier = OAuthLoginService.GenerateCodeVerifier();
+            var codeChallenge = OAuthLoginService.ComputeCodeChallenge(codeVerifier);
+            var state = OAuthLoginService.GenerateState();
+
+            var authorizeUrl = $"{PrivStackApiClient.ApiBaseUrl}/connect/authorize" +
+                $"?client_id=privstack-desktop" +
+                $"&response_type=code" +
+                $"&scope=updates" +
+                $"&code_challenge={Uri.EscapeDataString(codeChallenge)}" +
+                $"&code_challenge_method=S256" +
+                $"&state={Uri.EscapeDataString(state)}";
+
+            var callback = await _oauthLoginService.AuthorizeAsync(
+                authorizeUrl, state, _oauthCts.Token);
+
+            StatusMessage = "Completing sign in...";
+
+            var tokenResult = await _apiClient.ExchangeCodeForTokenAsync(
+                callback.Code, codeVerifier, callback.RedirectUri, _oauthCts.Token);
+
+            // Persist tokens
+            _appSettings.Settings.AccessToken = tokenResult.AccessToken;
+            _appSettings.Settings.RefreshToken = tokenResult.RefreshToken;
+            _appSettings.Save();
+
+            NeedsAuthentication = false;
+            StatusMessage = $"Signed in — ready to download v{UpdateVersion}";
+            Logger.Information("Re-authenticated via update modal");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "Sign in cancelled";
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "OAuth sign-in from update modal failed");
+            StatusMessage = $"Sign in failed: {ex.Message}";
+        }
+        finally
+        {
+            IsAuthenticating = false;
+        }
+    }
+
+    [RelayCommand]
     private void OpenModal()
     {
         IsUpdateModalOpen = true;
@@ -311,6 +379,8 @@ public partial class UpdateViewModel : ViewModelBase
     {
         StopAutoCheck();
         CancelDismissTimer();
+        _oauthCts?.Cancel();
+        _oauthCts?.Dispose();
         _updateService.UpdateFound -= OnUpdateFound;
         _updateService.UpdateError -= OnUpdateError;
     }

@@ -125,7 +125,9 @@ public partial class MainWindowViewModel : ViewModelBase
         App.Services.GetRequiredService<Services.Abstractions.IUpdateService>(),
         App.Services.GetRequiredService<IDialogService>(),
         App.Services.GetRequiredService<IUiDispatcher>(),
-        _appSettings);
+        _appSettings,
+        App.Services.GetRequiredService<Services.OAuthLoginService>(),
+        App.Services.GetRequiredService<Services.PrivStackApiClient>());
 
     private SettingsViewModel? _settingsVM;
     public SettingsViewModel SettingsVM
