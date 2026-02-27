@@ -96,7 +96,8 @@ Every request (except /api/v1/status) requires your API key. Send it as either:
                             CornerRadius="6" Padding="14,10" Margin="16,0,0,0">
                         <TextBlock FontFamily="Consolas, Menlo, monospace"
                                    FontSize="{DynamicResource ThemeFontSizeXs}"
-                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                   TextWrapping="Wrap" LineHeight="18">
 curl http://127.0.0.1:9720/api/v1/status
                         </TextBlock>
                     </Border>
@@ -133,20 +134,22 @@ curl -H "X-API-Key: YOUR_KEY" \
                     <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
                             CornerRadius="6" Padding="14,10">
                         <StackPanel Spacing="6">
-                            <Grid ColumnDefinitions="90,*">
+                            <Grid ColumnDefinitions="50,*">
                                 <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
                                            Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
                                 <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                           TextWrapping="Wrap">
                                     <Run Text="/api/v1/status"/>
                                     <Run Foreground="{DynamicResource ThemeTextMutedBrush}" Text="  health check (no auth)"/>
                                 </TextBlock>
                             </Grid>
-                            <Grid ColumnDefinitions="90,*">
+                            <Grid ColumnDefinitions="50,*">
                                 <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
                                            Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
                                 <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                           TextWrapping="Wrap">
                                     <Run Text="/api/v1/routes"/>
                                     <Run Foreground="{DynamicResource ThemeTextMutedBrush}" Text="  list all routes"/>
                                 </TextBlock>
@@ -170,12 +173,13 @@ curl -H "X-API-Key: YOUR_KEY" \
                                             <ItemsControl ItemsSource="{Binding Routes}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="dialogs:ApiRouteItem">
-                                                        <Grid ColumnDefinitions="90,*" Margin="0,3">
+                                                        <Grid ColumnDefinitions="50,*" Margin="0,3">
                                                             <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
                                                                        Text="{Binding Method}"
                                                                        Foreground="{Binding MethodBrush}"/>
                                                             <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                                                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                                       TextWrapping="Wrap">
                                                                 <Run Text="{Binding Path}"/>
                                                                 <Run Foreground="{DynamicResource ThemeTextMutedBrush}"
                                                                      Text="{Binding DescriptionSuffix}"/>
