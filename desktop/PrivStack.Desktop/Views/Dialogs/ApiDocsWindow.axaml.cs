@@ -133,7 +133,7 @@ public partial class ApiDocsWindow : Window
             Foreground = GetBrush("ThemeTextPrimaryBrush"),
         });
 
-        var body = new StackPanel { Spacing = 16, Margin = new Thickness(4) };
+        var body = new StackPanel { Spacing = 16, Margin = new Thickness(20) };
         body.Children.Add(headerRow);
 
         if (!string.IsNullOrEmpty(route.Description))
