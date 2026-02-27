@@ -37,6 +37,11 @@ public partial class ApiRouteDetailWindow : Window
 
     private void BuildDetailContent(ApiRouteItem route)
     {
+        // cURL command
+        var curl = BuildCurlCommand(route);
+        DetailContent.Children.Add(BuildSection("cURL"));
+        DetailContent.Children.Add(BuildCodeBlock(curl));
+
         // Query parameters
         if (route.QueryParamDocs is { Count: > 0 })
         {
@@ -88,17 +93,6 @@ public partial class ApiRouteDetailWindow : Window
             DetailContent.Children.Add(BuildCodeBlock(route.ResponseExample));
         }
 
-        // Empty state
-        if (DetailContent.Children.Count == 0)
-        {
-            DetailContent.Children.Add(new TextBlock
-            {
-                Text = "No schema documentation available for this endpoint.",
-                FontSize = 13,
-                Foreground = GetBrush("ThemeTextMutedBrush"),
-                FontStyle = FontStyle.Italic,
-            });
-        }
     }
 
     private TextBlock BuildSection(string title) => new()
@@ -166,6 +160,32 @@ public partial class ApiRouteDetailWindow : Window
             Margin = new Thickness(0, 4, 0, 0),
             Child = wrapper,
         };
+    }
+
+    private static string BuildCurlCommand(ApiRouteItem route)
+    {
+        var parts = new List<string> { "curl" };
+
+        if (route.Method != "GET")
+            parts.Add($"-X {route.Method}");
+
+        parts.Add("-H \"X-API-Key: YOUR_KEY\"");
+
+        if (!string.IsNullOrEmpty(route.RequestExample))
+        {
+            parts.Add("-H \"Content-Type: application/json\"");
+            // Compact the JSON to a single line for the -d flag
+            var body = route.RequestExample
+                .Replace("\n", "").Replace("\r", "");
+            // Collapse runs of whitespace between JSON tokens
+            while (body.Contains("  "))
+                body = body.Replace("  ", " ");
+            parts.Add($"-d '{body.Trim()}'");
+        }
+
+        parts.Add($"http://127.0.0.1:9720{route.Path}");
+
+        return string.Join(" \\\n     ", parts);
     }
 
     private IBrush? GetBrush(string key)

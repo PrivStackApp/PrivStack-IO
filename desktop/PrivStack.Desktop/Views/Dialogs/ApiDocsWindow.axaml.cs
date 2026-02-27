@@ -86,7 +86,7 @@ public partial class ApiDocsWindow : Window
 
     private void OnRouteClick(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is Control { DataContext: ApiRouteItem route } && route.HasDetail)
+        if (sender is Control { DataContext: ApiRouteItem route })
         {
             var detail = new ApiRouteDetailWindow(route);
             detail.ShowDialog(this);
