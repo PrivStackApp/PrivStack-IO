@@ -287,54 +287,66 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         }
     }
 
+    /// <summary>
+    /// Scans the note's content blocks for embedded table/chart blocks backed by
+    /// datasets or cross-plugin queries, fetches a sample of their data, and
+    /// appends it to the context so Duncan can answer questions about them.
+    /// </summary>
     private async Task<string> AppendEmbeddedDatasetContentAsync(string noteJson, string itemId)
     {
         try
         {
-            // Parse the note JSON to find embedded table/dataset references
             using var doc = JsonDocument.Parse(noteJson);
             var root = doc.RootElement;
 
-            // Look for content field that may contain table block references
-            if (!root.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.String)
+            // Content is a JSON array of block objects (not a string)
+            if (!root.TryGetProperty("content", out var content))
                 return noteJson;
 
-            var contentStr = content.GetString() ?? "";
+            // Handle both array (structured) and string (legacy) content
+            List<EmbeddedDataRef> refs;
+            if (content.ValueKind == JsonValueKind.Array)
+                refs = ExtractDataRefsFromBlocks(content);
+            else if (content.ValueKind == JsonValueKind.String)
+                refs = ExtractDataRefsFromString(content.GetString() ?? "");
+            else
+                return noteJson;
 
-            // Find dataset_id references in the note content (tables reference datasets by ID)
-            var datasetIds = new HashSet<string>();
-            var idx = 0;
-            while ((idx = contentStr.IndexOf("dataset_id", idx, StringComparison.Ordinal)) >= 0)
-            {
-                // Simple extraction: find the value after dataset_id
-                var start = contentStr.IndexOf('"', idx + 10);
-                if (start < 0) { idx++; continue; }
-                start++; // skip opening quote
-                var end = contentStr.IndexOf('"', start);
-                if (end > start && end - start < 100)
-                    datasetIds.Add(contentStr[start..end]);
-                idx = end > 0 ? end : idx + 1;
-            }
+            if (refs.Count == 0) return noteJson;
 
-            if (datasetIds.Count == 0) return noteJson;
-
-            // Fetch each dataset's first rows via IPluginDataSourceProvider
             var providers = _pluginRegistry.GetCapabilityProviders<PrivStack.Sdk.Capabilities.IPluginDataSourceProvider>();
-            var dataProvider = providers.FirstOrDefault(p => p.NavigationLinkType == "dataset_row");
-            if (dataProvider == null) return noteJson;
-
             var sb = new System.Text.StringBuilder(noteJson);
-            foreach (var dsId in datasetIds.Take(3)) // cap at 3 datasets
+
+            foreach (var dataRef in refs.Take(3))
             {
                 try
                 {
-                    var result = await dataProvider.QueryItemAsync(dsId, page: 0, pageSize: 20);
-                    if (result.Rows.Count == 0) continue;
+                    PrivStack.Sdk.Capabilities.DatasetQueryResult? result = null;
 
+                    if (dataRef.BackingMode == "plugin_query"
+                        && dataRef.ProviderPluginId != null
+                        && dataRef.ProviderQueryKey != null)
+                    {
+                        // Cross-plugin query (Tasks, Contacts, etc.)
+                        var provider = providers.FirstOrDefault(p =>
+                            p.PluginId == dataRef.ProviderPluginId);
+                        if (provider != null)
+                            result = await provider.QueryItemAsync(dataRef.ProviderQueryKey, page: 0, pageSize: 20);
+                    }
+                    else if (dataRef.DatasetId != null)
+                    {
+                        // Dataset-backed (Data plugin)
+                        var dataProvider = providers.FirstOrDefault(p => p.NavigationLinkType == "dataset_row");
+                        if (dataProvider != null)
+                            result = await dataProvider.QueryItemAsync(dataRef.DatasetId, page: 0, pageSize: 20);
+                    }
+
+                    if (result == null || result.Rows.Count == 0) continue;
+
+                    var label = dataRef.Title ?? dataRef.DatasetId ?? dataRef.ProviderQueryKey ?? "unknown";
                     sb.AppendLine();
-                    sb.AppendLine($"\n--- Embedded Dataset ({dsId}) ---");
+                    sb.AppendLine($"\n--- Embedded Table: {label} ({result.TotalCount} total rows) ---");
                     sb.AppendLine($"Columns: {string.Join(", ", result.Columns)}");
-                    sb.AppendLine($"Total rows: {result.TotalCount}");
                     foreach (var row in result.Rows)
                     {
                         var fields = new List<string>();
@@ -342,19 +354,73 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
                             fields.Add($"{result.Columns[i]}: {row[i]}");
                         sb.AppendLine(string.Join(" | ", fields));
                     }
+                    if (result.TotalCount > result.Rows.Count)
+                        sb.AppendLine($"... ({result.TotalCount - result.Rows.Count} more rows)");
                 }
                 catch (Exception ex)
                 {
-                    _log.Debug(ex, "Failed to fetch embedded dataset {DatasetId} for note {NoteId}", dsId, itemId);
+                    _log.Debug(ex, "Failed to fetch embedded data for note {NoteId}: {Ref}", itemId, dataRef);
                 }
             }
             return sb.ToString();
         }
         catch
         {
-            return noteJson; // If parsing fails, just return the original
+            return noteJson;
         }
     }
+
+    /// <summary>
+    /// Extracts dataset/plugin-query references from structured block array content.
+    /// </summary>
+    private static List<EmbeddedDataRef> ExtractDataRefsFromBlocks(JsonElement blocksArray)
+    {
+        var refs = new List<EmbeddedDataRef>();
+        foreach (var block in blocksArray.EnumerateArray())
+        {
+            if (!block.TryGetProperty("type", out var typeProp)) continue;
+            var type = typeProp.GetString();
+            if (type is not ("table" or "chart")) continue;
+
+            var backingMode = block.TryGetProperty("backing_mode", out var bm) ? bm.GetString() : null;
+            var datasetId = block.TryGetProperty("dataset_id", out var ds) ? ds.GetString() : null;
+            var providerPluginId = block.TryGetProperty("provider_plugin_id", out var pp) ? pp.GetString() : null;
+            var providerQueryKey = block.TryGetProperty("provider_query_key", out var pq) ? pq.GetString() : null;
+            var title = block.TryGetProperty("title", out var t) ? t.GetString() : null;
+
+            // Only include blocks that reference external data
+            if (datasetId != null || (providerPluginId != null && providerQueryKey != null))
+            {
+                refs.Add(new EmbeddedDataRef(
+                    backingMode, datasetId, providerPluginId, providerQueryKey, title));
+            }
+        }
+        return refs;
+    }
+
+    /// <summary>
+    /// Legacy fallback: extracts dataset_id values from a content string via text scanning.
+    /// </summary>
+    private static List<EmbeddedDataRef> ExtractDataRefsFromString(string contentStr)
+    {
+        var refs = new List<EmbeddedDataRef>();
+        var idx = 0;
+        while ((idx = contentStr.IndexOf("dataset_id", idx, StringComparison.Ordinal)) >= 0)
+        {
+            var start = contentStr.IndexOf('"', idx + 10);
+            if (start < 0) { idx++; continue; }
+            start++;
+            var end = contentStr.IndexOf('"', start);
+            if (end > start && end - start < 100)
+                refs.Add(new EmbeddedDataRef("dataset", contentStr[start..end], null, null, null));
+            idx = end > 0 ? end : idx + 1;
+        }
+        return refs;
+    }
+
+    private sealed record EmbeddedDataRef(
+        string? BackingMode, string? DatasetId,
+        string? ProviderPluginId, string? ProviderQueryKey, string? Title);
 
     // ── Commands ─────────────────────────────────────────────────────
 
