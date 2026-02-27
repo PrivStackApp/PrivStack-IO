@@ -1,0 +1,315 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="PrivStack.Desktop.Views.Dialogs.ApiDocsWindow"
+        Title="Local API Documentation"
+        Width="600" Height="680"
+        MinWidth="480" MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True"
+        SystemDecorations="Full"
+        Background="{DynamicResource ThemeSurfaceBrush}">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Spacing="4" Margin="28,24,28,0">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Border Width="36" Height="36" CornerRadius="8"
+                        Background="{DynamicResource ThemePrimaryMutedBrush}"
+                        HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <TextBlock Text="API" FontFamily="Consolas, Menlo, monospace"
+                               FontSize="13" FontWeight="Bold"
+                               Foreground="{DynamicResource ThemePrimaryBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="Local API" FontSize="{DynamicResource ThemeFontSizeXl}" FontWeight="Bold"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                    <TextBlock Text="Programmatic access to your PrivStack data"
+                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Scrollable Content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="28,20,28,0">
+            <StackPanel Spacing="24">
+
+                <!-- Overview -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Overview" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                    <TextBlock TextWrapping="Wrap" FontSize="{DynamicResource ThemeFontSizeSm}"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                               LineHeight="20">
+The local API runs an HTTP server on your machine (127.0.0.1 only — never exposed to the network). Use it to create tasks from scripts, build custom integrations, log data from CLI tools, or automate workflows.
+                    </TextBlock>
+                </StackPanel>
+
+                <!-- Authentication -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Authentication" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                    <TextBlock TextWrapping="Wrap" FontSize="{DynamicResource ThemeFontSizeSm}"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                               LineHeight="20">
+Every request (except /api/v1/status) requires your API key. Send it as either:
+                    </TextBlock>
+                    <StackPanel Spacing="4" Margin="12,0,0,0">
+                        <TextBlock FontSize="{DynamicResource ThemeFontSizeXs}"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                            <Run FontWeight="SemiBold" Foreground="{DynamicResource ThemeTextPrimaryBrush}">Header:</Run>
+                            <Run>  X-API-Key: your-key-here</Run>
+                        </TextBlock>
+                        <TextBlock FontSize="{DynamicResource ThemeFontSizeXs}"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                            <Run FontWeight="SemiBold" Foreground="{DynamicResource ThemeTextPrimaryBrush}">Bearer:</Run>
+                            <Run>  Authorization: Bearer your-key-here</Run>
+                        </TextBlock>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Getting Started -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Getting Started" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+                    <!-- Step 1 -->
+                    <TextBlock FontSize="{DynamicResource ThemeFontSizeSm}"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                        <Run FontWeight="SemiBold" Foreground="{DynamicResource ThemeTextPrimaryBrush}">1.</Run>
+                        <Run> Enable the API toggle above and copy your API key</Run>
+                    </TextBlock>
+
+                    <!-- Step 2 -->
+                    <TextBlock FontSize="{DynamicResource ThemeFontSizeSm}"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                        <Run FontWeight="SemiBold" Foreground="{DynamicResource ThemeTextPrimaryBrush}">2.</Run>
+                        <Run> Check the server is running:</Run>
+                    </TextBlock>
+                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                            CornerRadius="6" Padding="14,10" Margin="16,0,0,0">
+                        <TextBlock FontFamily="Consolas, Menlo, monospace"
+                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+curl http://127.0.0.1:9720/api/v1/status
+                        </TextBlock>
+                    </Border>
+
+                    <!-- Step 3 -->
+                    <TextBlock FontSize="{DynamicResource ThemeFontSizeSm}"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                        <Run FontWeight="SemiBold" Foreground="{DynamicResource ThemeTextPrimaryBrush}">3.</Run>
+                        <Run> Make an authenticated request:</Run>
+                    </TextBlock>
+                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                            CornerRadius="6" Padding="14,10" Margin="16,0,0,0">
+                        <TextBlock FontFamily="Consolas, Menlo, monospace"
+                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                   TextWrapping="Wrap" LineHeight="18">
+curl -H "X-API-Key: YOUR_KEY" \
+     http://127.0.0.1:9720/api/v1/tasks
+                        </TextBlock>
+                    </Border>
+                </StackPanel>
+
+                <!-- Endpoints -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Available Endpoints" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+                    <!-- Shell endpoints -->
+                    <TextBlock Text="Shell" FontWeight="Medium"
+                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                               Margin="0,4,0,0"/>
+                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                            CornerRadius="6" Padding="14,10">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="90,*">
+                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
+                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                                    <Run Text="/api/v1/status"/>
+                                    <Run Foreground="{DynamicResource ThemeTextMutedBrush}" Text="  health check (no auth)"/>
+                                </TextBlock>
+                            </Grid>
+                            <Grid ColumnDefinitions="90,*">
+                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
+                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                                    <Run Text="/api/v1/routes"/>
+                                    <Run Foreground="{DynamicResource ThemeTextMutedBrush}" Text="  list all routes"/>
+                                </TextBlock>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Tasks endpoints -->
+                    <TextBlock Text="Tasks" FontWeight="Medium"
+                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                               Margin="0,8,0,0"/>
+                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                            CornerRadius="6" Padding="14,10">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="90,*">
+                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
+                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="90,*">
+                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
+                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/{id}"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="90,*">
+                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemePrimaryBrush}" Text="POST"/>
+                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="90,*">
+                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeWarningBrush}" Text="PATCH"/>
+                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/{id}"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="90,*">
+                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeDangerBrush}" Text="DELETE"/>
+                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/{id}"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="90,*">
+                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
+                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/search?q="/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Projects endpoints -->
+                    <TextBlock Text="Projects" FontWeight="Medium"
+                               FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                               Margin="0,8,0,0"/>
+                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                            CornerRadius="6" Padding="14,10">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="90,*">
+                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
+                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/projects"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="90,*">
+                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeSuccessBrush}" Text="GET"/>
+                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/projects/{id}"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="90,*">
+                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemePrimaryBrush}" Text="POST"/>
+                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/projects"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="90,*">
+                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeWarningBrush}" Text="PATCH"/>
+                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/projects/{id}"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="90,*">
+                                <TextBlock FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeDangerBrush}" Text="DELETE"/>
+                                <TextBlock Grid.Column="1" FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="/api/v1/tasks/projects/{id}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Examples -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Examples" FontWeight="SemiBold"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+                    <TextBlock Text="Create a task:" FontSize="{DynamicResource ThemeFontSizeSm}"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                            CornerRadius="6" Padding="14,10">
+                        <TextBlock FontFamily="Consolas, Menlo, monospace"
+                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                   TextWrapping="Wrap" LineHeight="18">
+curl -X POST \
+     -H "X-API-Key: YOUR_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"title":"Buy groceries","priority":"medium"}' \
+     http://127.0.0.1:9720/api/v1/tasks
+                        </TextBlock>
+                    </Border>
+
+                    <TextBlock Text="Search tasks:" FontSize="{DynamicResource ThemeFontSizeSm}"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                               Margin="0,4,0,0"/>
+                    <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                            CornerRadius="6" Padding="14,10">
+                        <TextBlock FontFamily="Consolas, Menlo, monospace"
+                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                   TextWrapping="Wrap" LineHeight="18">
+curl -H "X-API-Key: YOUR_KEY" \
+     "http://127.0.0.1:9720/api/v1/tasks/search?q=groceries"
+                        </TextBlock>
+                    </Border>
+                </StackPanel>
+
+                <!-- Security Note -->
+                <Border Background="{DynamicResource ThemeWarningMutedBrush}"
+                        CornerRadius="8" Padding="14,10">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Security" FontWeight="SemiBold"
+                                   FontSize="{DynamicResource ThemeFontSizeSm}"
+                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                        <TextBlock TextWrapping="Wrap"
+                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                   LineHeight="18">
+The API binds to 127.0.0.1 only and is never accessible from other machines. Your API key is stored locally in your settings file. If you suspect your key has been compromised, use the Regenerate button to create a new one.
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <!-- Bottom spacer -->
+                <Border Height="8"/>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" BorderThickness="0,1,0,0"
+                BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
+                Padding="28,16">
+            <Button Content="Close" Click="OnClose"
+                    HorizontalAlignment="Right"
+                    Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    Padding="20,10" CornerRadius="6"/>
+        </Border>
+    </Grid>
+</Window>

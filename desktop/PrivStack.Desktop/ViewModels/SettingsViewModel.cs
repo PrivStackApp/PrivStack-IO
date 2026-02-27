@@ -1058,6 +1058,15 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task ViewApiDocsAsync()
+    {
+        var owner = _dialogService is DialogService ds ? ds.Owner : null;
+        if (owner == null) return;
+        var dialog = new Views.Dialogs.ApiDocsWindow();
+        await dialog.ShowDialog<object?>(owner);
+    }
+
+    [RelayCommand]
     private async Task CopyApiKeyAsync()
     {
         if (string.IsNullOrEmpty(ApiKey)) return;

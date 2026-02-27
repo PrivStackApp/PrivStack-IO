@@ -1969,7 +1969,17 @@
                     <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
                         <StackPanel Spacing="4">
                             <TextBlock Text="Developer" Classes="settings-section-title"/>
-                            <TextBlock Text="Local HTTP API for programmatic access" Classes="settings-section-subtitle"/>
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="Local HTTP API for programmatic access" Classes="settings-section-subtitle"
+                                           VerticalAlignment="Center"/>
+                                <Button Command="{Binding ViewApiDocsCommand}"
+                                        Background="Transparent" Padding="0" Cursor="Hand"
+                                        VerticalAlignment="Center">
+                                    <TextBlock Text="View Documentation"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemePrimaryBrush}"/>
+                                </Button>
+                            </StackPanel>
                         </StackPanel>
 
                         <!-- Enable API -->
