@@ -374,23 +374,20 @@
                         <!-- Info Panel: Collapsed side tab (visible when panel is closed and not on Graph/Nexus) -->
                         <!-- Hover region: wider hit-test area that fades in the tab button -->
                         <Border Classes="info-tab-hover-zone"
-                                Width="36"
                                 HorizontalAlignment="Right"
-                                VerticalAlignment="Stretch"
-                                Background="Transparent"
+                                VerticalAlignment="Center"
                                 IsVisible="{Binding ShowInfoPanelTab}"
-                                ZIndex="10"
-                                IsHitTestVisible="True">
+                                ZIndex="10">
                             <Border.Styles>
                                 <Style Selector="Border.info-tab-hover-zone Button">
-                                    <Setter Property="Opacity" Value="0"/>
+                                    <Setter Property="Opacity" Value="0.15"/>
                                     <Setter Property="Transitions">
                                         <Transitions>
                                             <DoubleTransition Property="Opacity" Duration="0:0:0.2"/>
                                         </Transitions>
                                     </Setter>
                                 </Style>
-                                <Style Selector="Border.info-tab-hover-zone:pointerover Button">
+                                <Style Selector="Border.info-tab-hover-zone Button:pointerover">
                                     <Setter Property="Opacity" Value="1"/>
                                 </Style>
                             </Border.Styles>
