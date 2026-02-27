@@ -926,6 +926,7 @@
     </Style>
 
     <!-- MenuFlyoutPresenter (popup container for MenuFlyout) -->
+    <!-- Override template to wrap Border in Panel with margin so BoxShadow isn't clipped by popup window bounds -->
     <Style Selector="MenuFlyoutPresenter">
         <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderSubtleBrush}"/>
@@ -933,6 +934,27 @@
         <Setter Property="CornerRadius" Value="{DynamicResource ThemeRadiusMd}"/>
         <Setter Property="Padding" Value="4"/>
         <Setter Property="MinWidth" Value="180"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Panel Margin="12,6,12,22">
+                    <Border Name="LayoutRoot"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            BoxShadow="0 8 24 0 #40000000, 0 2 6 0 #28000000"
+                            MinWidth="{TemplateBinding MinWidth}">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto">
+                            <ItemsPresenter Name="PART_ItemsPresenter"
+                                            Margin="{TemplateBinding Padding}"
+                                            Grid.IsSharedSizeScope="True"
+                                            KeyboardNavigation.TabNavigation="Continue"/>
+                        </ScrollViewer>
+                    </Border>
+                </Panel>
+            </ControlTemplate>
+        </Setter>
         <Setter Property="RenderTransformOrigin" Value="0.5,0"/>
         <Style.Animations>
             <Animation Duration="0:0:0.12" Easing="CubicEaseOut" FillMode="Forward">
@@ -947,11 +969,9 @@
             </Animation>
         </Style.Animations>
     </Style>
-    <Style Selector="MenuFlyoutPresenter /template/ Border">
-        <Setter Property="BoxShadow" Value="0 8 24 0 #40000000, 0 2 6 0 #28000000"/>
-    </Style>
 
     <!-- Context Menu -->
+    <!-- Same template override for shadow space -->
     <Style Selector="ContextMenu">
         <Setter Property="Background" Value="{DynamicResource ThemeSurfaceElevatedBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderSubtleBrush}"/>
@@ -960,6 +980,28 @@
         <Setter Property="Padding" Value="4"/>
         <Setter Property="MinWidth" Value="180"/>
         <Setter Property="MaxWidth" Value="320"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Panel Margin="12,6,12,22">
+                    <Border Name="LayoutRoot"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            BoxShadow="0 8 24 0 #40000000, 0 2 6 0 #28000000"
+                            MinWidth="{TemplateBinding MinWidth}"
+                            MaxWidth="{TemplateBinding MaxWidth}">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto">
+                            <ItemsPresenter Name="PART_ItemsPresenter"
+                                            Margin="{TemplateBinding Padding}"
+                                            Grid.IsSharedSizeScope="True"
+                                            KeyboardNavigation.TabNavigation="Continue"/>
+                        </ScrollViewer>
+                    </Border>
+                </Panel>
+            </ControlTemplate>
+        </Setter>
         <Setter Property="RenderTransformOrigin" Value="0.5,0"/>
         <Style.Animations>
             <Animation Duration="0:0:0.12" Easing="CubicEaseOut" FillMode="Forward">
@@ -973,9 +1015,6 @@
                 </KeyFrame>
             </Animation>
         </Style.Animations>
-    </Style>
-    <Style Selector="ContextMenu /template/ Border">
-        <Setter Property="BoxShadow" Value="0 8 24 0 #40000000, 0 2 6 0 #28000000"/>
     </Style>
 
     <!-- Submenu popup container — same elevated treatment -->
