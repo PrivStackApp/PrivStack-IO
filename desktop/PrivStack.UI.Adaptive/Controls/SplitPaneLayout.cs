@@ -8,7 +8,6 @@
 
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Presenters;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -41,11 +40,11 @@ public sealed class SplitPaneLayout : Border
         AvaloniaProperty.Register<SplitPaneLayout, double>(
             nameof(HandleSize), defaultValue: 5.0);
 
-    public static readonly StyledProperty<object?> Pane1Property =
-        AvaloniaProperty.Register<SplitPaneLayout, object?>(nameof(Pane1));
+    public static readonly StyledProperty<Control?> Pane1Property =
+        AvaloniaProperty.Register<SplitPaneLayout, Control?>(nameof(Pane1));
 
-    public static readonly StyledProperty<object?> Pane2Property =
-        AvaloniaProperty.Register<SplitPaneLayout, object?>(nameof(Pane2));
+    public static readonly StyledProperty<Control?> Pane2Property =
+        AvaloniaProperty.Register<SplitPaneLayout, Control?>(nameof(Pane2));
 
     // ── CLR Accessors ──────────────────────────────────────────────
 
@@ -53,8 +52,8 @@ public sealed class SplitPaneLayout : Border
     public double MinRatio { get => GetValue(MinRatioProperty); set => SetValue(MinRatioProperty, value); }
     public double MaxRatio { get => GetValue(MaxRatioProperty); set => SetValue(MaxRatioProperty, value); }
     public double HandleSize { get => GetValue(HandleSizeProperty); set => SetValue(HandleSizeProperty, value); }
-    public object? Pane1 { get => GetValue(Pane1Property); set => SetValue(Pane1Property, value); }
-    public object? Pane2 { get => GetValue(Pane2Property); set => SetValue(Pane2Property, value); }
+    public Control? Pane1 { get => GetValue(Pane1Property); set => SetValue(Pane1Property, value); }
+    public Control? Pane2 { get => GetValue(Pane2Property); set => SetValue(Pane2Property, value); }
 
     // ── Events ─────────────────────────────────────────────────────
 
@@ -63,8 +62,8 @@ public sealed class SplitPaneLayout : Border
 
     // ── Private State ──────────────────────────────────────────────
 
-    private readonly ContentPresenter _pane1Presenter;
-    private readonly ContentPresenter _pane2Presenter;
+    private readonly Border _pane1Host;
+    private readonly Border _pane2Host;
     private readonly Border _handle;
     private readonly SplitPanel _panel;
 
@@ -79,19 +78,8 @@ public sealed class SplitPaneLayout : Border
     {
         ClipToBounds = true;
 
-        _pane1Presenter = new ContentPresenter
-        {
-            ClipToBounds = true,
-            HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            VerticalContentAlignment = VerticalAlignment.Stretch,
-        };
-
-        _pane2Presenter = new ContentPresenter
-        {
-            ClipToBounds = true,
-            HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            VerticalContentAlignment = VerticalAlignment.Stretch,
-        };
+        _pane1Host = new Border { ClipToBounds = true };
+        _pane2Host = new Border { ClipToBounds = true };
 
         var handlePill = new Border
         {
@@ -115,9 +103,9 @@ public sealed class SplitPaneLayout : Border
         _handle.PointerReleased += OnResizeReleased;
 
         _panel = new SplitPanel(this);
-        _panel.Children.Add(_pane1Presenter);
+        _panel.Children.Add(_pane1Host);
         _panel.Children.Add(_handle);
-        _panel.Children.Add(_pane2Presenter);
+        _panel.Children.Add(_pane2Host);
 
         Child = _panel;
     }
@@ -129,9 +117,9 @@ public sealed class SplitPaneLayout : Border
         base.OnPropertyChanged(change);
 
         if (change.Property == Pane1Property)
-            _pane1Presenter.Content = Pane1;
+            _pane1Host.Child = Pane1;
         else if (change.Property == Pane2Property)
-            _pane2Presenter.Content = Pane2;
+            _pane2Host.Child = Pane2;
         else if (change.Property == RatioProperty ||
                  change.Property == MinRatioProperty ||
                  change.Property == MaxRatioProperty ||
@@ -208,8 +196,8 @@ public sealed class SplitPaneLayout : Border
     // ── Custom Layout Panel ────────────────────────────────────────
 
     /// <summary>
-    /// Inner panel that arranges [pane1, handle, pane2] using ratio-based math
-    /// instead of Grid columns, avoiding star-column minimum width issues.
+    /// Inner panel that arranges [pane1Host, handle, pane2Host] using ratio-based
+    /// math instead of Grid columns, avoiding star-column minimum width issues.
     /// </summary>
     private sealed class SplitPanel : Panel
     {
@@ -218,9 +206,23 @@ public sealed class SplitPaneLayout : Border
 
         protected override Size MeasureOverride(Size availableSize)
         {
-            foreach (var child in Children)
-                child.Measure(availableSize);
-            return availableSize;
+            var w = double.IsFinite(availableSize.Width) ? availableSize.Width : 0;
+            var h = double.IsFinite(availableSize.Height) ? availableSize.Height : 0;
+
+            if (Children.Count >= 3)
+            {
+                var handleWidth = _owner.HandleSize;
+                var contentWidth = Math.Max(0, w - handleWidth);
+                var ratio = _owner.ActiveRatio;
+                var pane2W = contentWidth * ratio;
+                var pane1W = contentWidth - pane2W;
+
+                Children[0].Measure(new Size(pane1W, h));
+                Children[1].Measure(new Size(handleWidth, h));
+                Children[2].Measure(new Size(pane2W, h));
+            }
+
+            return new Size(w, h);
         }
 
         protected override Size ArrangeOverride(Size finalSize)
