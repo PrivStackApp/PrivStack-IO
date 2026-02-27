@@ -299,16 +299,29 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
             using var doc = JsonDocument.Parse(noteJson);
             var root = doc.RootElement;
 
-            // Content is a JSON array of block objects (not a string)
-            if (!root.TryGetProperty("content", out var content))
+            // Page JSON structure: { "content": { "type": "doc", "content": [...blocks...] } }
+            // Drill through the PageDocument wrapper to reach the block array.
+            if (!root.TryGetProperty("content", out var contentField))
                 return noteJson;
 
-            // Handle both array (structured) and string (legacy) content
+            // Find the block array — could be at content.content (PageDocument) or content directly
+            JsonElement? blocksArray = null;
+            if (contentField.ValueKind == JsonValueKind.Object
+                && contentField.TryGetProperty("content", out var inner)
+                && inner.ValueKind == JsonValueKind.Array)
+            {
+                blocksArray = inner;
+            }
+            else if (contentField.ValueKind == JsonValueKind.Array)
+            {
+                blocksArray = contentField;
+            }
+
             List<EmbeddedDataRef> refs;
-            if (content.ValueKind == JsonValueKind.Array)
-                refs = ExtractDataRefsFromBlocks(content);
-            else if (content.ValueKind == JsonValueKind.String)
-                refs = ExtractDataRefsFromString(content.GetString() ?? "");
+            if (blocksArray.HasValue)
+                refs = ExtractDataRefsFromBlocks(blocksArray.Value);
+            else if (contentField.ValueKind == JsonValueKind.String)
+                refs = ExtractDataRefsFromString(contentField.GetString() ?? "");
             else
                 return noteJson;
 
