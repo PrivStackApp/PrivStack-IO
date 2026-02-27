@@ -16,6 +16,27 @@
     <Color x:Key="ThemeShadowColorLg">#38000000</Color>
 
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- ELEVATION SHADOWS — 5-tier system                                       -->
+    <!-- Each tier is a two-layer shadow: ambient (wide, soft) + direct (tight)  -->
+    <!--                                                                         -->
+    <!--   Xs  — cards at rest, subtle depth cue                                 -->
+    <!--   Sm  — surface cards, raised sections                                  -->
+    <!--   Md  — elevated cards, hover lift, floating toolbars                   -->
+    <!--   Lg  — menus, popovers, dropdowns, toasts                             -->
+    <!--   Xl  — modals, dialogs, full-screen overlays                           -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <BoxShadows x:Key="ThemeShadowXs">0 1 3 0 #10000000, 0 0 1 0 #0C000000</BoxShadows>
+    <BoxShadows x:Key="ThemeShadowSm">0 2 8 0 #18000000, 0 1 2 0 #0C000000</BoxShadows>
+    <BoxShadows x:Key="ThemeShadowMd">0 4 12 0 #20000000, 0 1 4 0 #10000000</BoxShadows>
+    <BoxShadows x:Key="ThemeShadowLg">0 8 24 0 #30000000, 0 2 6 0 #18000000</BoxShadows>
+    <BoxShadows x:Key="ThemeShadowXl">0 12 32 0 #40000000, 0 4 8 0 #20000000</BoxShadows>
+
+    <!-- Hover-state shadows (one tier up from resting state) -->
+    <BoxShadows x:Key="ThemeShadowXsHover">0 4 12 0 #18000000, 0 1 3 0 #0E000000</BoxShadows>
+    <BoxShadows x:Key="ThemeShadowSmHover">0 6 20 0 #22000000, 0 2 6 0 #14000000</BoxShadows>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
     <!-- CORNER RADIUS                                                            -->
     <!-- ═══════════════════════════════════════════════════════════════════════ -->
 

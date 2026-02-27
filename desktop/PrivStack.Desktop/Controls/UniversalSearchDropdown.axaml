@@ -21,7 +21,7 @@
                 MaxHeight="400"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top"
-                BoxShadow="0 8 32 0 #40000000"
+                BoxShadow="{DynamicResource ThemeShadowXl}"
                 ClipToBounds="True">
             <Grid RowDefinitions="Auto,Auto,Auto,*">
                 <!-- Plugin filter pill row (visible when a scope filter is active) -->

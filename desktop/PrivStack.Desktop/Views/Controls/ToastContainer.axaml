@@ -65,7 +65,7 @@
                         BorderBrush="{DynamicResource ThemeBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="8"
-                        BoxShadow="0 4 20 0 #40000000"
+                        BoxShadow="{DynamicResource ThemeShadowLg}"
                         ClipToBounds="True"
                         Tag="{Binding TypeClass}">
 
