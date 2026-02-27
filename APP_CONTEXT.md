@@ -62,6 +62,7 @@ System overview and plugin management center.
 - **Reminders**: Aggregates from all `IReminderProvider` plugins into system notifications
 - **Theme Management**: Light/dark themes with custom color palette editor
 - **Speech/Audio**: Recording + Whisper STT for voice input
+- **Local HTTP API**: Opt-in Kestrel server on `127.0.0.1:9720` for programmatic access. Plugins declare routes via `IApiProvider`; the shell hosts the server, handles API key auth (`X-API-Key` / `Bearer`), and routes requests. Shell endpoints: `/api/v1/status` (health, no auth), `/api/v1/routes` (route listing). Enabled via `ApiEnabled` in settings.
 - **Multi-Workspace**: Separate data directories per workspace with independent plugin activation
 - **Backup & Recovery**: Workspace snapshots with restore capability
 - **Master Password**: Encrypted vault for sensitive data (credentials, files)
@@ -87,6 +88,7 @@ Each plugin implements a subset of SDK capability interfaces to participate in c
 | `IVaultConsumer` | Store encrypted credentials in the system vault |
 | `IConnectionConsumer` | Declare required OAuth connections |
 | `IStorageProvider` | Provide file storage operations |
+| `IApiProvider` | Declare local HTTP API routes for programmatic access |
 
 ## Available Plugins
 
