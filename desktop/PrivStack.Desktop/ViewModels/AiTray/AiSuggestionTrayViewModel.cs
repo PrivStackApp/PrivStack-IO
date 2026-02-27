@@ -375,6 +375,7 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
                         if (datasetInfo != null)
                         {
                             _hasEmbeddedDatasets = true;
+                            sb.AppendLine($"Dataset ID: {datasetInfo.Id.Value} (use this in chart block dataset_id)");
                             sb.AppendLine($"Dataset Name: {datasetInfo.Name} (use source:\"{datasetInfo.Name}\" in SQL)");
                             sb.AppendLine($"Total Rows: {datasetInfo.RowCount}");
                             sb.AppendLine("Schema:");
