@@ -14,6 +14,7 @@ using PrivStack.Desktop.Native;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.Biometric;
+using PrivStack.Desktop.Services.Api;
 using PrivStack.Desktop.Services.Connections;
 using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Sdk;
@@ -220,6 +221,7 @@ public partial class SettingsViewModel : ViewModelBase
     private readonly IAuthService _authService;
     private readonly SeedDataService _seedDataService;
     private readonly IBiometricService _biometricService;
+    private readonly ILocalApiServer _apiServer;
     private Avalonia.Threading.DispatcherTimer? _metricsRefreshTimer;
 
     private readonly ISystemNotificationService _notificationService;
@@ -248,7 +250,8 @@ public partial class SettingsViewModel : ViewModelBase
         OAuthLoginService oauthLoginService,
         PrivStackApiClient apiClient,
         IMasterPasswordCache passwordCache,
-        IBiometricService biometricService)
+        IBiometricService biometricService,
+        ILocalApiServer apiServer)
     {
         _settingsService = settingsService;
         _backupService = backupService;
@@ -262,6 +265,7 @@ public partial class SettingsViewModel : ViewModelBase
         _notificationService = notificationService;
         _customThemeStore = customThemeStore;
         _biometricService = biometricService;
+        _apiServer = apiServer;
 
         ThemeEditor = new ThemeEditorViewModel(themeService, customThemeStore, settingsService);
         ThemeEditor.EditorClosed += OnThemeEditorClosed;
@@ -989,6 +993,81 @@ public partial class SettingsViewModel : ViewModelBase
         _settingsService.SaveDebounced();
     }
 
+    // ========================================
+    // Local API settings
+    // ========================================
+
+    [ObservableProperty]
+    private bool _apiEnabled;
+
+    [ObservableProperty]
+    private int _apiPort = 9720;
+
+    [ObservableProperty]
+    private string? _apiKey;
+
+    [ObservableProperty]
+    private string? _apiStatus;
+
+    partial void OnApiEnabledChanged(bool value)
+    {
+        _settingsService.Settings.ApiEnabled = value;
+        _settingsService.Save();
+        _ = ToggleApiServerAsync(value);
+    }
+
+    partial void OnApiPortChanged(int value)
+    {
+        if (value is < 1024 or > 65535) return;
+        _settingsService.Settings.ApiPort = value;
+        _settingsService.Save();
+    }
+
+    private async Task ToggleApiServerAsync(bool enable)
+    {
+        try
+        {
+            if (enable)
+            {
+                await _apiServer.StartAsync();
+                ApiKey = _settingsService.Settings.ApiKey;
+                ApiStatus = $"Running on port {_settingsService.Settings.ApiPort}";
+            }
+            else
+            {
+                await _apiServer.StopAsync();
+                ApiStatus = "Stopped";
+            }
+        }
+        catch (Exception ex)
+        {
+            ApiStatus = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void RegenerateApiKey()
+    {
+        var keyBytes = new byte[32];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(keyBytes);
+        var newKey = Convert.ToBase64String(keyBytes)
+            .Replace("+", "-").Replace("/", "_").TrimEnd('=');
+        _settingsService.Settings.ApiKey = newKey;
+        _settingsService.Save();
+        ApiKey = newKey;
+    }
+
+    [RelayCommand]
+    private async Task CopyApiKeyAsync()
+    {
+        if (string.IsNullOrEmpty(ApiKey)) return;
+        var clipboard = Avalonia.Application.Current?.ApplicationLifetime
+            is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            ? desktop.MainWindow?.Clipboard : null;
+        if (clipboard != null)
+            await clipboard.SetTextAsync(ApiKey);
+    }
+
     [RelayCommand]
     private async Task TestNotificationAsync()
     {
@@ -1470,6 +1549,12 @@ public partial class SettingsViewModel : ViewModelBase
         // Audio input device
         AudioRecorderService.Instance.SelectedDeviceId = settings.AudioInputDevice;
         RefreshAudioDevices();
+
+        // Local API settings
+        ApiEnabled = settings.ApiEnabled;
+        ApiPort = settings.ApiPort;
+        ApiKey = settings.ApiKey;
+        ApiStatus = _apiServer.IsRunning ? $"Running on port {settings.ApiPort}" : "Stopped";
 
         // Emergency Kit status
         LoadEmergencyKitStatus();

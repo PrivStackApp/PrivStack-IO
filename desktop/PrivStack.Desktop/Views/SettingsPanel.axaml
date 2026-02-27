@@ -248,6 +248,19 @@
                         </Grid>
                     </ListBoxItem>
 
+                    <!-- Developer -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Classes="cat-icon-bubble" VerticalAlignment="Center">
+                                <controls:IconControl Icon="Code" Size="12"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="Developer" Classes="cat-label"
+                                       Margin="10,0,0,0" FontSize="{DynamicResource ThemeFontSizeSm}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </ListBoxItem>
+
                     <!-- Enterprise -->
                     <ListBoxItem IsVisible="{Binding IsPolicyActive}">
                         <Grid ColumnDefinitions="Auto,*">
@@ -1951,7 +1964,110 @@
                     </StackPanel>
                 </ScrollViewer>
 
-            <!-- ── 9: Enterprise ──────────────────────────────── -->
+            <!-- ── 9: Developer ────────────────────────────────── -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Developer" Classes="settings-section-title"/>
+                            <TextBlock Text="Local HTTP API for programmatic access" Classes="settings-section-subtitle"/>
+                        </StackPanel>
+
+                        <!-- Enable API -->
+                        <Border Classes="card" Padding="16,14">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="Enable Local API"
+                                               FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Medium"/>
+                                    <TextBlock Text="Start an HTTP server on localhost for scripts and tools to interact with PrivStack"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding ApiEnabled}"
+                                              OnContent="" OffContent=""
+                                              VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- API Details (visible when enabled) -->
+                        <StackPanel Spacing="16" IsVisible="{Binding ApiEnabled}">
+
+                            <!-- Status -->
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border Width="8" Height="8" CornerRadius="4"
+                                        VerticalAlignment="Center"
+                                        Background="{DynamicResource ThemeSuccessBrush}"/>
+                                <TextBlock Text="{Binding ApiStatus}"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                            </StackPanel>
+
+                            <!-- Port -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Port" Classes="field-label"/>
+                                <TextBox Text="{Binding ApiPort}"
+                                         Watermark="9720"
+                                         Padding="12,8"
+                                         MaxWidth="120"
+                                         HorizontalAlignment="Left"/>
+                                <TextBlock Text="Restart the API after changing the port."
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"/>
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}"/>
+
+                            <!-- API Key -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="API Key" Classes="field-label"/>
+                                <TextBlock Text="Include this key in requests as X-API-Key header or Authorization: Bearer token."
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           TextWrapping="Wrap"/>
+                                <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                        CornerRadius="6" Padding="12,8">
+                                    <TextBlock Text="{Binding ApiKey}"
+                                               FontFamily="Consolas, Menlo, monospace"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               TextWrapping="Wrap"
+                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                </Border>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Command="{Binding CopyApiKeyCommand}"
+                                            Padding="14,8" CornerRadius="8">
+                                        <TextBlock Text="Copy Key" FontWeight="Medium"/>
+                                    </Button>
+                                    <Button Command="{Binding RegenerateApiKeyCommand}"
+                                            Padding="14,8" CornerRadius="8"
+                                            Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                            Foreground="{DynamicResource ThemeTextSecondaryBrush}">
+                                        <TextBlock Text="Regenerate" FontWeight="Medium"/>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource ThemeBorderSubtleBrush}"/>
+
+                            <!-- Usage example -->
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Quick Test" Classes="field-label"/>
+                                <Border Background="{DynamicResource ThemeSurfaceElevatedBrush}"
+                                        CornerRadius="6" Padding="12,8">
+                                    <TextBlock FontFamily="Consolas, Menlo, monospace"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                               TextWrapping="Wrap">
+                                        <Run Text="curl http://127.0.0.1:9720/api/v1/status"/>
+                                    </TextBlock>
+                                </Border>
+                            </StackPanel>
+
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+            <!-- ── 10: Enterprise ──────────────────────────────── -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
                         <StackPanel Spacing="4">
@@ -1975,7 +2091,7 @@
                     </StackPanel>
                 </ScrollViewer>
 
-            <!-- ── 10: About ──────────────────────────────────── -->
+            <!-- ── 11: About ──────────────────────────────────── -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
                         <StackPanel Spacing="4">
@@ -2024,7 +2140,7 @@
                     </StackPanel>
                 </ScrollViewer>
 
-            <!-- ── 11: Danger Zone ────────────────────────────── -->
+            <!-- ── 12: Danger Zone ────────────────────────────── -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Spacing="24" Margin="32,28,32,40" MaxWidth="520">
                         <StackPanel Spacing="4">
