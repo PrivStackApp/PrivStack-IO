@@ -64,6 +64,12 @@ public sealed record AiResponse
     public int TokensUsed { get; init; }
     public TimeSpan Duration { get; init; }
 
+    /// <summary>
+    /// True when the response was truncated because the model hit the max_tokens limit.
+    /// Consumers can use this to retry with a higher limit or warn the user.
+    /// </summary>
+    public bool WasTruncated { get; init; }
+
     public static AiResponse Failure(string error) => new()
     {
         Success = false,

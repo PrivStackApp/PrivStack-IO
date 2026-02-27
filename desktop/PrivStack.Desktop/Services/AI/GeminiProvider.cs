@@ -107,19 +107,26 @@ internal sealed class GeminiProvider : AiProviderBase
             content = textProp.GetString();
         }
 
-        // Check for finish reason indicating blocked content
+        // Gemini: finishReason is "STOP" for normal, "MAX_TOKENS" when truncated
+        var geminiFinishReason = candidate.TryGetProperty("finishReason", out var finishReason)
+            ? finishReason.GetString() : null;
+
+        // Check for finish reason indicating blocked content (not truncation)
         if (string.IsNullOrEmpty(content)
-            && candidate.TryGetProperty("finishReason", out var finishReason)
-            && finishReason.GetString() != "STOP")
+            && geminiFinishReason != null && geminiFinishReason != "STOP")
         {
             return new AiResponse
             {
                 Success = false,
-                ErrorMessage = $"Generation stopped: {finishReason.GetString()}",
+                ErrorMessage = $"Generation stopped: {geminiFinishReason}",
                 ProviderUsed = Id,
                 ModelUsed = model,
             };
         }
+
+        var wasTruncated = geminiFinishReason == "MAX_TOKENS";
+        if (wasTruncated)
+            Log.Warning("Gemini response truncated (finishReason=MAX_TOKENS, limit={MaxTokens})", request.MaxTokens);
 
         var tokensUsed = root.TryGetProperty("usageMetadata", out var usage)
             && usage.TryGetProperty("totalTokenCount", out var tokenCount)
@@ -129,6 +136,7 @@ internal sealed class GeminiProvider : AiProviderBase
         {
             Success = !string.IsNullOrEmpty(content),
             Content = content,
+            WasTruncated = wasTruncated,
             ErrorMessage = string.IsNullOrEmpty(content) ? "Empty response" : null,
             ProviderUsed = Id,
             ModelUsed = model,

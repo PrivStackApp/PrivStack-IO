@@ -110,10 +110,18 @@ internal sealed class AnthropicProvider : AiProviderBase
             ? usage.GetProperty("input_tokens").GetInt32() + usage.GetProperty("output_tokens").GetInt32()
             : 0;
 
+        // Anthropic: stop_reason is "end_turn" for normal, "max_tokens" when truncated
+        var stopReason = root.TryGetProperty("stop_reason", out var sr) ? sr.GetString() : null;
+        var wasTruncated = stopReason == "max_tokens";
+
+        if (wasTruncated)
+            Log.Warning("Anthropic response truncated (stop_reason=max_tokens, limit={MaxTokens})", request.MaxTokens);
+
         return new AiResponse
         {
             Success = true,
             Content = textContent,
+            WasTruncated = wasTruncated,
             ProviderUsed = Id,
             ModelUsed = model,
             TokensUsed = tokensUsed

@@ -71,10 +71,15 @@ internal sealed class OpenAiProvider : AiProviderBase
         using var doc = await PostJsonAsync(ApiUrl, payload, headers, ct);
         var root = doc.RootElement;
 
-        var content = root.GetProperty("choices")[0]
-            .GetProperty("message")
-            .GetProperty("content")
-            .GetString();
+        var choice = root.GetProperty("choices")[0];
+        var content = choice.GetProperty("message").GetProperty("content").GetString();
+
+        // OpenAI: finish_reason is "stop" for normal, "length" when truncated
+        var finishReason = choice.TryGetProperty("finish_reason", out var fr) ? fr.GetString() : null;
+        var wasTruncated = finishReason == "length";
+
+        if (wasTruncated)
+            Log.Warning("OpenAI response truncated (finish_reason=length, limit={MaxTokens})", request.MaxTokens);
 
         var tokensUsed = root.TryGetProperty("usage", out var usage)
             ? usage.GetProperty("total_tokens").GetInt32() : 0;
@@ -83,6 +88,7 @@ internal sealed class OpenAiProvider : AiProviderBase
         {
             Success = true,
             Content = content,
+            WasTruncated = wasTruncated,
             ProviderUsed = Id,
             ModelUsed = model,
             TokensUsed = tokensUsed
