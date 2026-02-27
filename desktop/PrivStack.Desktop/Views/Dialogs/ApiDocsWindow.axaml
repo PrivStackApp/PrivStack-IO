@@ -161,10 +161,15 @@ curl -H "X-API-Key: YOUR_KEY" \
 
                     <!-- Dynamic plugin endpoints -->
                     <ItemsControl x:Name="PluginSections">
+                        <ItemsControl.ItemContainerTheme>
+                            <ControlTheme TargetType="ContentPresenter">
+                                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                            </ControlTheme>
+                        </ItemsControl.ItemContainerTheme>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="dialogs:ApiPluginSection">
                                 <StackPanel Spacing="4" Margin="0,8,0,0">
-                                    <Expander IsExpanded="True">
+                                    <Expander IsExpanded="True" HorizontalAlignment="Stretch">
                                         <Expander.Header>
                                             <TextBlock Text="{Binding Header}" FontWeight="Medium"
                                                        FontSize="{DynamicResource ThemeFontSizeSmMd}"
