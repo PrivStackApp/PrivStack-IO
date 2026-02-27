@@ -34,7 +34,7 @@
         </StackPanel>
 
         <!-- Scrollable Content -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="28,20,28,0">
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="28,20,28,0">
             <StackPanel Spacing="24">
 
                 <!-- Overview -->
