@@ -267,8 +267,10 @@ public sealed class PluginInstallService : IPluginInstallService
     {
         try
         {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
             using var request = new HttpRequestMessage(HttpMethod.Get, $"{PrivStackApiClient.ApiBaseUrl}/api/health");
-            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
             return response.IsSuccessStatusCode;
         }
         catch

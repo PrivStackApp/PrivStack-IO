@@ -238,127 +238,16 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
 
         try
         {
-            // 1. Always populate locally installed plugins first — this never fails
-            var installedVersions = _installService.GetInstalledVersions();
+            // 1. Populate from local sources immediately (no network, no blocking)
+            PopulateLocalPlugins();
+            IsLoading = false;
 
-            // 2. Try to fetch remote plugin registry (non-fatal on failure)
-            var online = false;
-            try
-            {
-                online = await _installService.IsOnlineAsync();
-                IsOffline = !online;
-
-                if (online)
-                {
-                    _serverPlugins = (await _installService.GetAvailablePluginsAsync()).ToList();
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.Warning(ex, "Failed to fetch plugin registry — showing local plugins only");
-                IsOffline = true;
-                StatusMessage = "Plugin registry unavailable — showing installed plugins only.";
-            }
-
-            // 3. Build the plugin list from server + local data
-            AllPlugins.Clear();
-
-            foreach (var sp in _serverPlugins)
-            {
-                var installed = installedVersions.TryGetValue(sp.PluginId, out var localVersion);
-                var hasUpdate = installed
-                    && Version.TryParse(sp.Version, out var serverVer)
-                    && localVersion < serverVer;
-
-                AllPlugins.Add(new DashboardPluginItem
-                {
-                    Id = sp.PluginId,
-                    Name = sp.Name,
-                    Description = sp.Description,
-                    Tagline = sp.Tagline,
-                    Author = sp.Author,
-                    LatestVersion = sp.Version,
-                    InstalledVersion = localVersion?.ToString(),
-                    Category = sp.Category,
-                    Icon = sp.Icon ?? "Package",
-                    IsInstalled = installed,
-                    HasUpdate = hasUpdate,
-                    TrustTier = "Official",
-                    PackageSizeBytes = sp.PackageSizeBytes,
-                    ReleaseStage = sp.ReleaseStage ?? "release"
-                });
-            }
-
-            foreach (var (pluginId, version) in installedVersions)
-            {
-                if (_serverPlugins.Any(s => s.PluginId.Equals(pluginId, StringComparison.OrdinalIgnoreCase)))
-                    continue;
-
-                AllPlugins.Add(new DashboardPluginItem
-                {
-                    Id = pluginId,
-                    Name = pluginId.Replace("privstack.", "").Replace(".", " "),
-                    Description = "Installed locally",
-                    InstalledVersion = version.ToString(),
-                    LatestVersion = version.ToString(),
-                    IsInstalled = true,
-                    TrustTier = "Official"
-                });
-            }
-
-            // 3b. Add any loaded plugins not already covered by server or manifest data
-            //     (e.g. dev-loaded plugins via project references without marketplace manifests)
-            var existingIds = new HashSet<string>(
-                AllPlugins.Select(p => p.Id), StringComparer.OrdinalIgnoreCase);
-
-            foreach (var plugin in _pluginRegistry.Plugins)
-            {
-                if (existingIds.Contains(plugin.Metadata.Id))
-                    continue;
-
-                AllPlugins.Add(new DashboardPluginItem
-                {
-                    Id = plugin.Metadata.Id,
-                    Name = plugin.Metadata.Name,
-                    Description = plugin.Metadata.Description,
-                    Author = plugin.Metadata.Author,
-                    InstalledVersion = plugin.Metadata.Version.ToString(),
-                    LatestVersion = plugin.Metadata.Version.ToString(),
-                    Category = plugin.Metadata.Category.ToString(),
-                    Icon = plugin.Metadata.Icon ?? "Package",
-                    IsInstalled = true,
-                    TrustTier = "Official",
-                    ReleaseStage = plugin.Metadata.ReleaseStage.ToString().ToLowerInvariant()
-                });
-            }
-
-            // 4. Populate workspace activation state on each plugin item
-            foreach (var item in AllPlugins)
-            {
-                var plugin = _pluginRegistry.GetPlugin(item.Id);
-                if (plugin != null && !plugin.Metadata.IsHardLocked && plugin.Metadata.CanDisable)
-                {
-                    item.CanToggle = true;
-                    item.IsActivated = _pluginRegistry.IsPluginEnabled(item.Id);
-                }
-                else if (plugin != null)
-                {
-                    item.CanToggle = false;
-                    item.IsActivated = true;
-                }
-            }
-
-            NotifyCountsChanged();
-
-            if (IsOffline && AllPlugins.Count == 0)
-            {
-                StatusMessage = "No connection to plugin registry. Install plugins when you're back online.";
-            }
-
-            // 5. System metrics always load — independent of remote registry
+            // 2. Load system metrics (local-only, fast)
             await LoadSystemMetricsAsync();
-
             HasLoadedOnce = true;
+
+            // 3. Try to enrich with remote plugin registry data (non-fatal)
+            await TryFetchRemoteRegistryAsync();
         }
         catch (Exception ex)
         {
@@ -368,6 +257,131 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Populates AllPlugins from local sources: filesystem manifests + loaded plugin registry.
+    /// No network calls — always fast.
+    /// </summary>
+    private void PopulateLocalPlugins()
+    {
+        var installedVersions = _installService.GetInstalledVersions();
+
+        AllPlugins.Clear();
+
+        // Add plugins from server cache (if we fetched previously)
+        foreach (var sp in _serverPlugins)
+        {
+            var installed = installedVersions.TryGetValue(sp.PluginId, out var localVersion);
+            var hasUpdate = installed
+                && Version.TryParse(sp.Version, out var serverVer)
+                && localVersion < serverVer;
+
+            AllPlugins.Add(new DashboardPluginItem
+            {
+                Id = sp.PluginId,
+                Name = sp.Name,
+                Description = sp.Description,
+                Tagline = sp.Tagline,
+                Author = sp.Author,
+                LatestVersion = sp.Version,
+                InstalledVersion = localVersion?.ToString(),
+                Category = sp.Category,
+                Icon = sp.Icon ?? "Package",
+                IsInstalled = installed,
+                HasUpdate = hasUpdate,
+                TrustTier = "Official",
+                PackageSizeBytes = sp.PackageSizeBytes,
+                ReleaseStage = sp.ReleaseStage ?? "release"
+            });
+        }
+
+        // Add manifest-based installs not covered by server data
+        foreach (var (pluginId, version) in installedVersions)
+        {
+            if (_serverPlugins.Any(s => s.PluginId.Equals(pluginId, StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            AllPlugins.Add(new DashboardPluginItem
+            {
+                Id = pluginId,
+                Name = pluginId.Replace("privstack.", "").Replace(".", " "),
+                Description = "Installed locally",
+                InstalledVersion = version.ToString(),
+                LatestVersion = version.ToString(),
+                IsInstalled = true,
+                TrustTier = "Official"
+            });
+        }
+
+        // Add any loaded plugins not covered by server or manifest data
+        // (dev-loaded via project references, or bundled without marketplace manifests)
+        var existingIds = new HashSet<string>(
+            AllPlugins.Select(p => p.Id), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var plugin in _pluginRegistry.Plugins)
+        {
+            if (existingIds.Contains(plugin.Metadata.Id))
+                continue;
+
+            AllPlugins.Add(new DashboardPluginItem
+            {
+                Id = plugin.Metadata.Id,
+                Name = plugin.Metadata.Name,
+                Description = plugin.Metadata.Description,
+                Author = plugin.Metadata.Author,
+                InstalledVersion = plugin.Metadata.Version.ToString(),
+                LatestVersion = plugin.Metadata.Version.ToString(),
+                Category = plugin.Metadata.Category.ToString(),
+                Icon = plugin.Metadata.Icon ?? "Package",
+                IsInstalled = true,
+                TrustTier = "Official",
+                ReleaseStage = plugin.Metadata.ReleaseStage.ToString().ToLowerInvariant()
+            });
+        }
+
+        // Set workspace activation state
+        foreach (var item in AllPlugins)
+        {
+            var plugin = _pluginRegistry.GetPlugin(item.Id);
+            if (plugin != null && !plugin.Metadata.IsHardLocked && plugin.Metadata.CanDisable)
+            {
+                item.CanToggle = true;
+                item.IsActivated = _pluginRegistry.IsPluginEnabled(item.Id);
+            }
+            else if (plugin != null)
+            {
+                item.CanToggle = false;
+                item.IsActivated = true;
+            }
+        }
+
+        NotifyCountsChanged();
+    }
+
+    /// <summary>
+    /// Attempts to fetch the remote plugin registry and merge server data.
+    /// Non-fatal — dashboard works fine without it.
+    /// </summary>
+    private async Task TryFetchRemoteRegistryAsync()
+    {
+        try
+        {
+            var online = await _installService.IsOnlineAsync();
+            IsOffline = !online;
+
+            if (!online) return;
+
+            _serverPlugins = (await _installService.GetAvailablePluginsAsync()).ToList();
+
+            // Re-populate with enriched server data
+            PopulateLocalPlugins();
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Failed to fetch plugin registry — local plugins already shown");
+            IsOffline = true;
         }
     }
 
