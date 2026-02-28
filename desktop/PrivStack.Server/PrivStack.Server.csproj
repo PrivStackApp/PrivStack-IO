@@ -23,4 +23,21 @@
     <PackageReference Include="Tomlyn" Version="0.17.0" />
   </ItemGroup>
 
+  <!-- Native Rust FFI library — same source as Desktop -->
+  <PropertyGroup>
+    <RustLibraryPath>..\..\core\target\release</RustLibraryPath>
+  </PropertyGroup>
+
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+    <None Include="$(RustLibraryPath)\libprivstack_ffi.dylib" CopyToOutputDirectory="PreserveNewest" Link="libprivstack_ffi.dylib" Condition="Exists('$(RustLibraryPath)\libprivstack_ffi.dylib')" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <None Include="$(RustLibraryPath)\privstack_ffi.dll" CopyToOutputDirectory="PreserveNewest" Link="privstack_ffi.dll" Condition="Exists('$(RustLibraryPath)\privstack_ffi.dll')" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+    <None Include="$(RustLibraryPath)\libprivstack_ffi.so" CopyToOutputDirectory="PreserveNewest" Link="libprivstack_ffi.so" Condition="Exists('$(RustLibraryPath)\libprivstack_ffi.so')" />
+  </ItemGroup>
+
 </Project>
