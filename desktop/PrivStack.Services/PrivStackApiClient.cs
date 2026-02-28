@@ -16,7 +16,7 @@ public sealed class PrivStackApiClient
 
     private static readonly HttpClient Http = new()
     {
-        Timeout = TimeSpan.FromSeconds(15)
+        Timeout = TimeSpan.FromSeconds(30)
     };
 
     private static readonly JsonSerializerOptions JsonOptions = new()

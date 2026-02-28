@@ -238,16 +238,29 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
 
         try
         {
-            var online = await _installService.IsOnlineAsync();
-            IsOffline = !online;
-
-            if (online)
-            {
-                _serverPlugins = (await _installService.GetAvailablePluginsAsync()).ToList();
-            }
-
+            // 1. Always populate locally installed plugins first — this never fails
             var installedVersions = _installService.GetInstalledVersions();
 
+            // 2. Try to fetch remote plugin registry (non-fatal on failure)
+            var online = false;
+            try
+            {
+                online = await _installService.IsOnlineAsync();
+                IsOffline = !online;
+
+                if (online)
+                {
+                    _serverPlugins = (await _installService.GetAvailablePluginsAsync()).ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Warning(ex, "Failed to fetch plugin registry — showing local plugins only");
+                IsOffline = true;
+                StatusMessage = "Plugin registry unavailable — showing installed plugins only.";
+            }
+
+            // 3. Build the plugin list from server + local data
             AllPlugins.Clear();
 
             foreach (var sp in _serverPlugins)
@@ -293,7 +306,7 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
                 });
             }
 
-            // Populate workspace activation state on each plugin item
+            // 4. Populate workspace activation state on each plugin item
             foreach (var item in AllPlugins)
             {
                 var plugin = _pluginRegistry.GetPlugin(item.Id);
@@ -316,15 +329,15 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
                 StatusMessage = "No connection to plugin registry. Install plugins when you're back online.";
             }
 
+            // 5. System metrics always load — independent of remote registry
             await LoadSystemMetricsAsync();
 
             HasLoadedOnce = true;
         }
         catch (Exception ex)
         {
-            _log.Error(ex, "Failed to refresh Dashboard plugin list");
-            StatusMessage = $"Failed to load plugins: {ex.Message}";
-            IsOffline = true;
+            _log.Error(ex, "Failed to refresh Dashboard");
+            StatusMessage = $"Failed to load dashboard: {ex.Message}";
         }
         finally
         {
