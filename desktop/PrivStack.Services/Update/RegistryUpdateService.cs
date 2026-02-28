@@ -15,8 +15,24 @@ public sealed class RegistryUpdateService : IUpdateService
 
     private static readonly HttpClient Http = new(new System.Net.Http.SocketsHttpHandler
     {
+        ConnectCallback = async (context, ct) =>
+        {
+            var socket = new System.Net.Sockets.Socket(
+                System.Net.Sockets.AddressFamily.InterNetwork,
+                System.Net.Sockets.SocketType.Stream,
+                System.Net.Sockets.ProtocolType.Tcp);
+            try
+            {
+                await socket.ConnectAsync(context.DnsEndPoint, ct);
+                return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
+            }
+            catch
+            {
+                socket.Dispose();
+                throw;
+            }
+        },
         PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-        ConnectTimeout = TimeSpan.FromSeconds(10),
     })
     {
         Timeout = TimeSpan.FromMinutes(10)

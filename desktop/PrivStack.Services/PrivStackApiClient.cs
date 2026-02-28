@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -17,11 +18,26 @@ public sealed class PrivStackApiClient
 
     private static readonly HttpClient Http = new(new SocketsHttpHandler
     {
+        ConnectCallback = async (context, ct) =>
+        {
+            // Force IPv4 — privstack.io has an AAAA record but many networks
+            // have broken IPv6 connectivity, causing 30s+ connection hangs.
+            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            try
+            {
+                await socket.ConnectAsync(context.DnsEndPoint, ct);
+                return new NetworkStream(socket, ownsSocket: true);
+            }
+            catch
+            {
+                socket.Dispose();
+                throw;
+            }
+        },
         PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-        ConnectTimeout = TimeSpan.FromSeconds(10),
     })
     {
-        Timeout = TimeSpan.FromSeconds(30)
+        Timeout = TimeSpan.FromSeconds(15)
     };
 
     private static readonly JsonSerializerOptions JsonOptions = new()

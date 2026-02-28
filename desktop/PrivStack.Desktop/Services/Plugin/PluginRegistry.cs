@@ -58,6 +58,13 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
     /// </summary>
     private List<Type>? _cachedPluginTypes;
 
+    /// <summary>
+    /// Directories for plugins that were skipped during discovery because they
+    /// were disabled. Keyed by expected plugin ID (derived from directory name).
+    /// Used by <see cref="EnablePlugin"/> to load assemblies on demand.
+    /// </summary>
+    private readonly Dictionary<string, string> _deferredPluginDirs = new(StringComparer.OrdinalIgnoreCase);
+
     private PluginHostFactory HostFactory => _hostFactory ??= new PluginHostFactory();
 
     public PluginRegistry()
@@ -395,6 +402,7 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
         _pluginById.Clear();
         _pluginByNavId.Clear();
         _navigationItems.Clear();
+        _deferredPluginDirs.Clear();
         _hostFactory = null;
 
         // Rediscover with fresh workspace settings
@@ -441,6 +449,7 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
         _plugins.Clear();
         _pluginById.Clear();
         _pluginByNavId.Clear();
+        _deferredPluginDirs.Clear();
 
         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => _navigationItems.Clear());
 
@@ -510,7 +519,9 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
     public bool IsPluginEnabled(string pluginId)
     {
         var plugin = GetPlugin(pluginId);
-        if (plugin == null) return false;
+        // Deferred plugins are known but disabled (assembly not loaded)
+        if (plugin == null)
+            return false;
 
         // Core shell plugins are always enabled
         if (!plugin.Metadata.CanDisable || plugin.Metadata.IsHardLocked)
@@ -531,6 +542,26 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
         ThrowIfDisposed();
 
         var plugin = GetPlugin(pluginId);
+
+        // Plugin was deferred (assembly not loaded) — load on demand
+        if (plugin == null && _deferredPluginDirs.TryGetValue(pluginId, out var deferredDir))
+        {
+            _log.Information("Loading deferred plugin assembly for: {PluginId}", pluginId);
+
+            // Update config first so the plugin is no longer disabled
+            var settingsService2 = App.Services.GetRequiredService<IAppSettingsService>();
+            var wsConfig2 = settingsService2.GetWorkspacePluginConfig();
+            if (wsConfig2.IsWhitelistMode)
+                wsConfig2.EnabledPlugins!.Add(pluginId);
+            else
+                wsConfig2.DisabledPlugins.Remove(pluginId);
+            settingsService2.Save();
+
+            _deferredPluginDirs.Remove(pluginId);
+            _ = LoadPluginFromDirectoryAsync(deferredDir);
+            return true;
+        }
+
         if (plugin == null)
         {
             _log.Warning("Cannot enable unknown plugin: {PluginId}", pluginId);
@@ -873,6 +904,10 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
         var pluginTypes = new List<Type>();
         var pending = new List<PendingWasmPlugin>();
 
+        // Build set of disabled plugin IDs so we can skip loading their assemblies entirely
+        var wsConfig = App.Services.GetRequiredService<IAppSettingsService>().GetWorkspacePluginConfig();
+        var experimentalEnabled = App.Services.GetRequiredService<IAppSettingsService>().Settings.ExperimentalPluginsEnabled;
+
         var pluginDirs = GetPluginDirectories();
         foreach (var pluginDir in pluginDirs)
         {
@@ -897,6 +932,22 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
             {
                 try
                 {
+                    // Derive expected plugin ID from directory name to check disabled state
+                    // before loading the assembly (avoids mapping DLLs into memory for disabled plugins)
+                    var expectedId = DerivePluginIdFromDirectory(dir);
+                    if (expectedId != null && IsPluginDisabledByConfig(wsConfig, expectedId))
+                    {
+                        // Check if this directory has C# plugin DLLs before recording it
+                        var hasDlls = Directory.GetFiles(dir, "PrivStack.Plugin.*.dll").Length > 0;
+                        if (hasDlls)
+                        {
+                            _deferredPluginDirs.TryAdd(expectedId, dir);
+                            _log.Debug("Deferring assembly load for disabled plugin: {PluginId} ({Dir})",
+                                expectedId, Path.GetFileName(dir));
+                            continue;
+                        }
+                    }
+
                     // C# assembly plugins: look for DLLs matching PrivStack.Plugin.*.dll
                     var nativePluginTypes = ScanAssemblyPlugins(dir);
                     if (nativePluginTypes.Count > 0)
@@ -923,7 +974,26 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
             BatchLoadWasmPlugins(pending);
         }
 
+        _log.Information("Plugin discovery: {Loaded} types loaded, {Deferred} deferred (disabled)",
+            pluginTypes.Count, _deferredPluginDirs.Count);
+
         return pluginTypes;
+    }
+
+    /// <summary>
+    /// Derives an expected plugin ID from a plugin directory name.
+    /// Convention: "PrivStack.Plugin.Calendar" → "privstack.calendar",
+    ///             "privstack.calendar" → "privstack.calendar".
+    /// Returns null if the directory doesn't match expected naming patterns.
+    /// </summary>
+    private static string? DerivePluginIdFromDirectory(string dir)
+    {
+        var dirName = Path.GetFileName(dir).ToLowerInvariant();
+        if (dirName.StartsWith("privstack.plugin."))
+            return "privstack." + dirName["privstack.plugin.".Length..];
+        if (dirName.StartsWith("privstack."))
+            return dirName;
+        return null;
     }
 
     /// <summary>
