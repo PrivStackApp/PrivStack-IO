@@ -316,6 +316,31 @@ public sealed class PrivStackApiClient
     }
 
     /// <summary>
+    /// Deletes a cloud workspace by workspace ID.
+    /// Returns true on success, false if not found.
+    /// </summary>
+    public async Task<bool> DeleteCloudWorkspaceAsync(
+        string accessToken, string workspaceId, CancellationToken ct = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"{ApiBaseUrl}/api/cloud/workspaces/{workspaceId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        using var response = await Http.SendAsync(request, ct);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return false;
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(ct);
+            var error = TryParseError(body);
+            throw new PrivStackApiException(error ?? $"Delete workspace failed (HTTP {(int)response.StatusCode})");
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Lists cloud workspaces for the authenticated user (direct HTTP — no FFI required).
     /// Returns an empty list on HTTP error (user may not have cloud access).
     /// </summary>

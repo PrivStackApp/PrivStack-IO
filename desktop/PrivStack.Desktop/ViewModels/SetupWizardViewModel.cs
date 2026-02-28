@@ -985,6 +985,35 @@ public partial class SetupWizardViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task DeleteCloudWorkspaceAsync(CloudWorkspaceInfo workspace)
+    {
+        var accessToken = _appSettings.Settings.CloudSyncAccessToken;
+        if (string.IsNullOrEmpty(accessToken))
+            return;
+
+        try
+        {
+            var deleted = await _apiClient.DeleteCloudWorkspaceAsync(accessToken, workspace.WorkspaceId);
+            if (!deleted)
+                return;
+
+            CloudWorkspaces.Remove(workspace);
+            OnPropertyChanged(nameof(HasCloudWorkspaces));
+
+            if (SelectedCloudWorkspace?.WorkspaceId == workspace.WorkspaceId)
+            {
+                SelectedCloudWorkspace = null;
+                IsCreateNewCloudWorkspace = true;
+                OnPropertyChanged(nameof(CanGoNext));
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to delete cloud workspace {WorkspaceId}", workspace.WorkspaceId);
+        }
+    }
+
+    [RelayCommand]
     private void SelectDirectoryType(DataDirectoryType type)
     {
         SelectedDirectoryType = type;
