@@ -11,7 +11,7 @@ namespace PrivStack.Services.Update;
 /// </summary>
 public sealed class RegistryUpdateService : IUpdateService
 {
-    private static readonly ILogger Logger = Log.ForContext<RegistryUpdateService>();
+    private static ILogger Logger => Log.ForContext<RegistryUpdateService>();
 
     private static readonly HttpClient Http = new()
     {

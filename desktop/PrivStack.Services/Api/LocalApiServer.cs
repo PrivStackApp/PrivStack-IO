@@ -254,7 +254,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
                 return Results.Json(new { success = false, error_code = "ffi_error", error_message = "Execute returned null" }, statusCode: 500);
             }
 
-            _log.Debug("[SDK] execute {Action} {EntityType} → {Len}B ({Elapsed}ms)", action, entityType, result.Length, sw.ElapsedMilliseconds);
+            _log.Information("[SDK] execute {Action} {EntityType} → {Len}B ({Elapsed}ms)", action, entityType, result.Length, sw.ElapsedMilliseconds);
             return Results.Text(result, "application/json");
         });
 
@@ -268,7 +268,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             var result = transport.Search(body);
             sw.Stop();
 
-            _log.Debug("[SDK] search → {Len}B ({Elapsed}ms)", result?.Length ?? 0, sw.ElapsedMilliseconds);
+            _log.Information("[SDK] search → {Len}B ({Elapsed}ms)", result?.Length ?? 0, sw.ElapsedMilliseconds);
             return result != null
                 ? Results.Text(result, "application/json")
                 : Results.Json(new { success = false, error_code = "ffi_error", error_message = "Search returned null" }, statusCode: 500);
@@ -293,7 +293,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
 
         apiGroup.MapGet("/sdk/db/diagnostics", () =>
         {
-            _log.Debug("[SDK] db/diagnostics");
+            _log.Information("[SDK] db/diagnostics");
             var result = transport.DbDiagnostics();
             return Results.Text(result ?? "{}", "application/json");
         });
@@ -303,14 +303,14 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var result = transport.DbMaintenance();
             sw.Stop();
-            _log.Debug("[SDK] db/maintenance → {Result} ({Elapsed}ms)", result, sw.ElapsedMilliseconds);
+            _log.Information("[SDK] db/maintenance → {Result} ({Elapsed}ms)", result, sw.ElapsedMilliseconds);
             return Results.Json(new { error_code = (int)result });
         });
 
         apiGroup.MapPost("/sdk/db/find-orphans", async (HttpContext ctx) =>
         {
             var body = await ReadBodyAsync(ctx) ?? "[]";
-            _log.Debug("[SDK] db/find-orphans");
+            _log.Information("[SDK] db/find-orphans");
             var result = transport.FindOrphanEntities(body);
             return Results.Text(result ?? "[]", "application/json");
         });
@@ -318,14 +318,14 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
         apiGroup.MapPost("/sdk/db/delete-orphans", async (HttpContext ctx) =>
         {
             var body = await ReadBodyAsync(ctx) ?? "[]";
-            _log.Debug("[SDK] db/delete-orphans");
+            _log.Information("[SDK] db/delete-orphans");
             var result = transport.DeleteOrphanEntities(body);
             return Results.Text(result ?? "{\"deleted\":0}", "application/json");
         });
 
         apiGroup.MapPost("/sdk/db/compact", () =>
         {
-            _log.Debug("[SDK] db/compact");
+            _log.Information("[SDK] db/compact");
             var result = transport.CompactDatabases();
             return Results.Text(result ?? "{}", "application/json");
         });
@@ -337,7 +337,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             var body = await ReadJsonAsync(ctx);
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
-            _log.Debug("[SDK] vault/is-initialized {VaultId}", vaultId);
+            _log.Information("[SDK] vault/is-initialized {VaultId}", vaultId);
             return Results.Json(new { result = transport.VaultIsInitialized(vaultId) });
         });
 
@@ -368,7 +368,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             var body = await ReadJsonAsync(ctx);
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
-            _log.Debug("[SDK] vault/lock {VaultId}", vaultId);
+            _log.Information("[SDK] vault/lock {VaultId}", vaultId);
             transport.VaultLock(vaultId);
             return Results.Json(new { error_code = 0 });
         });
@@ -378,7 +378,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             var body = await ReadJsonAsync(ctx);
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
-            _log.Debug("[SDK] vault/is-unlocked {VaultId}", vaultId);
+            _log.Information("[SDK] vault/is-unlocked {VaultId}", vaultId);
             return Results.Json(new { result = transport.VaultIsUnlocked(vaultId) });
         });
 
@@ -390,7 +390,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
             var dataB64 = body.RootElement.GetProperty("data").GetString()!;
             var data = Convert.FromBase64String(dataB64);
-            _log.Debug("[SDK] vault/blob-store {VaultId}/{BlobId} ({Size}B)", vaultId, blobId, data.Length);
+            _log.Information("[SDK] vault/blob-store {VaultId}/{BlobId} ({Size}B)", vaultId, blobId, data.Length);
             var result = transport.VaultBlobStore(vaultId, blobId, data);
             return Results.Json(new { error_code = (int)result });
         });
@@ -401,7 +401,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
             var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
-            _log.Debug("[SDK] vault/blob-read {VaultId}/{BlobId}", vaultId, blobId);
+            _log.Information("[SDK] vault/blob-read {VaultId}/{BlobId}", vaultId, blobId);
             var (data, result) = transport.VaultBlobRead(vaultId, blobId);
             return Results.Json(new { error_code = (int)result, data = Convert.ToBase64String(data) });
         });
@@ -412,7 +412,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
             var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
-            _log.Debug("[SDK] vault/blob-delete {VaultId}/{BlobId}", vaultId, blobId);
+            _log.Information("[SDK] vault/blob-delete {VaultId}/{BlobId}", vaultId, blobId);
             var result = transport.VaultBlobDelete(vaultId, blobId);
             return Results.Json(new { error_code = (int)result });
         });
@@ -430,7 +430,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             string? metadataJson = null;
             if (body.RootElement.TryGetProperty("metadata", out var metaProp) && metaProp.ValueKind == JsonValueKind.String)
                 metadataJson = metaProp.GetString();
-            _log.Debug("[SDK] blob/store {Ns}/{BlobId} ({Size}B)", ns, blobId, data.Length);
+            _log.Information("[SDK] blob/store {Ns}/{BlobId} ({Size}B)", ns, blobId, data.Length);
             var result = transport.BlobStore(ns, blobId, data, metadataJson);
             return Results.Json(new { error_code = (int)result });
         });
@@ -441,7 +441,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var ns = body.RootElement.GetProperty("ns").GetString()!;
             var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
-            _log.Debug("[SDK] blob/read {Ns}/{BlobId}", ns, blobId);
+            _log.Information("[SDK] blob/read {Ns}/{BlobId}", ns, blobId);
             var (data, result) = transport.BlobRead(ns, blobId);
             return Results.Json(new { error_code = (int)result, data = Convert.ToBase64String(data) });
         });
@@ -452,7 +452,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var ns = body.RootElement.GetProperty("ns").GetString()!;
             var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
-            _log.Debug("[SDK] blob/delete {Ns}/{BlobId}", ns, blobId);
+            _log.Information("[SDK] blob/delete {Ns}/{BlobId}", ns, blobId);
             var result = transport.BlobDelete(ns, blobId);
             return Results.Json(new { error_code = (int)result });
         });
