@@ -78,6 +78,47 @@ internal static class HeadlessHost
             ConsoleUi.WriteSuccess("TLS configuration saved. Restart the server to apply.");
             return ExitSuccess;
         }
+        else if (options.SetupPolicy)
+        {
+            // Re-configure enterprise policy only
+            ConsoleUi.WriteSection("Enterprise Policy");
+            var existingConfig = HeadlessConfig.Load();
+            var policyPath = ConsoleUi.ReadLine("  Policy file path (.toml)", existingConfig.PolicyPath ?? "");
+            existingConfig.PolicyPath = string.IsNullOrEmpty(policyPath) ? null : policyPath;
+            existingConfig.Save();
+
+            if (!string.IsNullOrEmpty(policyPath) && File.Exists(policyPath))
+            {
+                try
+                {
+                    var policy = EnterprisePolicy.LoadFromFile(policyPath);
+                    ConsoleUi.WriteSuccess($"Policy loaded and validated: {policyPath}");
+                    if (policy!.Plugins.Mode != "disabled")
+                        Console.Error.WriteLine($"    Plugins: {policy.Plugins.Mode} [{string.Join(", ", policy.Plugins.List)}]");
+                    if (policy.Network.AllowedCidrs.Count > 0)
+                        Console.Error.WriteLine($"    Network: {policy.Network.AllowedCidrs.Count} CIDR range(s)");
+                    if (policy.Api.RequireTls)
+                        Console.Error.WriteLine("    API: TLS required");
+                    if (policy.Audit.Enabled)
+                        Console.Error.WriteLine($"    Audit: enabled → {policy.Audit.LogPath}");
+                }
+                catch (Exception ex)
+                {
+                    ConsoleUi.WriteError($"Policy validation failed: {ex.Message}");
+                    return ExitConfigError;
+                }
+            }
+            else if (!string.IsNullOrEmpty(policyPath))
+            {
+                ConsoleUi.WriteWarning($"Policy file not found: {policyPath}");
+            }
+            else
+            {
+                ConsoleUi.WriteSuccess("Enterprise policy disabled.");
+            }
+
+            return ExitSuccess;
+        }
 
         // Build headless DI container
         Log.Information("Building headless service container");
@@ -176,6 +217,34 @@ internal static class HeadlessHost
             return ExitSuccess;
         }
 
+        // Load enterprise policy (if configured)
+        EnterprisePolicy? enterprisePolicy = null;
+        AuditLogger? auditLogger = null;
+
+        if (!string.IsNullOrEmpty(headlessConfig.PolicyPath))
+        {
+            try
+            {
+                enterprisePolicy = EnterprisePolicy.LoadFromFile(headlessConfig.PolicyPath);
+                if (enterprisePolicy != null)
+                {
+                    Log.Information("Loaded enterprise policy from {Path}", headlessConfig.PolicyPath);
+
+                    // Apply plugin restrictions before discovery
+                    PolicyEnforcer.ApplyPluginPolicy(enterprisePolicy, appSettings);
+                }
+                else
+                {
+                    Log.Warning("Enterprise policy file not found: {Path}", headlessConfig.PolicyPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteError($"Enterprise policy error: {ex.Message}");
+                return ExitConfigError;
+            }
+        }
+
         // Discover and initialize plugins
         Log.Information("Discovering and initializing plugins");
         var pluginRegistry = provider.GetRequiredService<IPluginRegistry>();
@@ -200,6 +269,44 @@ internal static class HeadlessHost
             if (tlsOptions.Mode == TlsMode.LetsEncrypt)
             {
                 ConfigureLetsEncrypt(apiServer, tlsOptions, bindAddress, port);
+            }
+        }
+
+        // Enforce enterprise policy startup requirements
+        if (enterprisePolicy != null)
+        {
+            var policyError = PolicyEnforcer.ValidateStartupRequirements(enterprisePolicy, tlsOptions);
+            if (policyError != null)
+            {
+                WriteError(policyError);
+                return ExitConfigError;
+            }
+
+            // Set up network CIDR middleware
+            if (enterprisePolicy.Network.AllowedCidrs.Count > 0)
+            {
+                var networkMiddleware = PolicyEnforcer.CreateNetworkMiddleware(enterprisePolicy);
+                var existingOnConfigureApp = ((LocalApiServer)apiServer).OnConfigureApp;
+                ((LocalApiServer)apiServer).OnConfigureApp = app =>
+                {
+                    existingOnConfigureApp?.Invoke(app);
+                    app.Use(next => ctx => networkMiddleware(ctx, next));
+                };
+            }
+
+            // Set up audit logging
+            if (enterprisePolicy.Audit is { Enabled: true, LogPath: not null })
+            {
+                auditLogger = new AuditLogger(enterprisePolicy.Audit);
+                auditLogger.LogPolicyEvent("startup", $"Enterprise policy loaded from {headlessConfig.PolicyPath}");
+
+                var auditMiddleware = auditLogger.CreateMiddleware();
+                var existingOnConfigureApp2 = ((LocalApiServer)apiServer).OnConfigureApp;
+                ((LocalApiServer)apiServer).OnConfigureApp = app =>
+                {
+                    existingOnConfigureApp2?.Invoke(app);
+                    app.Use(next => ctx => auditMiddleware(ctx, next));
+                };
             }
         }
 
@@ -229,6 +336,10 @@ internal static class HeadlessHost
         Console.Error.WriteLine($"[privstack] API server listening on {protocol}://{bindAddress}:{port}");
         Console.Error.WriteLine($"[privstack] Workspace: {workspace.Name} ({workspace.Id})");
         Console.Error.WriteLine($"[privstack] API key: {apiKey}");
+        if (enterprisePolicy != null)
+            Console.Error.WriteLine($"[privstack] Enterprise policy: {headlessConfig.PolicyPath}");
+        if (auditLogger != null)
+            Console.Error.WriteLine($"[privstack] Audit log: {enterprisePolicy!.Audit.LogPath}");
         Console.Error.WriteLine("[privstack] Press Ctrl+C to stop.");
 
         // Block until SIGTERM/SIGINT
@@ -256,6 +367,8 @@ internal static class HeadlessHost
 
         // Graceful shutdown
         Console.Error.WriteLine("[privstack] Shutting down...");
+        auditLogger?.LogPolicyEvent("shutdown", "Server shutting down");
+        auditLogger?.Dispose();
         await apiServer.StopAsync();
         appSettings.Flush();
         provider.GetRequiredService<IPrivStackRuntime>().Shutdown();
