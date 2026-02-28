@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,6 +40,7 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
     private readonly IWorkspaceService _workspaceService;
     private readonly PrivStack.Services.Native.IPrivStackRuntime _runtime;
     private List<OfficialPluginInfo> _serverPlugins = [];
+    private DispatcherTimer? _liveMetricsTimer;
 
     internal DashboardViewModel(
         IPluginInstallService installService,
@@ -422,6 +424,59 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
         catch (Exception ex)
         {
             _log.Warning(ex, "Failed to load system metrics");
+        }
+    }
+
+    // =========================================================================
+    // Live metrics timer (memory + storage refresh every 5 seconds)
+    // =========================================================================
+
+    /// <summary>
+    /// Starts a 5-second timer that refreshes volatile metrics (memory, storage sizes)
+    /// while the Dashboard is visible. Called from DashboardPlugin.OnNavigatedToAsync.
+    /// </summary>
+    internal void StartLiveMetrics()
+    {
+        if (_liveMetricsTimer != null) return;
+        _liveMetricsTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _liveMetricsTimer.Tick += OnLiveMetricsTick;
+        _liveMetricsTimer.Start();
+    }
+
+    /// <summary>
+    /// Stops the live metrics timer. Called when navigating away from the Dashboard.
+    /// </summary>
+    internal void StopLiveMetrics()
+    {
+        if (_liveMetricsTimer == null) return;
+        _liveMetricsTimer.Stop();
+        _liveMetricsTimer.Tick -= OnLiveMetricsTick;
+        _liveMetricsTimer = null;
+    }
+
+    private async void OnLiveMetricsTick(object? sender, EventArgs e)
+    {
+        try
+        {
+            var (workingSet, gcHeap) = _metricsService.GetMemoryMetrics();
+            MemoryUsage = SystemMetricsHelper.FormatBytes(workingSet);
+            MemoryGcHeap = SystemMetricsHelper.FormatBytes(gcHeap);
+
+            var dataResult = await _metricsService.GetDataMetricsAsync(_pluginRegistry, _workspaceService);
+            DataStorageTotal = SystemMetricsHelper.FormatBytes(dataResult.TotalStorageBytes);
+
+            // If we're on the Data tab, also refresh the detailed breakdown
+            if (ActiveTab == DashboardTab.Data)
+            {
+                TotalDatabaseSize = SystemMetricsHelper.FormatBytes(dataResult.TotalDatabaseBytes);
+                TotalFilesSize = SystemMetricsHelper.FormatBytes(dataResult.TotalFilesBytes);
+                TotalVaultSize = SystemMetricsHelper.FormatBytes(dataResult.TotalVaultBytes);
+                TotalStorageSize = SystemMetricsHelper.FormatBytes(dataResult.TotalStorageBytes);
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Debug(ex, "Live metrics tick failed");
         }
     }
 

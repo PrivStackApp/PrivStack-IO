@@ -18,7 +18,7 @@ public sealed class DashboardPlugin : PluginBase<DashboardViewModel>
         Id = "privstack.dashboard",
         Name = "Dashboard",
         Description = "System overview, plugin marketplace, and management dashboard",
-        Version = new Version(1, 3, 0),
+        Version = new Version(1, 4, 0),
         Author = "PrivStack",
         Icon = "LayoutDashboard",
         NavigationOrder = 50,
@@ -57,5 +57,11 @@ public sealed class DashboardPlugin : PluginBase<DashboardViewModel>
         {
             await ViewModel.RefreshAsync();
         }
+        ViewModel?.StartLiveMetrics();
+    }
+
+    public override void OnNavigatedFrom()
+    {
+        ViewModel?.StopLiveMetrics();
     }
 }
