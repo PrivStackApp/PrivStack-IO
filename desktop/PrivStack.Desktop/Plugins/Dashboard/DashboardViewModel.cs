@@ -116,6 +116,12 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
     [ObservableProperty]
     private string _memoryGcHeap = "—";
 
+    [ObservableProperty]
+    private string _memoryNative = "—";
+
+    [ObservableProperty]
+    private string _memoryDetail = "";
+
     // --- Data Metrics (Data tab) ---
 
     [ObservableProperty]
@@ -413,9 +419,11 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
                 item.DiskSizeBytes = sizeLookup.TryGetValue(item.Id, out var size) ? size : null;
             }
 
-            var (workingSet, gcHeap) = _metricsService.GetMemoryMetrics();
-            MemoryUsage = SystemMetricsHelper.FormatBytes(workingSet);
-            MemoryGcHeap = SystemMetricsHelper.FormatBytes(gcHeap);
+            var diag = _metricsService.GetDetailedMemoryDiagnostic(_pluginRegistry);
+            MemoryUsage = SystemMetricsHelper.FormatBytes(diag.WorkingSet);
+            MemoryGcHeap = SystemMetricsHelper.FormatBytes(diag.GcHeap);
+            MemoryNative = SystemMetricsHelper.FormatBytes(diag.NativeEstimate);
+            MemoryDetail = diag.FormatDetail();
 
             // Also refresh data storage totals for the overview card
             var dataResult = await _metricsService.GetDataMetricsAsync(_pluginRegistry, _workspaceService);
@@ -458,9 +466,11 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
     {
         try
         {
-            var (workingSet, gcHeap) = _metricsService.GetMemoryMetrics();
-            MemoryUsage = SystemMetricsHelper.FormatBytes(workingSet);
-            MemoryGcHeap = SystemMetricsHelper.FormatBytes(gcHeap);
+            var diag = _metricsService.GetDetailedMemoryDiagnostic(_pluginRegistry);
+            MemoryUsage = SystemMetricsHelper.FormatBytes(diag.WorkingSet);
+            MemoryGcHeap = SystemMetricsHelper.FormatBytes(diag.GcHeap);
+            MemoryNative = SystemMetricsHelper.FormatBytes(diag.NativeEstimate);
+            MemoryDetail = diag.FormatDetail();
 
             var dataResult = await _metricsService.GetDataMetricsAsync(_pluginRegistry, _workspaceService);
             DataStorageTotal = SystemMetricsHelper.FormatBytes(dataResult.TotalStorageBytes);

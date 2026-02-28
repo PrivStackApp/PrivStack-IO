@@ -661,6 +661,18 @@ public partial class App : Application
                     NativeMessagingRegistrar.Register(bridgePath, appSettings);
 
                 Log.Information("Deferred background services started");
+
+                // Log detailed memory diagnostic for startup analysis
+                try
+                {
+                    var metricsService = new PrivStack.Desktop.Plugins.Dashboard.Services.SystemMetricsService();
+                    var pluginReg = Services.GetRequiredService<PrivStack.Services.Plugin.IPluginRegistry>();
+                    metricsService.LogMemoryDiagnostic(pluginReg);
+                }
+                catch (Exception diagEx)
+                {
+                    Log.Debug("Failed to log startup memory diagnostic: {Error}", diagEx.Message);
+                }
             }
             catch (Exception ex)
             {

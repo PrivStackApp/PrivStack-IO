@@ -128,6 +128,84 @@ internal sealed class SystemMetricsService
     }
 
     /// <summary>
+    /// Returns a detailed memory breakdown for diagnostics: GC generations,
+    /// native memory estimate, loaded assemblies, and thread count.
+    /// </summary>
+    public MemoryDiagnostic GetDetailedMemoryDiagnostic(IPluginRegistry? registry = null)
+    {
+        var proc = Process.GetCurrentProcess();
+        var gcInfo = GC.GetGCMemoryInfo();
+        var gcHeap = GC.GetTotalMemory(false);
+        var workingSet = proc.WorkingSet64;
+
+        // Generation sizes from GCMemoryInfo
+        var genInfo = gcInfo.GenerationInfo;
+        long gen0 = genInfo.Length > 0 ? genInfo[0].SizeAfterBytes : 0;
+        long gen1 = genInfo.Length > 1 ? genInfo[1].SizeAfterBytes : 0;
+        long gen2 = genInfo.Length > 2 ? genInfo[2].SizeAfterBytes : 0;
+        long loh = genInfo.Length > 3 ? genInfo[3].SizeAfterBytes : 0;
+        long poh = genInfo.Length > 4 ? genInfo[4].SizeAfterBytes : 0;
+
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        var threadCount = proc.Threads.Count;
+
+        // Plugin breakdown
+        int activePlugins = 0;
+        int totalPlugins = 0;
+        int totalEntitySchemas = 0;
+        if (registry != null)
+        {
+            activePlugins = registry.ActivePlugins.Count;
+            totalPlugins = registry.Plugins.Count;
+            totalEntitySchemas = registry.ActivePlugins.Sum(p => p.EntitySchemas.Count);
+        }
+
+        return new MemoryDiagnostic
+        {
+            WorkingSet = workingSet,
+            GcHeap = gcHeap,
+            NativeEstimate = Math.Max(0, workingSet - gcHeap),
+            Gen0 = gen0,
+            Gen1 = gen1,
+            Gen2 = gen2,
+            Loh = loh,
+            Poh = poh,
+            Fragmented = gcInfo.FragmentedBytes,
+            LoadedAssemblies = assemblies.Length,
+            ThreadCount = threadCount,
+            ActivePlugins = activePlugins,
+            TotalPlugins = totalPlugins,
+            ActiveEntitySchemas = totalEntitySchemas,
+        };
+    }
+
+    /// <summary>
+    /// Logs a detailed memory diagnostic to the application log.
+    /// </summary>
+    public void LogMemoryDiagnostic(IPluginRegistry? registry = null)
+    {
+        try
+        {
+            var d = GetDetailedMemoryDiagnostic(registry);
+            var fmt = SystemMetricsHelper.FormatBytes;
+
+            _log.Information(
+                "[MemoryDiag] WorkingSet={WorkingSet} | GC Heap={GcHeap} | Native≈{Native}" +
+                " | Gen0={Gen0} Gen1={Gen1} Gen2={Gen2} LOH={LOH} POH={POH} Frag={Frag}" +
+                " | Assemblies={Assemblies} Threads={Threads}" +
+                " | Plugins={Active}/{Total} EntityTypes={EntityTypes}",
+                fmt(d.WorkingSet), fmt(d.GcHeap), fmt(d.NativeEstimate),
+                fmt(d.Gen0), fmt(d.Gen1), fmt(d.Gen2), fmt(d.Loh), fmt(d.Poh), fmt(d.Fragmented),
+                d.LoadedAssemblies, d.ThreadCount,
+                d.ActivePlugins, d.TotalPlugins, d.ActiveEntitySchemas);
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Failed to log memory diagnostic");
+        }
+    }
+
+    /// <summary>
     /// Queries all IDataMetricsProvider plugins, measures actual DuckDB file sizes,
     /// and proportionally allocates on-disk bytes to each table.
     /// </summary>

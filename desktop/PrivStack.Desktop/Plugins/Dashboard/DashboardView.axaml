@@ -193,7 +193,8 @@
                         </Border>
                         <!-- Memory -->
                         <Border Classes="stat-card" Margin="0,0,12,12" MinWidth="180"
-                                Background="{DynamicResource ThemePrimaryMutedBrush}">
+                                Background="{DynamicResource ThemePrimaryMutedBrush}"
+                                ToolTip.Tip="{Binding MemoryDetail}">
                             <StackPanel Spacing="12">
                                 <Border Width="40" Height="40" CornerRadius="10"
                                         Background="{DynamicResource ThemePrimaryMutedBrush}">
@@ -209,7 +210,9 @@
                                     <TextBlock FontSize="{DynamicResource ThemeFontSizeXsSm}"
                                                Foreground="{DynamicResource ThemeTextMutedBrush}">
                                         <Run Text="{Binding MemoryGcHeap}"/>
-                                        <Run Text=" GC heap"/>
+                                        <Run Text=" GC heap · "/>
+                                        <Run Text="{Binding MemoryNative}"/>
+                                        <Run Text=" native"/>
                                     </TextBlock>
                                 </StackPanel>
                             </StackPanel>

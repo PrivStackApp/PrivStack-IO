@@ -322,7 +322,12 @@ public sealed class BacklinkService
         }
 
         // --- Phase 2: Legacy entity loading for uncovered types ---
-        var legacyEntityTypes = EntityTypes.Where(et => !coveredLinkTypes.Contains(et.LinkType)).ToArray();
+        // Only load entity types owned by ACTIVE plugins — disabled plugins' data should not be indexed
+        var activeEntityTypes = new HashSet<string>(
+            _pluginRegistry.ActivePlugins.SelectMany(p => p.EntitySchemas.Select(s => s.EntityType)));
+        var legacyEntityTypes = EntityTypes
+            .Where(et => !coveredLinkTypes.Contains(et.LinkType) && activeEntityTypes.Contains(et.EntityType))
+            .ToArray();
         if (legacyEntityTypes.Length > 0)
         {
             var tasks = legacyEntityTypes.Select(et => LoadEntitiesAsync(et.EntityType, et.LinkType, ct)).ToArray();

@@ -130,8 +130,11 @@ public sealed class GraphDataService
         }
 
         // --- Phase 2: Legacy fallback for uncovered entity types ---
+        // Only load entity types owned by ACTIVE plugins — disabled plugins' data should not appear
+        var activeEntityTypes = new HashSet<string>(
+            _pluginRegistry.ActivePlugins.SelectMany(p => p.EntitySchemas.Select(s => s.EntityType)));
         var legacyTypes = LegacyEntityTypes
-            .Where(et => !coveredLinkTypes.Contains(et.LinkType))
+            .Where(et => !coveredLinkTypes.Contains(et.LinkType) && activeEntityTypes.Contains(et.EntityType))
             .ToArray();
 
         if (legacyTypes.Length > 0)

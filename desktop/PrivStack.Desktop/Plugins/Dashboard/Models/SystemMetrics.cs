@@ -63,6 +63,36 @@ public partial class PluginDataInfo : ObservableObject
 }
 
 /// <summary>
+/// Detailed memory breakdown for diagnostics.
+/// </summary>
+public sealed class MemoryDiagnostic
+{
+    public long WorkingSet { get; init; }
+    public long GcHeap { get; init; }
+    public long NativeEstimate { get; init; }
+    public long Gen0 { get; init; }
+    public long Gen1 { get; init; }
+    public long Gen2 { get; init; }
+    public long Loh { get; init; }
+    public long Poh { get; init; }
+    public long Fragmented { get; init; }
+    public int LoadedAssemblies { get; init; }
+    public int ThreadCount { get; init; }
+    public int ActivePlugins { get; init; }
+    public int TotalPlugins { get; init; }
+    public int ActiveEntitySchemas { get; init; }
+
+    public string FormatDetail()
+    {
+        var f = SystemMetricsHelper.FormatBytes;
+        return $"GC: {f(Gen0)} Gen0, {f(Gen1)} Gen1, {f(Gen2)} Gen2, {f(Loh)} LOH" +
+               $" | Native: ~{f(NativeEstimate)}" +
+               $" | {LoadedAssemblies} assemblies, {ThreadCount} threads" +
+               $" | Plugins: {ActivePlugins}/{TotalPlugins} active";
+    }
+}
+
+/// <summary>
 /// Shared byte formatting helper.
 /// </summary>
 public static class SystemMetricsHelper
