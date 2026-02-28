@@ -12,7 +12,9 @@ namespace PrivStack.Server;
 /// </summary>
 internal static class HeadlessSetupWizard
 {
-    public static async Task<int> RunAsync()
+    public static Task<int> RunAsync() => Task.FromResult(RunSync());
+
+    private static int RunSync()
     {
         ConsoleUi.WriteBanner();
 
