@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using PrivStack.Services.Abstractions;
 using PrivStack.Services.Plugin;
+using PrivStack.Services.Sdk;
 using PrivStack.Sdk.Capabilities;
 using ILogger = Serilog.ILogger;
 using Log = Serilog.Log;
@@ -31,6 +32,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
     private readonly IPluginRegistry _pluginRegistry;
     private readonly IAppSettingsService _appSettings;
     private readonly IWorkspaceService _workspaceService;
+    private ISdkTransport? _transport;
     private WebApplication? _app;
 
     public LocalApiServer(IPluginRegistry pluginRegistry, IAppSettingsService appSettings, IWorkspaceService workspaceService)
@@ -39,6 +41,11 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
         _appSettings = appSettings;
         _workspaceService = workspaceService;
     }
+
+    /// <summary>
+    /// Wires the SDK transport for passthrough endpoints. Called after DI construction.
+    /// </summary>
+    internal void SetSdkTransport(ISdkTransport transport) => _transport = transport;
 
     public bool IsRunning => _app != null;
     public int? Port => IsRunning ? _appSettings.Settings.ApiPort : null;
@@ -165,6 +172,9 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
 
         apiGroup.MapGet("/routes", () => Results.Ok(new { routes = routeManifest }));
 
+        // SDK passthrough endpoints — allows Desktop client mode to proxy all data operations
+        MapSdkPassthroughRoutes(apiGroup);
+
         // Discover and map plugin routes
         var providers = _pluginRegistry.GetCapabilityProviders<IApiProvider>();
         foreach (var provider in providers)
@@ -197,6 +207,212 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             _app.DisposeAsync().AsTask().GetAwaiter().GetResult();
             _app = null;
         }
+    }
+
+    /// <summary>
+    /// Maps SDK passthrough endpoints that allow Desktop in client mode to proxy
+    /// all data operations to this server over HTTP.
+    /// </summary>
+    private void MapSdkPassthroughRoutes(RouteGroupBuilder apiGroup)
+    {
+        if (_transport == null)
+        {
+            _log.Warning("SDK transport not wired — SDK passthrough routes will not be available");
+            return;
+        }
+
+        var transport = _transport;
+
+        // Core SDK execute — the primary data operation endpoint
+        apiGroup.MapPost("/sdk/execute", async (HttpContext ctx) =>
+        {
+            var body = await ReadBodyAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+
+            var result = transport.Execute(body);
+            return result != null
+                ? Results.Text(result, "application/json")
+                : Results.Json(new { success = false, error_code = "ffi_error", error_message = "Execute returned null" }, statusCode: 500);
+        });
+
+        // Cross-plugin search
+        apiGroup.MapPost("/sdk/search", async (HttpContext ctx) =>
+        {
+            var body = await ReadBodyAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+
+            var result = transport.Search(body);
+            return result != null
+                ? Results.Text(result, "application/json")
+                : Results.Json(new { success = false, error_code = "ffi_error", error_message = "Search returned null" }, statusCode: 500);
+        });
+
+        // ── Database maintenance ──
+
+        apiGroup.MapGet("/sdk/db/diagnostics", () =>
+        {
+            var result = transport.DbDiagnostics();
+            return Results.Text(result ?? "{}", "application/json");
+        });
+
+        apiGroup.MapPost("/sdk/db/maintenance", () =>
+        {
+            var result = transport.DbMaintenance();
+            return Results.Json(new { error_code = (int)result });
+        });
+
+        apiGroup.MapPost("/sdk/db/find-orphans", async (HttpContext ctx) =>
+        {
+            var body = await ReadBodyAsync(ctx) ?? "[]";
+            var result = transport.FindOrphanEntities(body);
+            return Results.Text(result ?? "[]", "application/json");
+        });
+
+        apiGroup.MapPost("/sdk/db/delete-orphans", async (HttpContext ctx) =>
+        {
+            var body = await ReadBodyAsync(ctx) ?? "[]";
+            var result = transport.DeleteOrphanEntities(body);
+            return Results.Text(result ?? "{\"deleted\":0}", "application/json");
+        });
+
+        apiGroup.MapPost("/sdk/db/compact", () =>
+        {
+            var result = transport.CompactDatabases();
+            return Results.Text(result ?? "{}", "application/json");
+        });
+
+        // ── Vault operations ──
+
+        apiGroup.MapPost("/sdk/vault/is-initialized", async (HttpContext ctx) =>
+        {
+            var body = await ReadJsonAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+            var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
+            return Results.Json(new { result = transport.VaultIsInitialized(vaultId) });
+        });
+
+        apiGroup.MapPost("/sdk/vault/initialize", async (HttpContext ctx) =>
+        {
+            var body = await ReadJsonAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+            var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
+            var password = body.RootElement.GetProperty("password").GetString()!;
+            var result = transport.VaultInitialize(vaultId, password);
+            return Results.Json(new { error_code = (int)result });
+        });
+
+        apiGroup.MapPost("/sdk/vault/unlock", async (HttpContext ctx) =>
+        {
+            var body = await ReadJsonAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+            var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
+            var password = body.RootElement.GetProperty("password").GetString()!;
+            var result = transport.VaultUnlock(vaultId, password);
+            return Results.Json(new { error_code = (int)result });
+        });
+
+        apiGroup.MapPost("/sdk/vault/lock", async (HttpContext ctx) =>
+        {
+            var body = await ReadJsonAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+            var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
+            transport.VaultLock(vaultId);
+            return Results.Json(new { error_code = 0 });
+        });
+
+        apiGroup.MapPost("/sdk/vault/is-unlocked", async (HttpContext ctx) =>
+        {
+            var body = await ReadJsonAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+            var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
+            return Results.Json(new { result = transport.VaultIsUnlocked(vaultId) });
+        });
+
+        apiGroup.MapPost("/sdk/vault/blob-store", async (HttpContext ctx) =>
+        {
+            var body = await ReadJsonAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+            var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
+            var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
+            var dataB64 = body.RootElement.GetProperty("data").GetString()!;
+            var data = Convert.FromBase64String(dataB64);
+            var result = transport.VaultBlobStore(vaultId, blobId, data);
+            return Results.Json(new { error_code = (int)result });
+        });
+
+        apiGroup.MapPost("/sdk/vault/blob-read", async (HttpContext ctx) =>
+        {
+            var body = await ReadJsonAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+            var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
+            var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
+            var (data, result) = transport.VaultBlobRead(vaultId, blobId);
+            return Results.Json(new { error_code = (int)result, data = Convert.ToBase64String(data) });
+        });
+
+        apiGroup.MapPost("/sdk/vault/blob-delete", async (HttpContext ctx) =>
+        {
+            var body = await ReadJsonAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+            var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
+            var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
+            var result = transport.VaultBlobDelete(vaultId, blobId);
+            return Results.Json(new { error_code = (int)result });
+        });
+
+        // ── Blob (unencrypted) operations ──
+
+        apiGroup.MapPost("/sdk/blob/store", async (HttpContext ctx) =>
+        {
+            var body = await ReadJsonAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+            var ns = body.RootElement.GetProperty("ns").GetString()!;
+            var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
+            var dataB64 = body.RootElement.GetProperty("data").GetString()!;
+            var data = Convert.FromBase64String(dataB64);
+            string? metadataJson = null;
+            if (body.RootElement.TryGetProperty("metadata", out var metaProp) && metaProp.ValueKind == JsonValueKind.String)
+                metadataJson = metaProp.GetString();
+            var result = transport.BlobStore(ns, blobId, data, metadataJson);
+            return Results.Json(new { error_code = (int)result });
+        });
+
+        apiGroup.MapPost("/sdk/blob/read", async (HttpContext ctx) =>
+        {
+            var body = await ReadJsonAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+            var ns = body.RootElement.GetProperty("ns").GetString()!;
+            var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
+            var (data, result) = transport.BlobRead(ns, blobId);
+            return Results.Json(new { error_code = (int)result, data = Convert.ToBase64String(data) });
+        });
+
+        apiGroup.MapPost("/sdk/blob/delete", async (HttpContext ctx) =>
+        {
+            var body = await ReadJsonAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+            var ns = body.RootElement.GetProperty("ns").GetString()!;
+            var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
+            var result = transport.BlobDelete(ns, blobId);
+            return Results.Json(new { error_code = (int)result });
+        });
+
+        _log.Debug("Mapped SDK passthrough routes");
+    }
+
+    private static async Task<string?> ReadBodyAsync(HttpContext ctx)
+    {
+        using var reader = new StreamReader(ctx.Request.Body, Encoding.UTF8);
+        var body = await reader.ReadToEndAsync();
+        return string.IsNullOrEmpty(body) ? null : body;
+    }
+
+    private static async Task<JsonDocument?> ReadJsonAsync(HttpContext ctx)
+    {
+        var body = await ReadBodyAsync(ctx);
+        if (body == null) return null;
+        try { return JsonDocument.Parse(body); }
+        catch { return null; }
     }
 
     private void MapProviderRoutes(

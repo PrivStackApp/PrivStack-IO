@@ -54,6 +54,8 @@ public static class CoreServiceRegistration
         services.AddSingleton<ISyncIngestionService, SyncIngestionService>();
         // IPluginRegistry registered by caller (Desktop: PluginRegistry with Avalonia hooks, Server: headless version)
 
+        services.AddSingleton<FfiSdkTransport>();
+        services.AddSingleton<ISdkTransport>(sp => sp.GetRequiredService<FfiSdkTransport>());
         services.AddSingleton<SdkHost>();
         services.AddSingleton<IPrivStackSdk>(sp => sp.GetRequiredService<SdkHost>());
         services.AddSingleton<ISyncOutboundService, SyncOutboundService>();
@@ -112,6 +114,10 @@ public static class CoreServiceRegistration
         // Wire file-based event sync into outbound service
         if (provider.GetRequiredService<ISyncOutboundService>() is SyncOutboundService outbound)
             outbound.SetFileEventSync(provider.GetRequiredService<IFileEventSyncService>());
+
+        // Wire SDK transport into LocalApiServer for passthrough endpoints
+        if (provider.GetRequiredService<ILocalApiServer>() is LocalApiServer apiServer)
+            apiServer.SetSdkTransport(provider.GetRequiredService<ISdkTransport>());
 
         // Wire license read-only detection from SdkHost into the expiration service
         var expirationService = provider.GetRequiredService<LicenseExpirationService>();

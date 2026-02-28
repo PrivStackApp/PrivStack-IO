@@ -6,21 +6,20 @@ using PrivStack.Sdk;
 using PrivStack.Sdk.Json;
 using PrivStack.Sdk.Messaging;
 using Serilog;
-using NativeLib = PrivStack.Services.Native.NativeLibrary;
 
 namespace PrivStack.Services.Sdk;
 
 /// <summary>
-/// Implements IPrivStackSdk by serializing SdkMessage to JSON, calling the generic
-/// privstack_execute P/Invoke, and deserializing the response.
-/// Uses a ReaderWriterLockSlim to prevent FFI calls during workspace switches.
+/// Implements IPrivStackSdk by serializing SdkMessage to JSON, dispatching through
+/// an <see cref="ISdkTransport"/>, and deserializing the response.
+/// Uses a ReaderWriterLockSlim to prevent calls during workspace switches.
 /// </summary>
 internal sealed class SdkHost : IPrivStackSdk, IDisposable
 {
     private static readonly ILogger _log = Log.ForContext<SdkHost>();
     private static readonly JsonSerializerOptions _jsonOptions = SdkJsonOptions.Default;
 
-    private readonly IPrivStackRuntime _runtime;
+    private ISdkTransport _transport;
     private readonly ReaderWriterLockSlim _switchLock = new();
     private volatile bool _isSwitching;
     private ISyncOutboundService? _syncOutbound;
@@ -31,10 +30,16 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
     /// </summary>
     public event EventHandler? LicenseReadOnlyBlocked;
 
-    public SdkHost(IPrivStackRuntime runtime)
+    public SdkHost(ISdkTransport transport)
     {
-        _runtime = runtime;
+        _transport = transport;
     }
+
+    /// <summary>
+    /// Swaps the active transport. Used to switch from FFI to HTTP when a running
+    /// headless server is detected at startup. Must be called before any SDK calls.
+    /// </summary>
+    public void SetTransport(ISdkTransport transport) => _transport = transport;
 
     /// <summary>
     /// Wires the outbound sync service. Called after DI construction.
@@ -50,9 +55,9 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
         _vaultUnlockPrompt = prompt;
 
     /// <summary>
-    /// True when the native runtime is initialized and not mid-workspace-switch.
+    /// True when the transport is ready and not mid-workspace-switch.
     /// </summary>
-    public bool IsReady => _runtime.IsInitialized && !_isSwitching;
+    public bool IsReady => _transport.IsReady && !_isSwitching;
 
     /// <summary>
     /// Acquires the write lock, blocking all SDK calls during workspace switch.
@@ -84,52 +89,35 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
 
         try
         {
-            if (!_runtime.IsInitialized)
+            if (!_transport.IsReady)
                 return Task.FromResult(SdkResponse<TResult>.Fail("not_ready", "Runtime not initialized"));
 
             var requestJson = JsonSerializer.Serialize(message, _jsonOptions);
             _log.Debug("SDK Execute: {EntityType}.{Action}", message.EntityType, message.Action);
 
-            var responsePtr = NativeLib.Execute(requestJson);
+            var responseJson = _transport.Execute(requestJson);
+            if (string.IsNullOrEmpty(responseJson))
+            {
+                _log.Warning("SDK {EntityType}.{Action} returned empty response", message.EntityType, message.Action);
+                return Task.FromResult(SdkResponse<TResult>.Fail("ffi_error", "Execute returned empty response"));
+            }
+
             try
             {
-                if (responsePtr == nint.Zero)
-                {
-                    _log.Warning("SDK {EntityType}.{Action} returned null pointer", message.EntityType, message.Action);
-                    return Task.FromResult(SdkResponse<TResult>.Fail("ffi_error", "Execute returned null"));
-                }
-
-                var responseJson = System.Runtime.InteropServices.Marshal.PtrToStringUTF8(responsePtr);
-                if (string.IsNullOrEmpty(responseJson))
-                {
-                    _log.Warning("SDK {EntityType}.{Action} returned empty response", message.EntityType, message.Action);
-                    return Task.FromResult(SdkResponse<TResult>.Fail("ffi_error", "Execute returned empty response"));
-                }
-
-                try
-                {
-                    var response = JsonSerializer.Deserialize<SdkResponse<TResult>>(responseJson, _jsonOptions);
-                    if (response?.ErrorCode == "license_read_only")
-                        LicenseReadOnlyBlocked?.Invoke(this, EventArgs.Empty);
-                    if (response?.Success == true)
-                        NotifySyncIfMutation(message, responseJson);
-                    return Task.FromResult(response ?? SdkResponse<TResult>.Fail("json_error", "Failed to deserialize response"));
-                }
-                catch (Exception ex) when (ex is JsonException or NotSupportedException)
-                {
-                    _log.Error(ex, "SDK deserialization failed for {EntityType}.{Action} -> {TargetType}. Response: {Response}",
-                        message.EntityType, message.Action, typeof(TResult).Name,
-                        responseJson.Length > 500 ? responseJson[..500] + "..." : responseJson);
-                    return Task.FromResult(SdkResponse<TResult>.Fail("json_error",
-                        $"Failed to deserialize {typeof(TResult).Name}: {ex.Message}"));
-                }
+                var response = JsonSerializer.Deserialize<SdkResponse<TResult>>(responseJson, _jsonOptions);
+                if (response?.ErrorCode == "license_read_only")
+                    LicenseReadOnlyBlocked?.Invoke(this, EventArgs.Empty);
+                if (response?.Success == true)
+                    NotifySyncIfMutation(message, responseJson);
+                return Task.FromResult(response ?? SdkResponse<TResult>.Fail("json_error", "Failed to deserialize response"));
             }
-            finally
+            catch (Exception ex) when (ex is JsonException or NotSupportedException)
             {
-                if (responsePtr != nint.Zero)
-                {
-                    NativeLib.FreeString(responsePtr);
-                }
+                _log.Error(ex, "SDK deserialization failed for {EntityType}.{Action} -> {TargetType}. Response: {Response}",
+                    message.EntityType, message.Action, typeof(TResult).Name,
+                    responseJson.Length > 500 ? responseJson[..500] + "..." : responseJson);
+                return Task.FromResult(SdkResponse<TResult>.Fail("json_error",
+                    $"Failed to deserialize {typeof(TResult).Name}: {ex.Message}"));
             }
         }
         finally
@@ -147,47 +135,31 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
 
         try
         {
-            if (!_runtime.IsInitialized)
+            if (!_transport.IsReady)
                 return Task.FromResult(SdkResponse.Fail("not_ready", "Runtime not initialized"));
 
             var requestJson = JsonSerializer.Serialize(message, _jsonOptions);
             _log.Debug("SDK Execute: {EntityType}.{Action}", message.EntityType, message.Action);
 
-            var responsePtr = NativeLib.Execute(requestJson);
-            try
+            var responseJson = _transport.Execute(requestJson);
+            if (string.IsNullOrEmpty(responseJson))
             {
-                if (responsePtr == nint.Zero)
-                {
-                    return Task.FromResult(SdkResponse.Fail("ffi_error", "Execute returned null"));
-                }
-
-                var responseJson = System.Runtime.InteropServices.Marshal.PtrToStringUTF8(responsePtr);
-                if (string.IsNullOrEmpty(responseJson))
-                {
-                    return Task.FromResult(SdkResponse.Fail("ffi_error", "Execute returned empty response"));
-                }
-
-                var response = JsonSerializer.Deserialize<SdkResponse>(responseJson, _jsonOptions);
-                if (response?.ErrorCode == "license_read_only")
-                    LicenseReadOnlyBlocked?.Invoke(this, EventArgs.Empty);
-                if (response != null && !response.Success)
-                {
-                    _log.Warning("SDK {EntityType}.{Action} failed: [{ErrorCode}] {ErrorMessage}",
-                        message.EntityType, message.Action, response.ErrorCode, response.ErrorMessage);
-                }
-                else if (response?.Success == true)
-                {
-                    NotifySyncIfMutation(message, responseJson);
-                }
-                return Task.FromResult(response ?? SdkResponse.Fail("json_error", "Failed to deserialize response"));
+                return Task.FromResult(SdkResponse.Fail("ffi_error", "Execute returned empty response"));
             }
-            finally
+
+            var response = JsonSerializer.Deserialize<SdkResponse>(responseJson, _jsonOptions);
+            if (response?.ErrorCode == "license_read_only")
+                LicenseReadOnlyBlocked?.Invoke(this, EventArgs.Empty);
+            if (response != null && !response.Success)
             {
-                if (responsePtr != nint.Zero)
-                {
-                    NativeLib.FreeString(responsePtr);
-                }
+                _log.Warning("SDK {EntityType}.{Action} failed: [{ErrorCode}] {ErrorMessage}",
+                    message.EntityType, message.Action, response.ErrorCode, response.ErrorMessage);
             }
+            else if (response?.Success == true)
+            {
+                NotifySyncIfMutation(message, responseJson);
+            }
+            return Task.FromResult(response ?? SdkResponse.Fail("json_error", "Failed to deserialize response"));
         }
         finally
         {
@@ -221,49 +193,32 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
 
         try
         {
-            if (!_runtime.IsInitialized)
+            if (!_transport.IsReady)
                 return Task.FromResult(SdkResponse<TResult>.Fail("not_ready", "Runtime not initialized"));
 
             var searchQuery = new { query, entity_types = entityTypes, limit };
             var queryJson = JsonSerializer.Serialize(searchQuery, _jsonOptions);
             _log.Debug("SDK Search: {Query}", query);
 
-            var responsePtr = NativeLib.Search(queryJson);
+            var responseJson = _transport.Search(queryJson);
+            if (string.IsNullOrEmpty(responseJson))
+            {
+                _log.Warning("SDK Search returned empty response for query: {Query}", query);
+                return Task.FromResult(SdkResponse<TResult>.Fail("ffi_error", "Search returned empty response"));
+            }
+
             try
             {
-                if (responsePtr == nint.Zero)
-                {
-                    _log.Warning("SDK Search returned null pointer for query: {Query}", query);
-                    return Task.FromResult(SdkResponse<TResult>.Fail("ffi_error", "Search returned null"));
-                }
-
-                var responseJson = System.Runtime.InteropServices.Marshal.PtrToStringUTF8(responsePtr);
-                if (string.IsNullOrEmpty(responseJson))
-                {
-                    _log.Warning("SDK Search returned empty response for query: {Query}", query);
-                    return Task.FromResult(SdkResponse<TResult>.Fail("ffi_error", "Search returned empty response"));
-                }
-
-                try
-                {
-                    var response = JsonSerializer.Deserialize<SdkResponse<TResult>>(responseJson, _jsonOptions);
-                    return Task.FromResult(response ?? SdkResponse<TResult>.Fail("json_error", "Failed to deserialize search response"));
-                }
-                catch (JsonException ex)
-                {
-                    _log.Error(ex, "SDK Search deserialization failed for {TargetType}. Response: {Response}",
-                        typeof(TResult).Name,
-                        responseJson.Length > 500 ? responseJson[..500] + "..." : responseJson);
-                    return Task.FromResult(SdkResponse<TResult>.Fail("json_error",
-                        $"Failed to deserialize {typeof(TResult).Name}: {ex.Message}"));
-                }
+                var response = JsonSerializer.Deserialize<SdkResponse<TResult>>(responseJson, _jsonOptions);
+                return Task.FromResult(response ?? SdkResponse<TResult>.Fail("json_error", "Failed to deserialize search response"));
             }
-            finally
+            catch (JsonException ex)
             {
-                if (responsePtr != nint.Zero)
-                {
-                    NativeLib.FreeString(responsePtr);
-                }
+                _log.Error(ex, "SDK Search deserialization failed for {TargetType}. Response: {Response}",
+                    typeof(TResult).Name,
+                    responseJson.Length > 500 ? responseJson[..500] + "..." : responseJson);
+                return Task.FromResult(SdkResponse<TResult>.Fail("json_error",
+                    $"Failed to deserialize {typeof(TResult).Name}: {ex.Message}"));
             }
         }
         finally
@@ -285,7 +240,7 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
 
         try
         {
-            var result = NativeLib.DbMaintenance();
+            var result = _transport.DbMaintenance();
             if (result != PrivStackError.Ok)
                 throw new InvalidOperationException($"Database maintenance failed: {result}");
             return Task.CompletedTask;
@@ -303,11 +258,7 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
 
         try
         {
-            var ptr = NativeLib.DbDiagnostics();
-            if (ptr == nint.Zero) return "{}";
-            var json = System.Runtime.InteropServices.Marshal.PtrToStringUTF8(ptr) ?? "{}";
-            NativeLib.FreeString(ptr);
-            return json;
+            return _transport.DbDiagnostics() ?? "{}";
         }
         finally
         {
@@ -322,11 +273,7 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
 
         try
         {
-            var ptr = NativeLib.FindOrphanEntities(validTypesJson);
-            if (ptr == nint.Zero) return "[]";
-            var json = System.Runtime.InteropServices.Marshal.PtrToStringUTF8(ptr) ?? "[]";
-            NativeLib.FreeString(ptr);
-            return json;
+            return _transport.FindOrphanEntities(validTypesJson) ?? "[]";
         }
         finally
         {
@@ -341,11 +288,7 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
 
         try
         {
-            var ptr = NativeLib.DeleteOrphanEntities(validTypesJson);
-            if (ptr == nint.Zero) return "{\"deleted\":0}";
-            var json = System.Runtime.InteropServices.Marshal.PtrToStringUTF8(ptr) ?? "{\"deleted\":0}";
-            NativeLib.FreeString(ptr);
-            return json;
+            return _transport.DeleteOrphanEntities(validTypesJson) ?? "{\"deleted\":0}";
         }
         finally
         {
@@ -360,11 +303,7 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
 
         try
         {
-            var ptr = NativeLib.CompactDatabases();
-            if (ptr == nint.Zero) return "{}";
-            var json = System.Runtime.InteropServices.Marshal.PtrToStringUTF8(ptr) ?? "{}";
-            NativeLib.FreeString(ptr);
-            return json;
+            return _transport.CompactDatabases() ?? "{}";
         }
         finally
         {
@@ -380,7 +319,7 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
     {
         ct.ThrowIfCancellationRequested();
         if (!AcquireReadLock(out var notReady)) return Task.FromResult(false);
-        try { return Task.FromResult(NativeLib.VaultIsInitialized(vaultId)); }
+        try { return Task.FromResult(_transport.VaultIsInitialized(vaultId)); }
         finally { _switchLock.ExitReadLock(); }
     }
 
@@ -390,7 +329,7 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
         if (!AcquireReadLock(out _)) throw new InvalidOperationException("Workspace switch in progress");
         try
         {
-            var result = NativeLib.VaultInitialize(vaultId, password);
+            var result = _transport.VaultInitialize(vaultId, password);
             if (result != PrivStackError.Ok)
             {
                 var message = result switch
@@ -413,7 +352,7 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
         if (!AcquireReadLock(out _)) throw new InvalidOperationException("Workspace switch in progress");
         try
         {
-            var result = NativeLib.VaultUnlock(vaultId, password);
+            var result = _transport.VaultUnlock(vaultId, password);
             if (result != PrivStackError.Ok)
             {
                 var message = result switch
@@ -435,7 +374,7 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
     {
         ct.ThrowIfCancellationRequested();
         if (!AcquireReadLock(out _)) throw new InvalidOperationException("Workspace switch in progress");
-        try { NativeLib.VaultLock(vaultId); return Task.CompletedTask; }
+        try { _transport.VaultLock(vaultId); return Task.CompletedTask; }
         finally { _switchLock.ExitReadLock(); }
     }
 
@@ -443,7 +382,7 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
     {
         ct.ThrowIfCancellationRequested();
         if (!AcquireReadLock(out _)) return Task.FromResult(false);
-        try { return Task.FromResult(NativeLib.VaultIsUnlocked(vaultId)); }
+        try { return Task.FromResult(_transport.VaultIsUnlocked(vaultId)); }
         finally { _switchLock.ExitReadLock(); }
     }
 
@@ -485,15 +424,9 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
         if (!AcquireReadLock(out _)) throw new InvalidOperationException("Workspace switch in progress");
         try
         {
-            unsafe
-            {
-                fixed (byte* ptr = data)
-                {
-                    var result = NativeLib.VaultBlobStore(vaultId, blobId, (nint)ptr, (nuint)data.Length);
-                    if (result != PrivStackError.Ok)
-                        throw new InvalidOperationException($"VaultBlobStore failed: {result}");
-                }
-            }
+            var result = _transport.VaultBlobStore(vaultId, blobId, data);
+            if (result != PrivStackError.Ok)
+                throw new InvalidOperationException($"VaultBlobStore failed: {result}");
             return Task.CompletedTask;
         }
         finally { _switchLock.ExitReadLock(); }
@@ -505,19 +438,10 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
         if (!AcquireReadLock(out _)) throw new InvalidOperationException("Workspace switch in progress");
         try
         {
-            var result = NativeLib.VaultBlobRead(vaultId, blobId, out var outData, out var outLen);
+            var (data, result) = _transport.VaultBlobRead(vaultId, blobId);
             if (result != PrivStackError.Ok)
                 throw new InvalidOperationException($"VaultBlobRead failed: {result}");
-            try
-            {
-                var data = new byte[(int)outLen];
-                System.Runtime.InteropServices.Marshal.Copy(outData, data, 0, (int)outLen);
-                return Task.FromResult(data);
-            }
-            finally
-            {
-                NativeLib.FreeBytes(outData, outLen);
-            }
+            return Task.FromResult(data);
         }
         finally { _switchLock.ExitReadLock(); }
     }
@@ -528,7 +452,7 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
         if (!AcquireReadLock(out _)) throw new InvalidOperationException("Workspace switch in progress");
         try
         {
-            var result = NativeLib.VaultBlobDelete(vaultId, blobId);
+            var result = _transport.VaultBlobDelete(vaultId, blobId);
             if (result != PrivStackError.Ok)
                 throw new InvalidOperationException($"VaultBlobDelete failed: {result}");
             return Task.CompletedTask;
@@ -546,15 +470,9 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
         if (!AcquireReadLock(out _)) throw new InvalidOperationException("Workspace switch in progress");
         try
         {
-            unsafe
-            {
-                fixed (byte* ptr = data)
-                {
-                    var result = NativeLib.BlobStore(ns, blobId, (nint)ptr, (nuint)data.Length, metadataJson);
-                    if (result != PrivStackError.Ok)
-                        throw new InvalidOperationException($"BlobStore failed: {result}");
-                }
-            }
+            var result = _transport.BlobStore(ns, blobId, data, metadataJson);
+            if (result != PrivStackError.Ok)
+                throw new InvalidOperationException($"BlobStore failed: {result}");
             return Task.CompletedTask;
         }
         finally { _switchLock.ExitReadLock(); }
@@ -566,19 +484,10 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
         if (!AcquireReadLock(out _)) throw new InvalidOperationException("Workspace switch in progress");
         try
         {
-            var result = NativeLib.BlobRead(ns, blobId, out var outData, out var outLen);
+            var (data, result) = _transport.BlobRead(ns, blobId);
             if (result != PrivStackError.Ok)
                 throw new InvalidOperationException($"BlobRead failed: {result}");
-            try
-            {
-                var data = new byte[(int)outLen];
-                System.Runtime.InteropServices.Marshal.Copy(outData, data, 0, (int)outLen);
-                return Task.FromResult(data);
-            }
-            finally
-            {
-                NativeLib.FreeBytes(outData, outLen);
-            }
+            return Task.FromResult(data);
         }
         finally { _switchLock.ExitReadLock(); }
     }
@@ -589,7 +498,7 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
         if (!AcquireReadLock(out _)) throw new InvalidOperationException("Workspace switch in progress");
         try
         {
-            var result = NativeLib.BlobDelete(ns, blobId);
+            var result = _transport.BlobDelete(ns, blobId);
             if (result != PrivStackError.Ok)
                 throw new InvalidOperationException($"BlobDelete failed: {result}");
             return Task.CompletedTask;

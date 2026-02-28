@@ -28,6 +28,12 @@ public partial class App : Application
     /// </summary>
     public static IServiceProvider Services { get; internal set; } = null!;
 
+    /// <summary>
+    /// True when Desktop is running in client mode (proxying SDK calls to a headless server).
+    /// In client mode, DuckDB is not opened locally — the server owns the database.
+    /// </summary>
+    public static bool IsClientMode { get; private set; }
+
     public override void RegisterServices()
     {
         base.RegisterServices();
@@ -80,9 +86,16 @@ public partial class App : Application
                 Log.Information("Setup required (first-run or no workspaces), showing setup wizard");
                 ShowSetupWizard(desktop);
             }
+            else if (TryEnterClientMode())
+            {
+                // A headless server is already running — Desktop becomes a client.
+                // Skip DuckDB init and unlock screen; route SDK calls over HTTP.
+                Log.Information("Client mode active, loading application directly");
+                _ = EnterClientModeAsync(desktop);
+            }
             else
             {
-                // Setup is complete - initialize service at configured directory
+                // Normal standalone mode — initialize local DuckDB
                 Log.Information("Initializing PrivStack native service");
                 InitializeService();
 
@@ -135,6 +148,108 @@ public partial class App : Application
             Log.Error(ex, "Failed to initialize native service");
             Serilog.Log.CloseAndFlush();
         }
+    }
+
+    /// <summary>
+    /// Checks if a headless server is already running by probing the status endpoint.
+    /// If detected, swaps the SDK transport from FFI to HTTP and returns true.
+    /// </summary>
+    private bool TryEnterClientMode()
+    {
+        try
+        {
+            var appSettings = Services.GetRequiredService<IAppSettingsService>();
+            var apiKey = appSettings.Settings.ApiKey;
+            if (string.IsNullOrEmpty(apiKey))
+                return false;
+
+            // Determine server URL — check headless-config.json first, fall back to defaults
+            var serverUrl = ResolveServerUrl(appSettings);
+            Log.Debug("Probing for running headless server at {Url}", serverUrl);
+
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{serverUrl}/api/v1/status");
+            using var response = httpClient.Send(request, HttpCompletionOption.ResponseContentRead);
+
+            if (!response.IsSuccessStatusCode)
+                return false;
+
+            using var stream = response.Content.ReadAsStream();
+            using var reader = new StreamReader(stream);
+            var body = reader.ReadToEnd();
+
+            if (!body.Contains("\"status\":\"ok\""))
+                return false;
+
+            Log.Information("Detected running headless server at {Url}, switching to client mode", serverUrl);
+
+            // Swap the transport in SdkHost from FFI to HTTP
+            var transport = new HttpSdkTransport(serverUrl, apiKey);
+            var sdkHost = Services.GetRequiredService<SdkHost>();
+            sdkHost.SetTransport(transport);
+
+            // Set workspace paths even in client mode (needed for settings, logs, plugin paths)
+            var workspaceService = Services.GetRequiredService<IWorkspaceService>();
+            var active = workspaceService.GetActiveWorkspace();
+            if (active != null)
+            {
+                var resolvedDir = workspaceService.ResolveWorkspaceDir(active);
+                DataPaths.SetActiveWorkspace(active.Id, resolvedDir);
+                Log.ReconfigureForWorkspace(active.Id);
+            }
+
+            IsClientMode = true;
+            return true;
+        }
+        catch
+        {
+            Log.Debug("No running headless server detected (this is normal for standalone mode)");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Resolves the server URL from headless-config.json or falls back to defaults.
+    /// </summary>
+    private static string ResolveServerUrl(IAppSettingsService appSettings)
+    {
+        var configPath = Path.Combine(DataPaths.BaseDir, "headless-config.json");
+        if (File.Exists(configPath))
+        {
+            try
+            {
+                var json = File.ReadAllText(configPath);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var bind = root.TryGetProperty("bind_address", out var bindProp)
+                    ? bindProp.GetString() ?? "127.0.0.1"
+                    : "127.0.0.1";
+                var port = root.TryGetProperty("port", out var portProp)
+                    ? portProp.GetInt32()
+                    : appSettings.Settings.ApiPort;
+
+                return $"http://{bind}:{port}";
+            }
+            catch
+            {
+                // Fall through to default
+            }
+        }
+
+        return $"http://127.0.0.1:{appSettings.Settings.ApiPort}";
+    }
+
+    /// <summary>
+    /// Client mode startup: skip unlock screen, discover plugins, show main window directly.
+    /// Background services that duplicate the server's work are not started.
+    /// </summary>
+    private async Task EnterClientModeAsync(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var pluginRegistry = Services.GetRequiredService<IPluginRegistry>();
+        await Task.Run(() => pluginRegistry.DiscoverAndInitialize());
+
+        await ShowMainWindow(desktop, skipPluginInit: true, isClientMode: true);
     }
 
     /// <summary>
@@ -395,7 +510,8 @@ public partial class App : Application
         IClassicDesktopStyleApplicationLifetime desktop,
         bool skipPluginInit = false,
         Action<string>? updateStatus = null,
-        Action? onBeforeTransition = null)
+        Action? onBeforeTransition = null,
+        bool isClientMode = false)
     {
         if (!skipPluginInit)
         {
@@ -461,39 +577,46 @@ public partial class App : Application
         mainWindow.Show();
 
         // Start non-critical background services after the window is visible
+        var capturedClientMode = isClientMode;
         _ = Task.Run(async () =>
         {
             try
             {
-                Log.Information("Starting deferred background services");
+                Log.Information("Starting deferred background services (client_mode={ClientMode})", capturedClientMode);
 
-                _ = Services.GetRequiredService<IBackupService>();
+                if (!capturedClientMode)
+                {
+                    // These services are only needed in standalone mode — the server handles them
+                    _ = Services.GetRequiredService<IBackupService>();
 
-                Services.GetRequiredService<IFileEventSyncService>().Start();
-                await Services.GetRequiredService<ISnapshotSyncService>().StartAsync();
+                    Services.GetRequiredService<IFileEventSyncService>().Start();
+                    await Services.GetRequiredService<ISnapshotSyncService>().StartAsync();
+
+                    Services.GetRequiredService<ReminderSchedulerService>().Start();
+
+                    // Start local HTTP API server if enabled
+                    if (appSettings.Settings.ApiEnabled)
+                    {
+                        try
+                        {
+                            await Services.GetRequiredService<ILocalApiServer>().StartAsync();
+                        }
+                        catch (Exception apiEx)
+                        {
+                            Log.Error(apiEx, "Failed to start local API server");
+                        }
+                    }
+
+                    // Eagerly resolve RAG index service so its auto-init task runs on startup
+                    _ = Services.GetRequiredService<RagIndexService>();
+                }
+
+                // These run in both modes
                 _ = DatasetFileSyncHelper.ScanAndImportAsync(
                     Services.GetRequiredService<IWorkspaceService>(),
                     Services.GetRequiredService<IDatasetService>());
 
-                Services.GetRequiredService<ReminderSchedulerService>().Start();
                 Services.GetRequiredService<IIpcServer>().Start();
-
-                // Start local HTTP API server if enabled
-                if (appSettings.Settings.ApiEnabled)
-                {
-                    try
-                    {
-                        await Services.GetRequiredService<ILocalApiServer>().StartAsync();
-                    }
-                    catch (Exception apiEx)
-                    {
-                        Log.Error(apiEx, "Failed to start local API server");
-                    }
-                }
-
-                // Eagerly resolve RAG index service so its auto-init task runs on startup
-                _ = Services.GetRequiredService<RagIndexService>();
-
 
                 var bridgePath = FindBridgePath();
                 if (bridgePath != null)
