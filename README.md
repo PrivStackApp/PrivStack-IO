@@ -139,6 +139,40 @@ Font scaling is a separate accessibility multiplier applied on top of theme size
 - **Sensitive lock** — secondary timeout-based lock for high-value features (passwords, vault access)
 - **Auto-update** — checks for and installs updates
 
+### Headless API Mode
+
+The desktop binary supports a `--headless` flag that skips the GUI entirely and runs as a console API server. This enables programmatic access to PrivStack data from scripts, CI/CD pipelines, or background services.
+
+```bash
+# Start headless API server (prompts for master password on stdin)
+./PrivStack --headless
+
+# With env var authentication and workspace selection
+PRIVSTACK_MASTER_PASSWORD=<pw> ./PrivStack --headless --workspace "Default"
+
+# Override port and bind address
+./PrivStack --headless --port 8080 --bind 0.0.0.0
+
+# API key management (authenticates, prints key, exits)
+./PrivStack --headless --show-api-key
+./PrivStack --headless --generate-api-key
+```
+
+| Flag | Description |
+|---|---|
+| `--headless` | Run without GUI as an API server |
+| `--workspace <name-or-id>` | Target workspace (default: active workspace) |
+| `--port <N>` | API port (default: 9720) |
+| `--bind <addr>` | Bind address (default: `127.0.0.1`). Security warning printed for non-localhost |
+| `--show-api-key` | Print the current API key and exit |
+| `--generate-api-key` | Generate a new API key, save it, print it, and exit |
+
+Authentication uses `PRIVSTACK_MASTER_PASSWORD` env var first, then falls back to a masked stdin prompt. The env var is cleared from the process environment after reading.
+
+API endpoints require an `X-API-Key` header (or `Authorization: Bearer <key>`). The unauthenticated `GET /api/v1/status` endpoint returns server health and workspace info.
+
+Exit codes: `0` success, `1` config error, `2` auth error, `3` port in use, `4` database locked.
+
 ### Platforms
 
 | Platform | Transport | Native Library |
