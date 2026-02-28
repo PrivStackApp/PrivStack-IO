@@ -56,10 +56,17 @@ internal static class IntentPromptBuilder
         }
 
         sb.AppendLine();
-        sb.AppendLine($"Today: {now:yyyy-MM-dd dddd}");
+        sb.AppendLine($"Today: {now:yyyy-MM-dd dddd HH:mm}");
+        sb.AppendLine($"\"this week\" = {ThisWeekStart(now)} to {ThisWeekEnd(now)}. \"coming up\" = start from NOW, not period start.");
         sb.AppendLine();
 
         AppendSmallExamples(sb, now);
+
+        sb.AppendLine("--- Example 5 ---");
+        sb.AppendLine("Text: \"What's on my calendar this week?\"");
+        AppendExample(sb, "calendar.list_events", 0.95,
+            "List events this week",
+            ("start_date", ThisWeekStart(now)), ("end_date", ThisWeekEnd(now)));
 
         sb.Append("VALID intent_id: ");
         sb.AppendLine(string.Join(", ", intents.Select(i => i.IntentId)));
@@ -136,11 +143,15 @@ internal static class IntentPromptBuilder
         }
 
         sb.AppendLine();
-        sb.AppendLine($"Current date: {now:yyyy-MM-dd dddd}");
+        sb.AppendLine($"Current date/time: {now:yyyy-MM-dd dddd HH:mm}");
         sb.AppendLine("Use ISO 8601 format for dates/times (e.g. 2025-03-15T14:00:00).");
+        sb.AppendLine("Date range rules for calendar queries:");
+        sb.AppendLine($"- \"this week\" = {ThisWeekStart(now)} to {ThisWeekEnd(now)}");
+        sb.AppendLine($"- \"this month\" = {ThisMonthStart(now)} to {ThisMonthEnd(now)}");
+        sb.AppendLine($"- \"coming up\" / \"upcoming\" = start from NOW ({NowTimestamp(now)}), not period start");
         sb.AppendLine();
 
-        // 4 standard examples + 2 edge cases
+        // 4 standard examples + 3 edge cases
         AppendSmallExamples(sb, now);
 
         sb.AppendLine("--- Example 5 ---");
@@ -154,6 +165,12 @@ internal static class IntentPromptBuilder
             "Draft email about deadline change",
             ("subject", "Project Deadline Update"),
             ("body", "Draft email informing the team that the project deadline has been moved to next month"));
+
+        sb.AppendLine("--- Example 7 ---");
+        sb.AppendLine("Text: \"What's on my calendar this week?\"");
+        AppendExample(sb, "calendar.list_events", 0.95,
+            "List events this week",
+            ("start_date", ThisWeekStart(now)), ("end_date", ThisWeekEnd(now)));
 
         sb.Append("VALID intent_id values: ");
         sb.AppendLine(string.Join(", ", intents.Select(i => i.IntentId)));
@@ -210,9 +227,21 @@ internal static class IntentPromptBuilder
             sb.AppendLine();
         }
 
-        sb.AppendLine($"Current date: {now:yyyy-MM-dd dddd}");
+        sb.AppendLine($"Current date/time: {now:yyyy-MM-dd dddd HH:mm}");
         sb.AppendLine("Use ISO 8601 format for all dates/times (e.g. 2025-03-15T14:00:00).");
         sb.AppendLine("Resolve relative dates (\"next Tuesday\", \"tomorrow\", \"this Friday\") against the current date.");
+        sb.AppendLine();
+        sb.AppendLine("## Date Range Resolution for Queries");
+        sb.AppendLine();
+        sb.AppendLine("When the user asks about a time period, resolve it to concrete date boundaries:");
+        sb.AppendLine($"- \"this week\" → start_date: {ThisWeekStart(now)} (Monday), end_date: {ThisWeekEnd(now)} (Sunday)");
+        sb.AppendLine($"- \"this month\" → start_date: {ThisMonthStart(now)}, end_date: {ThisMonthEnd(now)}");
+        sb.AppendLine($"- \"coming up\" / \"upcoming\" / \"do I have any\" → start_date: {NowTimestamp(now)} (current time, excludes past events)");
+        sb.AppendLine("- \"coming up this month\" → start_date: NOW (current time), end_date: last day of month");
+        sb.AppendLine("- \"next week\" → Monday–Sunday of the following week");
+        sb.AppendLine("- \"today\" → start_date and end_date both set to today's date");
+        sb.AppendLine();
+        sb.AppendLine("Key rule: forward-looking language (\"coming up\", \"upcoming\", \"do I have\", \"what's ahead\") means start_date = NOW (current time), not the start of the period. This prevents returning events that already happened.");
         sb.AppendLine();
 
         sb.AppendLine("## Examples");
@@ -265,6 +294,18 @@ internal static class IntentPromptBuilder
             ("due_date", FutureDayDate(now, DayOfWeek.Thursday)),
             ("priority", "medium"));
 
+        sb.AppendLine("--- Example 7 ---");
+        sb.AppendLine("Text: \"What's on my calendar this week?\"");
+        AppendExample(sb, "calendar.list_events", 0.95,
+            "List events this week",
+            ("start_date", ThisWeekStart(now)), ("end_date", ThisWeekEnd(now)));
+
+        sb.AppendLine("--- Example 8 ---");
+        sb.AppendLine("Text: \"Do I have any lunches coming up this month?\"");
+        AppendExample(sb, "calendar.list_events", 0.9,
+            "Search upcoming lunches this month",
+            ("start_date", NowTimestamp(now)), ("end_date", ThisMonthEnd(now)), ("search_query", "lunch"));
+
         sb.Append("VALID intent_id values: ");
         sb.AppendLine(string.Join(", ", intents.Select(i => i.IntentId)));
         sb.AppendLine();
@@ -308,4 +349,31 @@ internal static class IntentPromptBuilder
         if (daysAhead == 0) daysAhead = 7;
         return now.Date.AddDays(daysAhead).ToString("yyyy-MM-dd");
     }
+
+    /// <summary>Monday of the current week (ISO week: Monday = first day).</summary>
+    private static string ThisWeekStart(DateTimeOffset now)
+    {
+        var daysFromMonday = ((int)now.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        return now.Date.AddDays(-daysFromMonday).ToString("yyyy-MM-dd");
+    }
+
+    /// <summary>Sunday end-of-day of the current week.</summary>
+    private static string ThisWeekEnd(DateTimeOffset now)
+    {
+        var daysToSunday = ((int)DayOfWeek.Sunday - (int)now.DayOfWeek + 7) % 7;
+        // If today is Sunday, daysToSunday = 0, which is correct (end of this week)
+        return now.Date.AddDays(daysToSunday).ToString("yyyy-MM-dd");
+    }
+
+    /// <summary>First day of the current month.</summary>
+    private static string ThisMonthStart(DateTimeOffset now) =>
+        new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, now.Offset).ToString("yyyy-MM-dd");
+
+    /// <summary>Last day of the current month.</summary>
+    private static string ThisMonthEnd(DateTimeOffset now) =>
+        new DateTimeOffset(now.Year, now.Month, DateTime.DaysInMonth(now.Year, now.Month), 0, 0, 0, now.Offset).ToString("yyyy-MM-dd");
+
+    /// <summary>Current date/time (for "upcoming" / "coming up" queries that should exclude past events).</summary>
+    private static string NowTimestamp(DateTimeOffset now) =>
+        now.ToString("yyyy-MM-ddTHH:mm:ss");
 }
