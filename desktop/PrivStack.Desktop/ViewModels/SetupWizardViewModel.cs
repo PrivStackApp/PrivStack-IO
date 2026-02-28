@@ -445,7 +445,7 @@ public partial class SetupWizardViewModel : ViewModelBase
             SetupStep.Workspace => SetupStep.DataDirectory,
             SetupStep.DataDirectory => await HandleDataDirectoryNext(),
             SetupStep.CloudWorkspaces => InitializeServiceAndContinue(),
-            SetupStep.Password => CompleteSetup(),
+            SetupStep.Password => await CompleteSetupAsync(),
             SetupStep.Biometric => SetupStep.EmergencyKit,
             SetupStep.EmergencyKit => CompleteEmergencyKitStep(),
             SetupStep.Complete => FinishSetup(),
@@ -1319,7 +1319,7 @@ public partial class SetupWizardViewModel : ViewModelBase
         }
     }
 
-    private SetupStep CompleteSetup()
+    private async Task<SetupStep> CompleteSetupAsync()
     {
         SetupError = string.Empty;
 
@@ -1351,7 +1351,7 @@ public partial class SetupWizardViewModel : ViewModelBase
                 // Check if biometric step should be shown
                 if (_biometricService.IsSupported)
                 {
-                    var available = _biometricService.IsAvailableAsync().GetAwaiter().GetResult();
+                    var available = await _biometricService.IsAvailableAsync();
                     if (available)
                     {
                         _showsBiometricStep = true;
