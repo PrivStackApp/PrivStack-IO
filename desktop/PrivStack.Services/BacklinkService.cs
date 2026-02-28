@@ -222,6 +222,11 @@ public sealed class BacklinkService
         _entityMap = null;
     }
 
+    /// <summary>
+    /// Pre-builds the backlink index in the background so the first query is instant.
+    /// </summary>
+    public Task PreBuildIndexAsync(CancellationToken ct = default) => EnsureIndexBuiltAsync(ct);
+
     private int CountLinks(string key)
     {
         var count = 0;

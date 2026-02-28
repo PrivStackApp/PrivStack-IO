@@ -7,6 +7,7 @@ using System.Linq;
 using Avalonia.Markup.Xaml;
 using AvaloniaWebView;
 using Microsoft.Extensions.DependencyInjection;
+using PrivStack.Services;
 using PrivStack.Services.Native;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
@@ -642,6 +643,9 @@ public partial class App : Application
 
                     // Eagerly resolve RAG index service so its auto-init task runs on startup
                     _ = Services.GetRequiredService<RagIndexService>();
+
+                    // Pre-build backlink index so first Info Panel interaction is instant
+                    _ = Services.GetRequiredService<BacklinkService>().PreBuildIndexAsync();
                 }
 
                 // These run in both modes
