@@ -374,6 +374,33 @@ internal sealed class LocalLlamaProvider : IAiProvider
     }
 
     /// <summary>
+    /// Releases the loaded model weights and context from memory without permanently
+    /// disposing the provider. Can be re-loaded on next inference via <see cref="EnsureModelLoadedAsync"/>.
+    /// </summary>
+    public async Task UnloadModelAsync()
+    {
+        await _inferLock.WaitAsync();
+        try
+        {
+            if (_weights == null && _context == null) return;
+
+            _context?.Dispose();
+            _weights?.Dispose();
+            _context = null;
+            _weights = null;
+            _loadedModelPath = null;
+
+            GC.Collect(2, GCCollectionMode.Aggressive, blocking: false);
+
+            _log.Information("Local LLM model unloaded from memory");
+        }
+        finally
+        {
+            _inferLock.Release();
+        }
+    }
+
+    /// <summary>
     /// Pre-loads a model into memory so the first inference request doesn't pay the load cost.
     /// Called by settings after a model download completes.
     /// </summary>

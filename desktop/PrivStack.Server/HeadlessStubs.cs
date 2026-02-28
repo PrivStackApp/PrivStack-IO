@@ -158,6 +158,7 @@ internal sealed class HeadlessEmbeddingService : PrivStack.Services.AI.IEmbeddin
 {
     public bool IsReady => false;
     public Task InitializeAsync(CancellationToken ct = default) => Task.CompletedTask;
+    public Task UnloadAsync() => Task.CompletedTask;
     public Task<double[]> EmbedAsync(string text, PrivStack.Services.AI.EmbeddingTaskType taskType, CancellationToken ct = default) => Task.FromResult(Array.Empty<double>());
     public Task<double[][]> EmbedBatchAsync(string[] texts, PrivStack.Services.AI.EmbeddingTaskType taskType, CancellationToken ct = default) => Task.FromResult(Array.Empty<double[]>());
 }

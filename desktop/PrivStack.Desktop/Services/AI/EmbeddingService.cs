@@ -30,6 +30,32 @@ internal sealed class EmbeddingService : PrivStack.Services.AI.IEmbeddingService
     }
 
     /// <summary>
+    /// Releases the ONNX session and tokenizer from memory without permanently disposing
+    /// the service. Can be re-initialized later via <see cref="InitializeAsync"/>.
+    /// </summary>
+    public async Task UnloadAsync()
+    {
+        await _semaphore.WaitAsync();
+        try
+        {
+            if (_session == null && _tokenizer == null) return;
+
+            _session?.Dispose();
+            _session = null;
+            _tokenizer = null;
+
+            // Nudge the GC to reclaim the native ONNX buffers promptly
+            GC.Collect(2, GCCollectionMode.Aggressive, blocking: false);
+
+            _log.Information("Embedding model unloaded from memory");
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+
+    /// <summary>
     /// Loads the ONNX model and tokenizer. No-op if already initialized.
     /// </summary>
     public async Task InitializeAsync(CancellationToken ct = default)

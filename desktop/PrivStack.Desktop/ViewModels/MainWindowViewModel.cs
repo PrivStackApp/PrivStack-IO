@@ -1283,6 +1283,12 @@ public partial class MainWindowViewModel : ViewModelBase
         try { App.Services.GetRequiredService<ISnapshotSyncService>().Dispose(); }
         catch { /* Ignore */ }
 
+        // Release AI native resources (ONNX embedding model, RAG index worker, local LLM)
+        try { App.Services.GetRequiredService<PrivStack.Services.AI.RagIndexService>().Dispose(); }
+        catch { /* Ignore */ }
+        try { App.Services.GetRequiredService<PrivStack.Desktop.Services.AI.EmbeddingService>().Dispose(); }
+        catch { /* Ignore */ }
+
         _infoPanelVM?.Cleanup();
         _syncVM?.StopRefreshTimer();
         _updateVM?.Cleanup();

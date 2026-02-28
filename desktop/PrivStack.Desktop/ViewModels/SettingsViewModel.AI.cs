@@ -363,6 +363,39 @@ public partial class SettingsViewModel
         _settingsService.Settings.AiEnabled = value;
         _settingsService.SaveDebounced();
         WeakReferenceMessenger.Default.Send(new IntentSettingsChangedMessage());
+
+        if (!value)
+            _ = UnloadAiModelsAsync();
+    }
+
+    /// <summary>
+    /// Unloads AI models (embedding ONNX + local LLM) from memory when AI is disabled.
+    /// Models will be re-loaded on demand when AI is re-enabled and used.
+    /// </summary>
+    private async Task UnloadAiModelsAsync()
+    {
+        try
+        {
+            // Unload embedding model (ONNX session + tokenizer)
+            var embeddingService = App.Services.GetRequiredService<EmbeddingService>();
+            await embeddingService.UnloadAsync();
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Failed to unload embedding model");
+        }
+
+        try
+        {
+            // Unload local LLM weights if loaded
+            var aiService = App.Services.GetRequiredService<AiService>();
+            if (aiService.GetProvider("local") is LocalLlamaProvider localProvider)
+                await localProvider.UnloadModelAsync();
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Failed to unload local LLM model");
+        }
     }
 
     partial void OnSelectedAiProviderChanged(AiProviderOption? value)

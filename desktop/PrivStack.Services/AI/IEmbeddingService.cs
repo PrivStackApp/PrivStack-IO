@@ -8,6 +8,7 @@ public interface IEmbeddingService
 {
     bool IsReady { get; }
     Task InitializeAsync(CancellationToken ct = default);
+    Task UnloadAsync();
     Task<double[]> EmbedAsync(string text, EmbeddingTaskType taskType, CancellationToken ct = default);
     Task<double[][]> EmbedBatchAsync(string[] texts, EmbeddingTaskType taskType, CancellationToken ct = default);
 }
