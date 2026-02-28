@@ -426,7 +426,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public string Version => $"v{PrivStackService.Version}";
 
-    public bool IsInitialized => _service.IsInitialized;
+    public bool IsInitialized => _service.IsInitialized || App.IsClientMode;
+
+    /// <summary>
+    /// In client mode the native runtime is not initialized (the server owns DuckDB),
+    /// but the app is fully operational via the HTTP SDK transport.
+    /// </summary>
+    private bool IsServiceReady => _service.IsInitialized || App.IsClientMode;
 
     public MainWindowViewModel(
         IPrivStackRuntime nativeService,
@@ -439,7 +445,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _appSettings = appSettings;
         _workspaceService = workspaceService;
 
-        if (_service.IsInitialized)
+        if (IsServiceReady)
         {
             StatusMessage = "Ready";
         }
@@ -771,7 +777,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _appSettings.UpdateLastActiveTab(tabName);
         _pluginRegistry.UpdateSelectedNavItem(tabName);
 
-        if (!_service.IsInitialized)
+        if (!IsServiceReady)
         {
             StatusMessage = "Not initialized";
             return Task.CompletedTask;
@@ -857,7 +863,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void Initialize()
     {
-        if (!_service.IsInitialized)
+        if (!IsServiceReady)
         {
             StatusMessage = "Service not initialized";
             return;
@@ -1064,7 +1070,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         _pluginRegistry.UpdateSelectedNavItem(tabName);
 
-        if (!_service.IsInitialized)
+        if (!IsServiceReady)
         {
             StatusMessage = "Not initialized";
             return;

@@ -100,7 +100,11 @@ public partial class App : Application
                 _ = EnterClientModeAsync(desktop).ContinueWith(t =>
                 {
                     if (t.IsFaulted)
-                        Log.Error(t.Exception!.InnerException ?? t.Exception, "Client mode startup failed");
+                    {
+                        var ex = t.Exception!.InnerException ?? t.Exception;
+                        Log.Error(ex, "Client mode startup failed");
+                        Console.Error.WriteLine($"[privstack] Client mode startup failed: {ex.GetType().Name}: {ex.Message}");
+                    }
                 }, TaskScheduler.Default);
             }
             else

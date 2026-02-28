@@ -37,7 +37,10 @@ namespace PrivStack.Desktop.Services.Plugin;
 /// </summary>
 public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, IDisposable
 {
-    private static readonly ILogger _log = Log.ForContext<PluginRegistry>();
+    // Use a property (not static readonly) because ReconfigureForWorkspace disposes the old
+    // Serilog logger. A static readonly ForContext child would be bound to the disposed instance
+    // and silently drop all messages after workspace log redirection.
+    private static ILogger _log => Serilog.Log.ForContext<PluginRegistry>();
 
     private readonly List<IAppPlugin> _plugins = [];
     private readonly Dictionary<string, IAppPlugin> _pluginById = new(StringComparer.OrdinalIgnoreCase);
@@ -188,8 +191,12 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
             catch (Exception ex)
             {
                 _log.Error(ex, "Plugin initialization failed: {PluginId}", plugin.Metadata.Id);
+                Console.Error.WriteLine($"[privstack] Plugin init failed: {plugin.Metadata.Id} — {ex.GetType().Name}: {ex.Message}");
             }
         }
+
+        _log.Information("Plugin initialization complete (sync). Initialized: {Count}/{Total}",
+            _plugins.Count(p => p.State == PluginState.Initialized), _plugins.Count);
 
         var syncWsConfig = App.Services.GetRequiredService<IAppSettingsService>().GetWorkspacePluginConfig();
         foreach (var plugin in _plugins.Where(p => p.State == PluginState.Initialized))
@@ -1644,6 +1651,7 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
         catch (Exception ex)
         {
             _log.Error(ex, "Plugin initialization failed: {PluginId}", plugin.Metadata.Id);
+            Console.Error.WriteLine($"[privstack] Plugin init failed: {plugin.Metadata.Id} — {ex.GetType().Name}: {ex.Message}");
             RaisePluginStateChanged(plugin, PluginState.Failed, ex.Message);
         }
     }
