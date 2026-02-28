@@ -247,6 +247,16 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
                 : Results.Json(new { success = false, error_code = "ffi_error", error_message = "Search returned null" }, statusCode: 500);
         });
 
+        // Entity type registration
+        apiGroup.MapPost("/sdk/register-entity-type", async (HttpContext ctx) =>
+        {
+            var body = await ReadBodyAsync(ctx);
+            if (body == null) return Results.BadRequest(new { error = "Request body required" });
+
+            var result = transport.RegisterEntityType(body);
+            return Results.Json(new { result });
+        });
+
         // ── Database maintenance ──
 
         apiGroup.MapGet("/sdk/db/diagnostics", () =>

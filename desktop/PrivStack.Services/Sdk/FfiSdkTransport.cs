@@ -32,6 +32,8 @@ internal sealed class FfiSdkTransport : ISdkTransport
         return MarshalAndFreeString(ptr);
     }
 
+    public int RegisterEntityType(string schemaJson) => NativeLib.RegisterEntityType(schemaJson);
+
     // =========================================================================
     // Database Maintenance
     // =========================================================================

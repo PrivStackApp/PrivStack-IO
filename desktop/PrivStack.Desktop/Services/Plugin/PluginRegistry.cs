@@ -1852,12 +1852,13 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
             },
         ];
 
+        var sdkHost = App.Services.GetRequiredService<SdkHost>();
         foreach (var schema in systemSchemas)
         {
             try
             {
                 var json = JsonSerializer.Serialize(schema, _schemaJsonOptions);
-                var result = NativeLib.RegisterEntityType(json);
+                var result = sdkHost.RegisterEntityType(json);
 
                 if (result == 0)
                     _log.Information("Registered system entity type '{EntityType}'", schema.EntityType);
@@ -1873,19 +1874,20 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
     }
 
     /// <summary>
-    /// Registers a plugin's entity schemas with the Rust core via FFI.
+    /// Registers a plugin's entity schemas with the core engine via the active transport.
     /// </summary>
     private static void RegisterEntitySchemas(IAppPlugin plugin)
     {
         var schemas = plugin.EntitySchemas;
         if (schemas.Count == 0) return;
 
+        var sdkHost = App.Services.GetRequiredService<SdkHost>();
         foreach (var schema in schemas)
         {
             try
             {
                 var json = JsonSerializer.Serialize(schema, _schemaJsonOptions);
-                var result = NativeLib.RegisterEntityType(json);
+                var result = sdkHost.RegisterEntityType(json);
 
                 if (result == 0)
                 {

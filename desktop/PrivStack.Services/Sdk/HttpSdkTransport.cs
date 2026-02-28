@@ -39,6 +39,12 @@ internal sealed class HttpSdkTransport : ISdkTransport
         return PostJson("/api/v1/sdk/search", queryJson);
     }
 
+    public int RegisterEntityType(string schemaJson)
+    {
+        var response = PostJson("/api/v1/sdk/register-entity-type", schemaJson);
+        return ParseIntResult(response);
+    }
+
     // =========================================================================
     // Database Maintenance
     // =========================================================================
@@ -278,6 +284,24 @@ internal sealed class HttpSdkTransport : ISdkTransport
         catch
         {
             return PrivStackError.StorageError;
+        }
+    }
+
+    private static int ParseIntResult(string? json)
+    {
+        if (string.IsNullOrEmpty(json))
+            return -1;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("result", out var resultProp))
+                return resultProp.GetInt32();
+            return -1;
+        }
+        catch
+        {
+            return -1;
         }
     }
 

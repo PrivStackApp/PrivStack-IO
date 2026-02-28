@@ -24,6 +24,12 @@ internal interface ISdkTransport : IDisposable
     /// </summary>
     string? Search(string queryJson);
 
+    /// <summary>
+    /// Registers an entity type schema with the core engine.
+    /// Returns 0 on success, negative on error.
+    /// </summary>
+    int RegisterEntityType(string schemaJson);
+
     // =========================================================================
     // Database Maintenance
     // =========================================================================

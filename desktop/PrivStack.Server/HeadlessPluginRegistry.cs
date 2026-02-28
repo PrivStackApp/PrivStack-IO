@@ -5,12 +5,10 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Services;
 using PrivStack.Services.Abstractions;
-using PrivStack.Services.Native;
 using PrivStack.Services.Plugin;
 using PrivStack.Services.Sdk;
 using PrivStack.Sdk;
 using Serilog;
-using NativeLib = PrivStack.Services.Native.NativeLibrary;
 
 namespace PrivStack.Server;
 
@@ -370,7 +368,7 @@ internal sealed class HeadlessPluginRegistry : IPluginRegistry
     };
 
     /// <summary>
-    /// Registers a plugin's entity schemas with the Rust core via FFI.
+    /// Registers a plugin's entity schemas with the core engine via the active transport.
     /// Must be called before <see cref="IAppPlugin.InitializeAsync"/> so the
     /// core engine knows about entity types when handling SDK messages.
     /// </summary>
@@ -379,12 +377,13 @@ internal sealed class HeadlessPluginRegistry : IPluginRegistry
         var schemas = plugin.EntitySchemas;
         if (schemas.Count == 0) return;
 
+        var sdkHost = ServiceProviderAccessor.Services.GetRequiredService<SdkHost>();
         foreach (var schema in schemas)
         {
             try
             {
                 var json = JsonSerializer.Serialize(schema, _schemaJsonOptions);
-                var result = NativeLib.RegisterEntityType(json);
+                var result = sdkHost.RegisterEntityType(json);
 
                 if (result == 0)
                     _log.Information("Registered entity type '{EntityType}' from plugin {PluginId}",
@@ -455,12 +454,13 @@ internal sealed class HeadlessPluginRegistry : IPluginRegistry
             },
         ];
 
+        var sdkHost = ServiceProviderAccessor.Services.GetRequiredService<SdkHost>();
         foreach (var schema in systemSchemas)
         {
             try
             {
                 var json = JsonSerializer.Serialize(schema, _schemaJsonOptions);
-                var result = NativeLib.RegisterEntityType(json);
+                var result = sdkHost.RegisterEntityType(json);
 
                 if (result == 0)
                     _log.Debug("Registered system entity type '{EntityType}'", schema.EntityType);

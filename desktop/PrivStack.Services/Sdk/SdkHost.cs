@@ -42,6 +42,12 @@ internal sealed class SdkHost : IPrivStackSdk, IDisposable
     public void SetTransport(ISdkTransport transport) => _transport = transport;
 
     /// <summary>
+    /// Registers an entity type schema with the core engine (via the active transport).
+    /// Returns 0 on success, negative on error.
+    /// </summary>
+    public int RegisterEntityType(string schemaJson) => _transport.RegisterEntityType(schemaJson);
+
+    /// <summary>
     /// Wires the outbound sync service. Called after DI construction.
     /// </summary>
     public void SetSyncOutbound(ISyncOutboundService service) => _syncOutbound = service;
