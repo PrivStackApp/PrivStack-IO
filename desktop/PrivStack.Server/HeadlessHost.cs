@@ -67,6 +67,31 @@ internal static class HeadlessHost
             var wizardResult = await HeadlessSetupWizard.RunAsync();
             if (wizardResult != 0) return wizardResult;
         }
+        else if (options.SetupNetwork)
+        {
+            // Re-configure network settings only
+            ConsoleUi.WriteSection("Network Configuration");
+            var existingConfig = HeadlessConfig.Load();
+            var bindAddr = ConsoleUi.ReadLine("  Bind address", existingConfig.BindAddress);
+            var portStr = ConsoleUi.ReadLine("  Port", existingConfig.Port.ToString());
+            var portVal = int.TryParse(portStr, out var pv) ? pv : existingConfig.Port;
+
+            if (bindAddr is not ("127.0.0.1" or "localhost" or "::1"))
+            {
+                ConsoleUi.WriteWarning($"Binding to {bindAddr} exposes the API to the network.");
+                if (!ConsoleUi.YesNo("  Continue?", defaultYes: false))
+                {
+                    bindAddr = existingConfig.BindAddress;
+                    ConsoleUi.WriteSuccess($"Reverted to {bindAddr}");
+                }
+            }
+
+            existingConfig.BindAddress = bindAddr;
+            existingConfig.Port = portVal;
+            existingConfig.Save();
+            ConsoleUi.WriteSuccess($"Network configuration saved: {bindAddr}:{portVal}. Restart the server to apply.");
+            return ExitSuccess;
+        }
         else if (options.SetupTls)
         {
             // Re-configure TLS only
