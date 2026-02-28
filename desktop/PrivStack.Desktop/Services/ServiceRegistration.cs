@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Desktop.Sdk;
 using PrivStack.Desktop.Services.Abstractions;
+using PrivStack.Desktop.Services.AI;
 using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Desktop.ViewModels;
 using PrivStack.Services;
@@ -42,6 +43,10 @@ public static class ServiceRegistration
         services.AddSingleton<WhisperModelManager>();
         services.AddSingleton<IAudioRecorderService, AudioRecorderServiceAdapter>();
         services.AddSingleton<ITranscriptionService, TranscriptionServiceAdapter>();
+
+        // Desktop-specific: ONNX embedding service (used by RagSearchService / RagIndexService)
+        services.AddSingleton<EmbeddingService>();
+        services.AddSingleton<PrivStack.Services.AI.IEmbeddingService>(sp => sp.GetRequiredService<EmbeddingService>());
 
         // UI-specific services
         services.AddSingleton<IThemeService, ThemeService>();
