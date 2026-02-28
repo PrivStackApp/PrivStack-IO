@@ -156,6 +156,7 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
     private string? _activeItemContextShort;
     private string? _activeItemContextFull;
     private string? _activePluginContext;
+    private string? _activeItemRagKeywords;
     private bool _hasEmbeddedDatasets;
 
     private void OnActivePluginChanged()
@@ -188,6 +189,7 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
         {
             _activeItemContextShort = null;
             _activeItemContextFull = null;
+            _activeItemRagKeywords = null;
             _hasEmbeddedDatasets = false;
             return;
         }
@@ -244,10 +246,85 @@ public partial class AiSuggestionTrayViewModel : ViewModelBase,
             _activeItemContextFull =
                 $"The user is currently viewing a {displayName} item: \"{title}\"\n" +
                 $"Full entity data (JSON):\n```json\n{json}\n```";
+
+            _activeItemRagKeywords = ExtractEntityKeywords(json, linkType);
         }
         catch (Exception ex)
         {
             _log.Debug(ex, "Failed to fetch active item entity for context: {LinkType}:{ItemId}", linkType, itemId);
+        }
+    }
+
+    /// <summary>
+    /// Extracts semantic keywords from entity JSON to augment RAG queries.
+    /// Returns space-separated keywords, or null if none found.
+    /// </summary>
+    private static string? ExtractEntityKeywords(string json, string linkType)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            var keywords = new List<string>();
+
+            switch (linkType)
+            {
+                case "contact":
+                    AddJsonStringField(root, "job_title", keywords);
+                    AddJsonStringField(root, "company_name", keywords);
+                    AddJsonStringField(root, "department", keywords);
+                    AddJsonStringField(root, "bio", keywords);
+                    AddJsonArrayField(root, "tags", keywords);
+                    break;
+
+                case "task":
+                    AddJsonArrayField(root, "tags", keywords);
+                    AddJsonArrayField(root, "contexts", keywords);
+                    AddJsonStringField(root, "project_name", keywords);
+                    break;
+
+                case "page":
+                    AddJsonArrayField(root, "tags", keywords);
+                    break;
+
+                default:
+                    AddJsonArrayField(root, "tags", keywords);
+                    break;
+            }
+
+            return keywords.Count > 0 ? string.Join(" ", keywords) : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static void AddJsonStringField(JsonElement root, string fieldName, List<string> keywords)
+    {
+        if (root.TryGetProperty(fieldName, out var prop) &&
+            prop.ValueKind == JsonValueKind.String)
+        {
+            var value = prop.GetString();
+            if (!string.IsNullOrWhiteSpace(value))
+                keywords.Add(value);
+        }
+    }
+
+    private static void AddJsonArrayField(JsonElement root, string fieldName, List<string> keywords)
+    {
+        if (root.TryGetProperty(fieldName, out var prop) &&
+            prop.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in prop.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String)
+                {
+                    var value = item.GetString();
+                    if (!string.IsNullOrWhiteSpace(value))
+                        keywords.Add(value);
+                }
+            }
         }
     }
 

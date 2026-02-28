@@ -106,6 +106,7 @@ public partial class AiSuggestionTrayViewModel
             var activePluginCtx = _activePluginContext;
             var activeItemCtxFull = _activeItemContextFull;
             var activeItemCtxShort = _activeItemContextShort;
+            var activeRagKeywords = _activeItemRagKeywords;
             var hasEmbeddedDatasets = _hasEmbeddedDatasets;
 
             // Capture conversational entity tracking state
@@ -127,7 +128,10 @@ public partial class AiSuggestionTrayViewModel
             // Run all heavy work (RAG, wiki-link resolution, prompt building, AI call) off the UI thread
             var (response, request) = await Task.Run(async () =>
             {
-                var (ragContext, hasIntentActions) = await BuildRagContextWithIntentsAsync(text);
+                var ragQuery = string.IsNullOrEmpty(activeRagKeywords)
+                    ? text
+                    : $"{text} {activeRagKeywords}";
+                var (ragContext, hasIntentActions) = await BuildRagContextWithIntentsAsync(ragQuery);
 
                 // Resolve wiki-links in background (I/O bound — was blocking UI thread)
                 var resolvedEntityContext = await ResolveWikiLinksAsync(text);
