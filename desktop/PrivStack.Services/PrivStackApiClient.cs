@@ -473,7 +473,7 @@ public record OAuthTokenResponse
     public string TokenType { get; init; } = string.Empty;
 
     [JsonPropertyName("expires_in")]
-    public int ExpiresIn { get; init; }
+    public long ExpiresIn { get; init; }
 
     [JsonPropertyName("cloud_config")]
     public OAuthCloudConfig? CloudConfig { get; init; }
