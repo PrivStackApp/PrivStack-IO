@@ -438,7 +438,7 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
     internal void StartLiveMetrics()
     {
         if (_liveMetricsTimer != null) return;
-        _liveMetricsTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _liveMetricsTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _liveMetricsTimer.Tick += OnLiveMetricsTick;
         _liveMetricsTimer.Start();
     }
