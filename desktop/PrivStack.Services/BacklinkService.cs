@@ -353,54 +353,6 @@ public sealed class BacklinkService
             }
         }
 
-        // For legacy entities without content from list view, load individually
-        var legacyLinkTypeSet = new HashSet<string>(legacyEntityTypes.Select(et => et.LinkType));
-        var entitiesToFetch = entityMap.Keys
-            .Where(k => !entityContents.ContainsKey(k) && legacyLinkTypeSet.Contains(k.Split(':', 2)[0]))
-            .ToList();
-        if (entitiesToFetch.Count > 0)
-        {
-            _log.Information("BacklinkService: fetching content for {Count} entities missing from list view", entitiesToFetch.Count);
-            var fetchTasks = entitiesToFetch.Select(async key =>
-            {
-                try
-                {
-                    var parts = key.Split(':', 2);
-                    if (parts.Length != 2) return;
-                    var linkType = parts[0];
-
-                    var sdkEntityType = EntityTypes.FirstOrDefault(et => et.LinkType == linkType).EntityType;
-                    if (sdkEntityType == null) return;
-
-                    var response = await _sdk.SendAsync<JsonElement>(new SdkMessage
-                    {
-                        PluginId = "privstack.graph",
-                        Action = SdkAction.Read,
-                        EntityType = sdkEntityType,
-                        EntityId = parts[1],
-                    }, ct);
-
-                    if (response.Data.ValueKind == JsonValueKind.Undefined) return;
-
-                    var content = WikiLinkParser.ExtractContentFromEntity(response.Data);
-                    var explicitLinks = ExtractExplicitLinksFromCustomFields(response.Data);
-
-                    if (!string.IsNullOrEmpty(content))
-                        lock (entityContents) { entityContents[key] = content; }
-                    if (explicitLinks.Count > 0)
-                        lock (entityExplicitLinks) { entityExplicitLinks[key] = explicitLinks; }
-                }
-                catch (Exception ex)
-                {
-                    _log.Debug(ex, "BacklinkService: failed to fetch content for {Key}", key);
-                }
-            });
-            await Task.WhenAll(fetchTasks);
-
-            _log.Information("BacklinkService: after individual fetches, {ContentCount} entities now have content",
-                entityContents.Count);
-        }
-
         // --- Phase 3: Build forward + reverse indices from wiki-links ---
         var reverseIndex = new Dictionary<string, List<BacklinkEntry>>();
         var forwardLinks = new Dictionary<string, HashSet<string>>();
