@@ -882,7 +882,9 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
     private static List<Type> ScanAssemblyPlugins(string dir)
     {
         var results = new List<Type>();
-        var pluginDlls = Directory.GetFiles(dir, "PrivStack.Plugin.*.dll");
+        var pluginDlls = Directory.GetFiles(dir, "PrivStack.Plugin.*.dll")
+            .Where(f => !Path.GetFileName(f).Contains(".Headless.", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
         if (pluginDlls.Length == 0) return results;
 
         foreach (var dllPath in pluginDlls)

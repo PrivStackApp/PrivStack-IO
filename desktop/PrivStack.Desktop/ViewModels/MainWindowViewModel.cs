@@ -497,12 +497,15 @@ public partial class MainWindowViewModel : ViewModelBase
         // Start auto-check for updates (checks setting internally)
         UpdateVM.StartAutoCheck(TimeSpan.FromHours(4));
 
-        // Validate subscription status in the background
-        _ = Task.Run(async () =>
+        // Validate subscription status in the background (skip in client mode — server validates)
+        if (!App.IsClientMode)
         {
-            var subService = App.Services.GetRequiredService<SubscriptionValidationService>();
-            await subService.ValidateAsync();
-        });
+            _ = Task.Run(async () =>
+            {
+                var subService = App.Services.GetRequiredService<SubscriptionValidationService>();
+                await subService.ValidateAsync();
+            });
+        }
 
         // Activate dataset insight orchestrator (subscribes to messenger)
         _ = App.Services.GetRequiredService<DatasetInsightOrchestrator>();

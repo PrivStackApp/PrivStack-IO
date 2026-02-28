@@ -1014,6 +1014,9 @@ public partial class SettingsViewModel : ViewModelBase
 
     private async Task ToggleApiServerAsync(bool enable)
     {
+        // In client mode, the remote server owns the API — don't start a local one
+        if (App.IsClientMode) return;
+
         try
         {
             if (enable)

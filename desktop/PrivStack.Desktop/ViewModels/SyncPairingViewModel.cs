@@ -361,6 +361,9 @@ public partial class SyncPairingViewModel : ViewModelBase
 
     private void LoadInitialState()
     {
+        // In client mode, the server manages sync — skip FFI pairing calls
+        if (App.IsClientMode) return;
+
         try
         {
             // Load pairing state from persisted settings
