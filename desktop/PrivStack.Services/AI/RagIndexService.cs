@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using PrivStack.Services.Plugin;
 using PrivStack.Sdk.Capabilities;
 using PrivStack.Sdk.Messaging;
+using PrivStack.Services.Abstractions;
 using Serilog;
 using NativeLib = PrivStack.Services.Native.NativeLibrary;
 
@@ -29,6 +30,7 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
 
     private readonly IEmbeddingService _embeddingService;
     private readonly IPluginRegistry _pluginRegistry;
+    private readonly IAppSettingsService _appSettings;
     private readonly Channel<List<RagIndexRequest>> _channel;
     private readonly ConcurrentQueue<RagIndexRequest> _pendingQueue = new();
     private readonly object _timerLock = new();
@@ -37,10 +39,11 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
     private Task? _consumerTask;
     private bool _disposed;
 
-    public RagIndexService(IEmbeddingService embeddingService, IPluginRegistry pluginRegistry)
+    public RagIndexService(IEmbeddingService embeddingService, IPluginRegistry pluginRegistry, IAppSettingsService appSettings)
     {
         _embeddingService = embeddingService;
         _pluginRegistry = pluginRegistry;
+        _appSettings = appSettings;
         _channel = Channel.CreateBounded<List<RagIndexRequest>>(
             new BoundedChannelOptions(QueueCapacity)
             {
@@ -58,6 +61,12 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
             await Task.Delay(TimeSpan.FromSeconds(5), _disposeCts.Token);
             try
             {
+                if (!_appSettings.Settings.AiEnabled)
+                {
+                    _log.Debug("AI is disabled — skipping embedding model auto-initialization");
+                    return;
+                }
+
                 await _embeddingService.InitializeAsync(_disposeCts.Token);
                 if (_embeddingService.IsReady)
                 {

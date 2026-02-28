@@ -175,11 +175,30 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
 
         _plugins.Sort((a, b) => a.Metadata.NavigationOrder.CompareTo(b.Metadata.NavigationOrder));
 
+        // Pre-compute which plugins are disabled so we can skip expensive init
+        var syncWsConfig = App.Services.GetRequiredService<IAppSettingsService>().GetWorkspacePluginConfig();
+        var experimentalEnabled = App.Services.GetRequiredService<IAppSettingsService>().Settings.ExperimentalPluginsEnabled;
+
         // Phase 1 (serial): vault unlock, host creation, schema registration.
         // These are fast and may access shared state or UI.
+        // Disabled plugins only get schema registration (cheap, needed for backlinks/sync).
         var readyPlugins = new List<(IAppPlugin plugin, IPluginHost host)>();
         foreach (var plugin in _plugins)
         {
+            var isRequired = !plugin.Metadata.CanDisable || plugin.Metadata.IsHardLocked;
+            var isDisabled = !isRequired && (
+                (plugin.Metadata.IsExperimental && !experimentalEnabled) ||
+                IsPluginDisabledByConfig(syncWsConfig, plugin.Metadata.Id));
+
+            if (isDisabled)
+            {
+                // Register schemas only — keeps entity data accessible for backlinks/sync
+                try { RegisterEntitySchemas(plugin); }
+                catch (Exception ex) { _log.Error(ex, "Schema registration failed for disabled plugin: {PluginId}", plugin.Metadata.Id); }
+                _log.Debug("Skipping initialization for disabled plugin: {PluginId}", plugin.Metadata.Id);
+                continue;
+            }
+
             try
             {
                 EnsurePluginVaultsUnlocked(plugin);
@@ -194,7 +213,7 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
             }
         }
 
-        // Phase 2 (parallel): InitializeAsync on all plugins concurrently.
+        // Phase 2 (parallel): InitializeAsync on enabled plugins only.
         // Each plugin's init is independent and makes SDK calls that, in client
         // mode, are HTTP roundtrips — parallelism dramatically reduces startup time.
         var initTasks = readyPlugins.Select(async pair =>
@@ -216,20 +235,9 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
         _log.Information("Plugin initialization complete (sync). Initialized: {Count}/{Total}",
             _plugins.Count(p => p.State == PluginState.Initialized), _plugins.Count);
 
-        var syncWsConfig = App.Services.GetRequiredService<IAppSettingsService>().GetWorkspacePluginConfig();
+        // Activate initialized plugins — config already checked above, just activate all initialized
         foreach (var plugin in _plugins.Where(p => p.State == PluginState.Initialized))
         {
-            // Core shell plugins (CanDisable=false / IsHardLocked) always activate
-            if (!plugin.Metadata.CanDisable || plugin.Metadata.IsHardLocked)
-            {
-                ActivatePlugin(plugin);
-                continue;
-            }
-            if (plugin.Metadata.IsExperimental &&
-                !App.Services.GetRequiredService<IAppSettingsService>().Settings.ExperimentalPluginsEnabled)
-                continue;
-            if (IsPluginDisabledByConfig(syncWsConfig, plugin.Metadata.Id))
-                continue;
             ActivatePlugin(plugin);
         }
 
@@ -285,8 +293,13 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
         // Sort by navigation order
         _plugins.Sort((a, b) => a.Metadata.NavigationOrder.CompareTo(b.Metadata.NavigationOrder));
 
+        // Pre-compute which plugins are disabled so we can skip expensive init
+        var asyncWsConfig = App.Services.GetRequiredService<IAppSettingsService>().GetWorkspacePluginConfig();
+        var asyncExperimentalEnabled = App.Services.GetRequiredService<IAppSettingsService>().Settings.ExperimentalPluginsEnabled;
+
         // Phase 1 (serial): vault unlock, host creation, schema registration.
         // These are fast and may access shared state.
+        // Disabled plugins only get schema registration (cheap, needed for backlinks/sync).
         var readyPlugins = new List<(IAppPlugin plugin, IPluginHost host)>();
         foreach (var plugin in _plugins)
         {
@@ -294,6 +307,19 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
             {
                 _log.Warning("Plugin initialization cancelled");
                 break;
+            }
+
+            var isRequired = !plugin.Metadata.CanDisable || plugin.Metadata.IsHardLocked;
+            var isDisabled = !isRequired && (
+                (plugin.Metadata.IsExperimental && !asyncExperimentalEnabled) ||
+                IsPluginDisabledByConfig(asyncWsConfig, plugin.Metadata.Id));
+
+            if (isDisabled)
+            {
+                try { RegisterEntitySchemas(plugin); }
+                catch (Exception ex) { _log.Error(ex, "Schema registration failed for disabled plugin: {PluginId}", plugin.Metadata.Id); }
+                _log.Debug("Skipping initialization for disabled plugin: {PluginId}", plugin.Metadata.Id);
+                continue;
             }
 
             try
@@ -309,7 +335,7 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
             }
         }
 
-        // Phase 2 (parallel): InitializeAsync on all plugins concurrently.
+        // Phase 2 (parallel): InitializeAsync on enabled plugins only.
         // Each plugin's init is independent — parallelism reduces startup time
         // especially in client mode where each SDK call is an HTTP roundtrip.
         await Task.WhenAll(readyPlugins.Select(async pair =>
@@ -326,30 +352,9 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
             }
         }));
 
-        // Activate initialized plugins — core plugins always, optional plugins check workspace config
-        var asyncWsConfig = App.Services.GetRequiredService<IAppSettingsService>().GetWorkspacePluginConfig();
+        // Activate all initialized plugins — disabled check already done above
         foreach (var plugin in _plugins.Where(p => p.State == PluginState.Initialized))
         {
-            // Core shell plugins (CanDisable=false / IsHardLocked) always activate
-            if (!plugin.Metadata.CanDisable || plugin.Metadata.IsHardLocked)
-            {
-                ActivatePlugin(plugin);
-                continue;
-            }
-
-            if (plugin.Metadata.IsExperimental &&
-                !App.Services.GetRequiredService<IAppSettingsService>().Settings.ExperimentalPluginsEnabled)
-            {
-                _log.Debug("Skipping experimental plugin (not enabled): {PluginId}", plugin.Metadata.Id);
-                continue;
-            }
-
-            if (IsPluginDisabledByConfig(asyncWsConfig, plugin.Metadata.Id))
-            {
-                _log.Debug("Skipping user-disabled plugin: {PluginId}", plugin.Metadata.Id);
-                continue;
-            }
-
             ActivatePlugin(plugin);
         }
 

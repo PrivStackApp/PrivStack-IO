@@ -641,8 +641,9 @@ public partial class App : Application
                         }
                     }
 
-                    // Eagerly resolve RAG index service so its auto-init task runs on startup
-                    _ = Services.GetRequiredService<RagIndexService>();
+                    // Only start RAG indexing if AI is enabled — the embedding model is expensive
+                    if (appSettings.Settings.AiEnabled)
+                        _ = Services.GetRequiredService<RagIndexService>();
 
                     // Pre-build backlink index so first Info Panel interaction is instant
                     _ = Services.GetRequiredService<BacklinkService>().PreBuildIndexAsync();
