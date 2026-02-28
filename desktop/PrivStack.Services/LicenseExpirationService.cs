@@ -26,6 +26,27 @@ public sealed class LicenseExpirationService
     public void CheckLicenseStatus(ILicensingService licensing)
     {
         var status = licensing.GetLicenseStatus();
+        ApplyStatus(status);
+    }
+
+    /// <summary>
+    /// Applies a license status received from a remote server (client mode).
+    /// Parses the status string (e.g., "active", "expired", "readonly") to the enum.
+    /// </summary>
+    public void CheckLicenseStatusFromServer(string? statusString)
+    {
+        if (string.IsNullOrEmpty(statusString) ||
+            !Enum.TryParse<LicenseStatus>(statusString, ignoreCase: true, out var status))
+        {
+            _log.Debug("Could not parse server license status '{Status}', assuming active", statusString);
+            return;
+        }
+
+        ApplyStatus(status);
+    }
+
+    private void ApplyStatus(LicenseStatus status)
+    {
         var wasExpired = IsExpired;
         IsExpired = status is LicenseStatus.ReadOnly or LicenseStatus.Expired or LicenseStatus.NotActivated;
 

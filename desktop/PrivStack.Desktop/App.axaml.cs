@@ -34,6 +34,12 @@ public partial class App : Application
     /// </summary>
     public static bool IsClientMode { get; private set; }
 
+    /// <summary>
+    /// License status received from the headless server during client mode detection.
+    /// Null in standalone mode (license is checked locally via native service).
+    /// </summary>
+    private static string? _serverLicenseStatus;
+
     public override void RegisterServices()
     {
         base.RegisterServices();
@@ -91,7 +97,11 @@ public partial class App : Application
                 // A headless server is already running — Desktop becomes a client.
                 // Skip DuckDB init and unlock screen; route SDK calls over HTTP.
                 Log.Information("Client mode active, loading application directly");
-                _ = EnterClientModeAsync(desktop);
+                _ = EnterClientModeAsync(desktop).ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        Log.Error(t.Exception!.InnerException ?? t.Exception, "Client mode startup failed");
+                }, TaskScheduler.Default);
             }
             else
             {
@@ -181,7 +191,17 @@ public partial class App : Application
             if (!body.Contains("\"status\":\"ok\""))
                 return false;
 
-            Log.Information("Detected running headless server at {Url}, switching to client mode", serverUrl);
+            // Parse license status from server response
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("license_status", out var lsProp))
+                    _serverLicenseStatus = lsProp.GetString();
+            }
+            catch { /* Non-critical — leave as null */ }
+
+            Log.Information("Detected running headless server at {Url}, switching to client mode (license={License})",
+                serverUrl, _serverLicenseStatus ?? "unknown");
 
             // Swap the transport in SdkHost from FFI to HTTP
             var transport = new HttpSdkTransport(serverUrl, apiKey);
@@ -536,9 +556,18 @@ public partial class App : Application
         updateStatus?.Invoke("Checking license...");
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
 
-        // Check license expiration state for read-only enforcement banner (sets banner visibility)
-        var licensing = Services.GetRequiredService<ILicensingService>();
-        Services.GetRequiredService<LicenseExpirationService>().CheckLicenseStatus(licensing);
+        // Check license expiration state for read-only enforcement banner (sets banner visibility).
+        // In client mode, use the license status received from the server (native service isn't initialized).
+        var expirationService = Services.GetRequiredService<LicenseExpirationService>();
+        if (isClientMode)
+        {
+            expirationService.CheckLicenseStatusFromServer(_serverLicenseStatus);
+        }
+        else
+        {
+            var licensing = Services.GetRequiredService<ILicensingService>();
+            expirationService.CheckLicenseStatus(licensing);
+        }
 
         updateStatus?.Invoke("Preparing workspace...");
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);

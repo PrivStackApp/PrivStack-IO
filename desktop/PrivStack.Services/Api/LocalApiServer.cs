@@ -136,13 +136,27 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
         // Shell routes (no auth for status)
         var workspaceName = _workspaceService.GetActiveWorkspace()?.Name;
         var workspaceId = _workspaceService.GetActiveWorkspace()?.Id;
-        _app.MapGet("/api/v1/status", () => Results.Ok(new
+        _app.MapGet("/api/v1/status", () =>
         {
-            status = "ok",
-            version = "1",
-            workspace = workspaceName,
-            workspace_id = workspaceId,
-        }));
+            // Resolve license status lazily — native service may not be ready at endpoint registration time
+            string licenseStatus = "unknown";
+            try
+            {
+                var licensing = ServiceProviderAccessor.Services.GetService<Native.ILicensingService>();
+                if (licensing != null)
+                    licenseStatus = licensing.GetLicenseStatus().ToString().ToLowerInvariant();
+            }
+            catch { /* Native service not initialized — leave as "unknown" */ }
+
+            return Results.Ok(new
+            {
+                status = "ok",
+                version = "1",
+                workspace = workspaceName,
+                workspace_id = workspaceId,
+                license_status = licenseStatus,
+            });
+        });
 
         // All other routes require API key
         var apiGroup = _app.MapGroup("/api/v1").AddEndpointFilter(async (context, next) =>
