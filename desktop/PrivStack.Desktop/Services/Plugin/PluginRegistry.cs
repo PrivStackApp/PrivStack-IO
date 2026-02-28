@@ -929,17 +929,20 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
     /// Custom AssemblyLoadContext for C# plugins. Delegates resolution of assemblies
     /// provided by the host (SDK, Avalonia, LiveCharts, etc.) to the default context
     /// so that shared types have a single identity across host and plugins.
-    /// Plugin-specific dependencies are resolved from the plugin's directory.
+    /// Plugin-specific dependencies are resolved from the plugin's directory,
+    /// then from sibling plugin directories (e.g. Tasks → Tasks.Headless).
     /// </summary>
     private sealed class PluginLoadContext : AssemblyLoadContext
     {
         private readonly AssemblyDependencyResolver _resolver;
         private readonly AssemblyDependencyResolver _hostResolver;
+        private readonly string _pluginDir;
 
         public PluginLoadContext(string pluginPath, string hostPath) : base(isCollectible: false)
         {
             _resolver = new AssemblyDependencyResolver(pluginPath);
             _hostResolver = new AssemblyDependencyResolver(hostPath);
+            _pluginDir = Path.GetDirectoryName(pluginPath)!;
         }
 
         protected override Assembly? Load(AssemblyName assemblyName)
@@ -963,7 +966,26 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
 
             // Plugin-specific dependency: resolve from plugin directory
             var path = _resolver.ResolveAssemblyToPath(assemblyName);
-            return path != null ? LoadFromAssemblyPath(path) : null;
+            if (path != null)
+                return LoadFromAssemblyPath(path);
+
+            // Sibling plugin directory fallback: the Desktop Tasks plugin depends on
+            // the Headless assembly (shared models/services) which is deployed to its
+            // own sibling directory (e.g. plugins/PrivStack.Plugin.Tasks.Headless/).
+            return ResolveSiblingPlugin(assemblyName);
+        }
+
+        private Assembly? ResolveSiblingPlugin(AssemblyName assemblyName)
+        {
+            var parentDir = Path.GetDirectoryName(_pluginDir);
+            if (parentDir == null) return null;
+
+            var siblingDir = Path.Combine(parentDir, assemblyName.Name!);
+            var siblingDll = Path.Combine(siblingDir, assemblyName.Name + ".dll");
+            if (File.Exists(siblingDll))
+                return LoadFromAssemblyPath(siblingDll);
+
+            return null;
         }
 
         protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)

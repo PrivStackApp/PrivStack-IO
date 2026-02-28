@@ -69,6 +69,12 @@ public partial class SettingsViewModel
     [RelayCommand]
     private async Task RegenerateEmergencyKitAsync()
     {
+        if (App.IsClientMode)
+        {
+            EmergencyKitError = "Emergency Kit management is not available in client mode. Use the server instance.";
+            return;
+        }
+
         EmergencyKitError = string.Empty;
         IsRegeneratingKit = true;
         ShowRegeneratedWords = false;
