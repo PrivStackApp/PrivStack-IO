@@ -13,7 +13,7 @@ namespace PrivStack.Services.Sdk;
 /// </summary>
 internal sealed class HttpSdkTransport : ISdkTransport
 {
-    private static readonly ILogger _log = Log.ForContext<HttpSdkTransport>();
+    private static ILogger _log => Log.ForContext<HttpSdkTransport>();
 
     private readonly HttpClient _httpClient;
 

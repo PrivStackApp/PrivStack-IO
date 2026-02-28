@@ -1053,7 +1053,7 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>
     /// Navigates to the specified tab/plugin using the plugin lifecycle.
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task SelectTab(string tabName)
     {
         var previousPlugin = _pluginRegistry.GetPluginForNavItem(SelectedTab);
