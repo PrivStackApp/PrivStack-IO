@@ -98,6 +98,11 @@ public sealed class RegistryUpdateService : IUpdateService
             UpdateFound?.Invoke(this, release);
             return release;
         }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or TimeoutException)
+        {
+            Logger.Warning("Update check skipped — network unavailable: {Message}", ex.Message);
+            return null;
+        }
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to check for updates");
