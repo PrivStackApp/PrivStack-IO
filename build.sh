@@ -300,13 +300,24 @@ if [ "$WITH_PLUGINS" = true ]; then
         if [ "$REBUILD" = false ] && [ -f "$plugin_dll" ]; then
             NEEDS_BUILD=false
 
+            # Incomplete publish detection: if the output directory only has the
+            # plugin DLL/PDB/deps.json but is missing NuGet dependencies, a previous
+            # publish was interrupted. Force a rebuild to get a complete deployment.
+            dll_count=$(find "$plugin_out" -maxdepth 1 -name "*.dll" | wc -l | tr -d ' ')
+            if [ "$dll_count" -le 1 ]; then
+                NEEDS_BUILD=true
+                log_debug "    $plugin_name: incomplete publish (only $dll_count DLL), rebuilding..."
+            fi
+
             # Check plugin source files
-            while IFS= read -r -d '' src_file; do
-                if [ "$src_file" -nt "$plugin_dll" ]; then
-                    NEEDS_BUILD=true
-                    break
-                fi
-            done < <(find "$plugin_dir" \( -name "*.cs" -o -name "*.csproj" -o -name "*.axaml" -o -name "*.xaml" \) -not -path "*/bin/*" -not -path "*/obj/*" -print0)
+            if [ "$NEEDS_BUILD" = false ]; then
+                while IFS= read -r -d '' src_file; do
+                    if [ "$src_file" -nt "$plugin_dll" ]; then
+                        NEEDS_BUILD=true
+                        break
+                    fi
+                done < <(find "$plugin_dir" \( -name "*.cs" -o -name "*.csproj" -o -name "*.axaml" -o -name "*.xaml" \) -not -path "*/bin/*" -not -path "*/obj/*" -print0)
+            fi
 
             # Check shared SDK/UI dependencies — if their build output is newer,
             # the plugin needs republishing to pick up the updated DLLs
