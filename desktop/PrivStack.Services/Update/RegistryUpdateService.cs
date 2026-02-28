@@ -23,6 +23,8 @@ public sealed class RegistryUpdateService : IUpdateService
 
     private string? _downloadedFilePath;
     private LatestReleaseInfo? _latestRelease;
+    private int _consecutiveNetworkFailures;
+    private const int MaxConsecutiveFailuresBeforeBackoff = 2;
 
     public string CurrentVersion
     {
@@ -42,12 +44,26 @@ public sealed class RegistryUpdateService : IUpdateService
         _appSettings = appSettings;
     }
 
+    /// <summary>
+    /// Resets the network backoff so the next auto-check fires immediately.
+    /// Call this when the user explicitly requests an update check.
+    /// </summary>
+    public void ResetNetworkBackoff() => _consecutiveNetworkFailures = 0;
+
     public async Task<LatestReleaseInfo?> CheckForUpdatesAsync(CancellationToken ct = default)
     {
+        if (_consecutiveNetworkFailures >= MaxConsecutiveFailuresBeforeBackoff)
+        {
+            Logger.Debug("Skipping update check — API unreachable after {Failures} consecutive failures",
+                _consecutiveNetworkFailures);
+            return null;
+        }
+
         try
         {
             Logger.Information("Checking for updates via registry API...");
             var release = await _apiClient.GetLatestReleaseAsync(ct);
+            _consecutiveNetworkFailures = 0; // API responded — network is reachable
 
             if (release == null || string.IsNullOrEmpty(release.Version))
             {
@@ -93,6 +109,7 @@ public sealed class RegistryUpdateService : IUpdateService
             }
 
             _latestRelease = release;
+            _consecutiveNetworkFailures = 0;
             Logger.Information("Update available: {Version} (current: {Current})",
                 release.Version, currentVersionStr);
             UpdateFound?.Invoke(this, release);
@@ -100,7 +117,9 @@ public sealed class RegistryUpdateService : IUpdateService
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or TimeoutException)
         {
-            Logger.Warning("Update check skipped — network unavailable: {Message}", ex.Message);
+            _consecutiveNetworkFailures++;
+            Logger.Warning("Update check failed — network unavailable ({Failures}/{Max}): {Message}",
+                _consecutiveNetworkFailures, MaxConsecutiveFailuresBeforeBackoff, ex.Message);
             return null;
         }
         catch (Exception ex)

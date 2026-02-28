@@ -178,6 +178,8 @@ public partial class UpdateViewModel : ViewModelBase
     {
         // Mark startup as complete so the "up to date" message shows
         _startupCheckComplete = true;
+        // Reset network backoff so the manual check always fires
+        (_updateService as PrivStack.Services.Update.RegistryUpdateService)?.ResetNetworkBackoff();
         await CheckForUpdatesAsync();
     }
 
