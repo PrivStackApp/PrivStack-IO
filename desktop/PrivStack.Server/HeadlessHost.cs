@@ -150,22 +150,11 @@ internal static class HeadlessHost
         ServiceProviderAccessor.Services = provider;
 
         var workspaceService = provider.GetRequiredService<IWorkspaceService>();
-        if (!workspaceService.HasWorkspaces)
-        {
-            WriteError("No workspaces found. Run with --setup to create one.");
-            return ExitConfigError;
-        }
 
-        // Resolve workspace
-        var workspace = ResolveWorkspace(workspaceService, options.WorkspaceName);
+        // Resolve workspace — interactive picker if no --workspace flag and terminal attached
+        var workspace = ResolveOrPickWorkspace(workspaceService, options.WorkspaceName);
         if (workspace == null)
-        {
-            if (options.WorkspaceName != null)
-                WriteError($"Workspace not found: '{options.WorkspaceName}'");
-            else
-                WriteError("No active workspace. Specify --workspace <name>.");
             return ExitConfigError;
-        }
 
         // Set up workspace paths
         var resolvedDir = workspaceService.ResolveWorkspaceDir(workspace);
@@ -432,22 +421,82 @@ internal static class HeadlessHost
         }
     }
 
-    private static Workspace? ResolveWorkspace(IWorkspaceService workspaceService, string? nameOrId)
+    /// <summary>
+    /// Resolves the target workspace. If --workspace is provided, looks it up by name/ID.
+    /// Otherwise, if interactive, shows a picker. Falls back to the active workspace.
+    /// </summary>
+    private static Workspace? ResolveOrPickWorkspace(IWorkspaceService workspaceService, string? nameOrId)
     {
-        if (nameOrId == null)
-            return workspaceService.GetActiveWorkspace();
+        // Explicit --workspace flag: look up by name or ID
+        if (nameOrId != null)
+        {
+            var workspaces = workspaceService.ListWorkspaces();
+            var match = workspaces.FirstOrDefault(w =>
+                w.Id.Equals(nameOrId, StringComparison.OrdinalIgnoreCase) ||
+                w.Name.Equals(nameOrId, StringComparison.OrdinalIgnoreCase));
 
-        var workspaces = workspaceService.ListWorkspaces();
+            if (match != null) return match;
 
-        // Try exact ID match first
-        var byId = workspaces.FirstOrDefault(w =>
-            w.Id.Equals(nameOrId, StringComparison.OrdinalIgnoreCase));
-        if (byId != null) return byId;
+            WriteError($"Workspace not found: '{nameOrId}'");
+            var available = workspaces.Select(w => w.Name).ToList();
+            if (available.Count > 0)
+                Console.Error.WriteLine($"[privstack] Available: {string.Join(", ", available)}");
+            return null;
+        }
 
-        // Try case-insensitive name match
-        var byName = workspaces.FirstOrDefault(w =>
-            w.Name.Equals(nameOrId, StringComparison.OrdinalIgnoreCase));
-        return byName;
+        // No workspaces at all — offer to create one (or error if non-interactive)
+        if (!workspaceService.HasWorkspaces)
+        {
+            if (Console.IsInputRedirected)
+            {
+                WriteError("No workspaces found. Run with --setup to create one.");
+                return null;
+            }
+
+            Console.Error.WriteLine("[privstack] No workspaces found in this data directory.");
+            if (ConsoleUi.YesNo("[privstack] Create a new workspace?", defaultYes: true))
+            {
+                var name = ConsoleUi.ReadLine("[privstack] Workspace name", "Personal");
+                return workspaceService.CreateWorkspace(name, makeActive: true);
+            }
+
+            return null;
+        }
+
+        var allWorkspaces = workspaceService.ListWorkspaces();
+
+        // Single workspace — use it directly
+        if (allWorkspaces.Count == 1)
+            return allWorkspaces[0];
+
+        // Multiple workspaces + non-interactive — use active workspace
+        if (Console.IsInputRedirected)
+        {
+            var active = workspaceService.GetActiveWorkspace();
+            if (active != null) return active;
+
+            WriteError("Multiple workspaces found. Use --workspace <name> to select one.");
+            return null;
+        }
+
+        // Multiple workspaces + interactive — show picker
+        var options = allWorkspaces
+            .Select(w =>
+            {
+                var marker = w.Id == (workspaceService.GetActiveWorkspace()?.Id ?? "") ? " (active)" : "";
+                return $"{w.Name}{marker}";
+            })
+            .Append("Create new workspace")
+            .ToArray();
+
+        var choice = ConsoleUi.MenuSelect("[privstack] Select workspace:", options);
+
+        if (choice < allWorkspaces.Count)
+            return allWorkspaces[choice];
+
+        // Create new
+        var newName = ConsoleUi.ReadLine("[privstack] Workspace name", "Server");
+        return workspaceService.CreateWorkspace(newName, makeActive: true);
     }
 
     private static string? AcquireMasterPassword(HeadlessConfig config)
