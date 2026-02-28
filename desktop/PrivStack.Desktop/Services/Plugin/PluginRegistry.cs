@@ -175,6 +175,9 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
 
         _plugins.Sort((a, b) => a.Metadata.NavigationOrder.CompareTo(b.Metadata.NavigationOrder));
 
+        // Phase 1 (serial): vault unlock, host creation, schema registration.
+        // These are fast and may access shared state or UI.
+        var readyPlugins = new List<(IAppPlugin plugin, IPluginHost host)>();
         foreach (var plugin in _plugins)
         {
             try
@@ -182,18 +185,33 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
                 EnsurePluginVaultsUnlocked(plugin);
                 var host = HostFactory.CreateHost(plugin.Metadata.Id);
                 RegisterEntitySchemas(plugin);
-                var success = plugin.InitializeAsync(host, CancellationToken.None).GetAwaiter().GetResult();
-                if (success)
-                {
-                    _log.Information("Plugin initialized: {PluginId}", plugin.Metadata.Id);
-                }
+                readyPlugins.Add((plugin, host));
             }
             catch (Exception ex)
             {
-                _log.Error(ex, "Plugin initialization failed: {PluginId}", plugin.Metadata.Id);
-                Console.Error.WriteLine($"[privstack] Plugin init failed: {plugin.Metadata.Id} — {ex.GetType().Name}: {ex.Message}");
+                _log.Error(ex, "Plugin setup failed: {PluginId}", plugin.Metadata.Id);
+                Console.Error.WriteLine($"[privstack] Plugin setup failed: {plugin.Metadata.Id} — {ex.GetType().Name}: {ex.Message}");
             }
         }
+
+        // Phase 2 (parallel): InitializeAsync on all plugins concurrently.
+        // Each plugin's init is independent and makes SDK calls that, in client
+        // mode, are HTTP roundtrips — parallelism dramatically reduces startup time.
+        var initTasks = readyPlugins.Select(async pair =>
+        {
+            try
+            {
+                var success = await pair.plugin.InitializeAsync(pair.host, CancellationToken.None);
+                if (success)
+                    _log.Information("Plugin initialized: {PluginId}", pair.plugin.Metadata.Id);
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex, "Plugin initialization failed: {PluginId}", pair.plugin.Metadata.Id);
+                Console.Error.WriteLine($"[privstack] Plugin init failed: {pair.plugin.Metadata.Id} — {ex.GetType().Name}: {ex.Message}");
+            }
+        });
+        Task.WhenAll(initTasks).GetAwaiter().GetResult();
 
         _log.Information("Plugin initialization complete (sync). Initialized: {Count}/{Total}",
             _plugins.Count(p => p.State == PluginState.Initialized), _plugins.Count);

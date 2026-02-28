@@ -145,31 +145,41 @@ internal sealed class SystemMetricsService
         {
             var providers = registry.GetCapabilityProviders<IDataMetricsProvider>();
 
-            foreach (var provider in providers)
+            // Fetch all provider metrics in parallel — in client mode each call is
+            // an HTTP roundtrip, so parallelism dramatically reduces wall-clock time.
+            var tasks = providers.Select(async provider =>
             {
                 try
                 {
                     var metrics = await provider.GetMetricsAsync();
-                    if (metrics.EntityCount == 0 && metrics.Tables.Count == 0)
-                        continue;
-
-                    pluginMetrics.Add((provider.ProviderName, provider.ProviderIcon,
-                        metrics.EntityCount, metrics.EstimatedSizeBytes, metrics.Tables.ToList()));
-
-                    foreach (var table in metrics.Tables)
-                    {
-                        allTables.Add(table);
-                        switch (table.BackingMode)
-                        {
-                            case "file": estFilesBytes += table.EstimatedSizeBytes; break;
-                            case "blob": estVaultBytes += table.EstimatedSizeBytes; break;
-                            default: estEntityBytes += table.EstimatedSizeBytes; break;
-                        }
-                    }
+                    return (provider.ProviderName, provider.ProviderIcon, metrics, Error: (Exception?)null);
                 }
                 catch (Exception ex)
                 {
                     _log.Warning(ex, "Failed to get metrics from {Provider}", provider.ProviderName);
+                    return (provider.ProviderName, provider.ProviderIcon, metrics: (PluginDataMetrics?)null, Error: ex);
+                }
+            }).ToList();
+
+            var results = await Task.WhenAll(tasks);
+
+            foreach (var (name, icon, metrics, error) in results)
+            {
+                if (metrics == null || (metrics.EntityCount == 0 && metrics.Tables.Count == 0))
+                    continue;
+
+                pluginMetrics.Add((name, icon,
+                    metrics.EntityCount, metrics.EstimatedSizeBytes, metrics.Tables.ToList()));
+
+                foreach (var table in metrics.Tables)
+                {
+                    allTables.Add(table);
+                    switch (table.BackingMode)
+                    {
+                        case "file": estFilesBytes += table.EstimatedSizeBytes; break;
+                        case "blob": estVaultBytes += table.EstimatedSizeBytes; break;
+                        default: estEntityBytes += table.EstimatedSizeBytes; break;
+                    }
                 }
             }
         }
