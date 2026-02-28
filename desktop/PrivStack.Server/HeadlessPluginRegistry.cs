@@ -22,13 +22,10 @@ internal sealed class HeadlessPluginRegistry : IPluginRegistry
     private readonly List<IAppPlugin> _activePlugins = [];
     private readonly List<NavigationItem> _navItems = [];
     private readonly ObservableCollection<NavigationItem> _navItemsObservable = [];
-    private readonly PluginHostFactory _hostFactory;
+    private PluginHostFactory? _hostFactory;
     private object? _mainViewModel;
 
-    public HeadlessPluginRegistry()
-    {
-        _hostFactory = new PluginHostFactory();
-    }
+    private PluginHostFactory HostFactory => _hostFactory ??= new PluginHostFactory();
 
     public IReadOnlyList<IAppPlugin> Plugins => _plugins;
     public IReadOnlyList<IAppPlugin> ActivePlugins => _activePlugins;
@@ -57,7 +54,7 @@ internal sealed class HeadlessPluginRegistry : IPluginRegistry
         }
 
         // Also check capability broker
-        var brokerProviders = _hostFactory.CapabilityBroker.GetProviders<TCapability>();
+        var brokerProviders = HostFactory.CapabilityBroker.GetProviders<TCapability>();
         if (brokerProviders != null)
             providers.AddRange(brokerProviders);
 
@@ -123,7 +120,23 @@ internal sealed class HeadlessPluginRegistry : IPluginRegistry
         // Find IAppPlugin implementations
         foreach (var asm in assemblies)
         {
-            foreach (var type in asm.GetExportedTypes().Where(t =>
+            Type[] exportedTypes;
+            try
+            {
+                exportedTypes = asm.GetExportedTypes();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                _log.Warning("Failed to scan types in assembly {Name}: {Message}", asm.GetName().Name, ex.Message);
+                continue;
+            }
+            catch (Exception ex)
+            {
+                _log.Warning("Failed to scan assembly {Name}: {Message}", asm.GetName().Name, ex.Message);
+                continue;
+            }
+
+            foreach (var type in exportedTypes.Where(t =>
                 t is { IsClass: true, IsAbstract: false } && typeof(IAppPlugin).IsAssignableFrom(t)))
             {
                 try
@@ -140,7 +153,7 @@ internal sealed class HeadlessPluginRegistry : IPluginRegistry
                     }
 
                     // Initialize
-                    var host = _hostFactory.CreateHost(pluginId);
+                    var host = HostFactory.CreateHost(pluginId);
                     await plugin.InitializeAsync(host);
 
                     _plugins.Add(plugin);

@@ -34,6 +34,7 @@ internal static class HeadlessHost
         }
         catch (Exception ex)
         {
+            Console.Error.WriteLine($"[privstack] Fatal: {ex}");
             Log.Fatal(ex, "Headless mode crashed");
             return ExitConfigError;
         }
@@ -176,6 +177,7 @@ internal static class HeadlessHost
         Directory.CreateDirectory(dir);
 
         // Initialize Rust core
+        Console.Error.WriteLine($"[privstack] Initializing workspace: {workspace.Name}");
         Log.Information("Initializing native runtime for workspace: {Name}", workspace.Name);
         try
         {
@@ -271,8 +273,22 @@ internal static class HeadlessHost
         // Discover and initialize plugins
         Log.Information("Discovering and initializing plugins");
         var pluginRegistry = provider.GetRequiredService<IPluginRegistry>();
-        pluginRegistry.DiscoverAndInitialize();
-        Log.Information("Plugin initialization complete");
+        try
+        {
+            // Use async path to avoid deadlock — PluginHostFactory resolves
+            // IPluginRegistry from DI, which would deadlock with sync .GetResult()
+            if (pluginRegistry is HeadlessPluginRegistry headlessRegistry)
+                await headlessRegistry.DiscoverAndInitializeAsync();
+            else
+                pluginRegistry.DiscoverAndInitialize();
+
+            Log.Information("Plugin initialization complete: {Count} plugins", pluginRegistry.ActivePlugins.Count);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Plugin discovery failed");
+            // Continue without plugins — API should still work
+        }
 
         // Configure API server
         var apiServer = provider.GetRequiredService<ILocalApiServer>();
