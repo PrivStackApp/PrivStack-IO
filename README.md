@@ -7,9 +7,15 @@ PrivStack keeps your data on your devices. There are no accounts, no cloud servi
 ## Project Structure
 
 ```
-core/           Rust workspace — encryption, storage, CRDTs, sync engine, plugin host, FFI
-desktop/        Avalonia (.NET 9) desktop shell — window management, theming, plugin UI rendering
-relay/          Standalone Rust relay & DHT bootstrap node for NAT traversal
+core/                       Rust workspace — encryption, storage, CRDTs, sync engine, plugin host, FFI
+desktop/
+├── PrivStack.Services/     Shared core services, models, native FFI (no Avalonia)
+├── PrivStack.Server/       Headless console binary — privstack-server (no Avalonia)
+├── PrivStack.Desktop/      Avalonia GUI shell — window management, theming, plugin UI
+├── PrivStack.Sdk/          Plugin SDK
+├── PrivStack.UI.Adaptive/  Shared UI components
+└── PrivStack.Desktop.Tests/
+relay/                      Standalone Rust relay & DHT bootstrap node for NAT traversal
 ```
 
 ## Core (Rust)
@@ -139,39 +145,203 @@ Font scaling is a separate accessibility multiplier applied on top of theme size
 - **Sensitive lock** — secondary timeout-based lock for high-value features (passwords, vault access)
 - **Auto-update** — checks for and installs updates
 
-### Headless API Mode
+## Headless Server (`privstack-server`)
 
-The desktop binary supports a `--headless` flag that skips the GUI entirely and runs as a console API server. This enables programmatic access to PrivStack data from scripts, CI/CD pipelines, or background services.
+A standalone console binary that runs PrivStack as an API-only server with no GUI or Avalonia dependency. Designed for Raspberry Pi, VPS, container, and CI/CD deployments.
+
+### Architecture
+
+```
+PrivStack.Services/     Shared core — services, models, native FFI (no Avalonia)
+PrivStack.Server/       Headless binary — console UI, setup wizard, TLS, policy
+PrivStack.Desktop/      GUI shell — Avalonia UI, delegates to Services
+PrivStack.Sdk/          Plugin SDK
+```
+
+`PrivStack.Services` is the shared library consumed by both Desktop and Server. Server has zero Avalonia dependencies.
+
+### First-Run Setup
 
 ```bash
-# Start headless API server (prompts for master password on stdin)
-./PrivStack --headless
-
-# With env var authentication and workspace selection
-PRIVSTACK_MASTER_PASSWORD=<pw> ./PrivStack --headless --workspace "Default"
-
-# Override port and bind address
-./PrivStack --headless --port 8080 --bind 0.0.0.0
-
-# API key management (authenticates, prints key, exits)
-./PrivStack --headless --show-api-key
-./PrivStack --headless --generate-api-key
+# Interactive setup wizard — creates workspace, sets master password,
+# configures network, TLS, and unlock method
+./privstack-server --setup
 ```
+
+The wizard walks through:
+
+1. **Workspace** — name for the data workspace
+2. **Master password** — encrypts all data (8+ characters, confirmed)
+3. **Unlock method** — how the server authenticates on startup:
+   - Password every start (most secure)
+   - OS keyring (macOS Keychain / Windows Credential Manager / Linux `secret-tool`)
+   - Environment variable (`PRIVSTACK_MASTER_PASSWORD`)
+4. **Network** — bind address and port (default: `127.0.0.1:9720`)
+5. **TLS** — optional HTTPS with two modes:
+   - Manual certificate (PFX/P12 or PEM + private key)
+   - Let's Encrypt (automatic free certificate via ACME)
+6. **Recovery phrase** — 12-word mnemonic for data recovery (write it down!)
+
+Setup generates an API key and saves configuration to `headless-config.json`.
+
+### Running
+
+```bash
+# Start server (prompts for password or uses keyring/env var)
+./privstack-server
+
+# With env var authentication
+PRIVSTACK_MASTER_PASSWORD=<pw> ./privstack-server
+
+# Select specific workspace
+./privstack-server --workspace "Work"
+
+# Override network settings
+./privstack-server --port 8080 --bind 0.0.0.0
+```
+
+### Command-Line Flags
 
 | Flag | Description |
 |---|---|
-| `--headless` | Run without GUI as an API server |
-| `--workspace <name-or-id>` | Target workspace (default: active workspace) |
-| `--port <N>` | API port (default: 9720) |
-| `--bind <addr>` | Bind address (default: `127.0.0.1`). Security warning printed for non-localhost |
+| `--setup` | Run the interactive setup wizard (first-run or re-run) |
+| `--setup-network` | Re-configure bind address and port only |
+| `--setup-tls` | Re-configure TLS settings only |
+| `--setup-policy` | Re-configure enterprise policy only |
+| `--workspace <name\|id>` | Target workspace (default: active workspace) |
+| `--port <N>` | Override API port (default: from config or 9720) |
+| `--bind <addr>` | Override bind address (default: from config or `127.0.0.1`) |
 | `--show-api-key` | Print the current API key and exit |
 | `--generate-api-key` | Generate a new API key, save it, print it, and exit |
 
-Authentication uses `PRIVSTACK_MASTER_PASSWORD` env var first, then falls back to a masked stdin prompt. The env var is cleared from the process environment after reading.
+### Authentication
+
+The server acquires the master password in priority order:
+
+1. `PRIVSTACK_MASTER_PASSWORD` environment variable (cleared after reading)
+2. OS keyring (if unlock method is `OsKeyring`)
+3. Interactive stdin prompt (if terminal is attached)
+4. Stdin line read (if stdin is redirected, e.g., `echo pw | privstack-server`)
 
 API endpoints require an `X-API-Key` header (or `Authorization: Bearer <key>`). The unauthenticated `GET /api/v1/status` endpoint returns server health and workspace info.
 
-Exit codes: `0` success, `1` config error, `2` auth error, `3` port in use, `4` database locked.
+### TLS / HTTPS
+
+Two modes, configured via `--setup-tls` or the full setup wizard:
+
+**Manual certificate:**
+
+```bash
+./privstack-server --setup-tls
+# Choose "Manual certificate"
+# Provide path to .pfx/.p12 file (with optional password)
+# Or provide .pem certificate + .pem private key
+```
+
+**Let's Encrypt (automatic):**
+
+```bash
+./privstack-server --setup-tls
+# Choose "Let's Encrypt"
+# Provide domain name, email, accept ToS
+# Server listens on HTTPS (configured port) + HTTP port 80 for ACME challenges
+```
+
+Requirements for Let's Encrypt:
+- Server must be publicly accessible on the specified domain
+- Port 80 must be open for ACME HTTP-01 domain validation
+- A valid domain name (not an IP address)
+
+Certificates are automatically renewed before expiration. A staging mode is available for testing (not trusted by browsers).
+
+### Enterprise Policy
+
+An optional TOML policy file enables centralized control over server behavior. Configured via `--setup-policy` or by setting `policy_path` in `headless-config.json`.
+
+```toml
+# ~/.privstack/policy.toml
+
+[authority]
+public_key = "base64-ecdsa-p256-public-key"
+signature  = "base64-ecdsa-p256-signature"
+
+[plugins]
+mode = "allowlist"                          # "allowlist", "blocklist", or "disabled"
+list = ["tasks", "notes", "calendar"]
+
+[network]
+allowed_cidrs = ["192.168.1.0/24", "10.0.0.0/8"]
+
+[api]
+require_tls = true                          # refuse to start without TLS
+
+[audit]
+enabled  = true
+log_path = "/var/log/privstack/audit.log"   # JSON Lines format
+level    = "all"                            # "all", "write" (skip GETs), or "auth"
+```
+
+**Enforcement points:**
+
+| Section | Effect |
+|---|---|
+| `[plugins]` | Restricts which plugins can load (allowlist or blocklist) |
+| `[network]` | Blocks API requests from IPs outside allowed CIDR ranges |
+| `[api]` | Requires TLS — server refuses to start if HTTPS is not configured |
+| `[audit]` | Logs API requests to a JSON Lines file with configurable verbosity |
+
+**Signature verification:** The optional `[authority]` section uses ECDSA P-256 to sign the policy body (all sections except `[authority]`). If present, the server verifies the signature on load and refuses to start if it has been tampered with.
+
+### Configuration Files
+
+| File | Location | Purpose |
+|---|---|---|
+| `headless-config.json` | `~/.privstack/` | Server-specific: unlock method, network, TLS, policy path |
+| `settings.json` | `~/.privstack/` | Shared: API key, API port, setup complete marker |
+| `policy.toml` | Admin-defined path | Enterprise policy (optional) |
+
+### Environment Variables
+
+| Variable | Description |
+|---|---|
+| `PRIVSTACK_MASTER_PASSWORD` | Master password (avoids interactive prompt) |
+| `PRIVSTACK_DATA_DIR` | Override data directory (default: `~/.privstack/`) |
+| `PRIVSTACK_LOG_LEVEL` | Log level: `Verbose`, `Debug`, `Information`, `Warning`, `Error`, `Fatal` |
+
+### Exit Codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Clean shutdown |
+| `1` | Configuration error (missing setup, invalid policy, etc.) |
+| `2` | Authentication failure |
+| `3` | Port already in use |
+| `4` | Database locked (another instance running) |
+
+### API Usage
+
+```bash
+# Check server status (no auth required)
+curl http://127.0.0.1:9720/api/v1/status
+
+# List available routes
+curl -H "X-API-Key: <key>" http://127.0.0.1:9720/api/v1/routes
+
+# Example: list tasks
+curl -H "X-API-Key: <key>" http://127.0.0.1:9720/api/v1/tasks
+
+# With HTTPS
+curl --cacert cert.pem -H "X-API-Key: <key>" https://privstack.example.com:9720/api/v1/status
+```
+
+### Building
+
+```bash
+cd desktop/PrivStack.Server
+dotnet build
+
+# The output binary is privstack-server (or privstack-server.exe on Windows)
+```
 
 ### Platforms
 
@@ -204,11 +374,19 @@ cd core
 cargo build --release
 ```
 
-### Desktop
+### Desktop (GUI)
 
 ```bash
 cd desktop/PrivStack.Desktop
 dotnet build
+```
+
+### Server (Headless)
+
+```bash
+cd desktop/PrivStack.Server
+dotnet build
+# Output: desktop/PrivStack.Server/bin/Debug/net9.0/privstack-server
 ```
 
 ### Relay
