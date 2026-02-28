@@ -285,7 +285,9 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
         // Sort by navigation order
         _plugins.Sort((a, b) => a.Metadata.NavigationOrder.CompareTo(b.Metadata.NavigationOrder));
 
-        // Initialize plugins — each gets its own IPluginHost
+        // Phase 1 (serial): vault unlock, host creation, schema registration.
+        // These are fast and may access shared state.
+        var readyPlugins = new List<(IAppPlugin plugin, IPluginHost host)>();
         foreach (var plugin in _plugins)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -294,8 +296,35 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
                 break;
             }
 
-            await InitializePluginAsync(plugin, cancellationToken);
+            try
+            {
+                EnsurePluginVaultsUnlocked(plugin);
+                var host = HostFactory.CreateHost(plugin.Metadata.Id);
+                RegisterEntitySchemas(plugin);
+                readyPlugins.Add((plugin, host));
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex, "Plugin setup failed: {PluginId}", plugin.Metadata.Id);
+            }
         }
+
+        // Phase 2 (parallel): InitializeAsync on all plugins concurrently.
+        // Each plugin's init is independent — parallelism reduces startup time
+        // especially in client mode where each SDK call is an HTTP roundtrip.
+        await Task.WhenAll(readyPlugins.Select(async pair =>
+        {
+            try
+            {
+                var success = await pair.plugin.InitializeAsync(pair.host, cancellationToken);
+                if (success)
+                    _log.Information("Plugin initialized: {PluginId}", pair.plugin.Metadata.Id);
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex, "Plugin initialization failed: {PluginId}", pair.plugin.Metadata.Id);
+            }
+        }));
 
         // Activate initialized plugins — core plugins always, optional plugins check workspace config
         var asyncWsConfig = App.Services.GetRequiredService<IAppSettingsService>().GetWorkspacePluginConfig();
@@ -412,8 +441,8 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
 
         _hostFactory = null;
 
-        // Phase 2 — heavy work on background thread
-        await Task.Run(() => DiscoverAndInitialize());
+        // Phase 2 — plugin discovery and initialization (async, no thread pool blocking)
+        await DiscoverAndInitializeAsync();
 
         // Phase 3 — UI-bound work back on UI thread
         await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>

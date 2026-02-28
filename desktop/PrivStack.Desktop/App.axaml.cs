@@ -272,7 +272,7 @@ public partial class App : Application
     private async Task EnterClientModeAsync(IClassicDesktopStyleApplicationLifetime desktop)
     {
         var pluginRegistry = Services.GetRequiredService<IPluginRegistry>();
-        await Task.Run(() => pluginRegistry.DiscoverAndInitialize());
+        await pluginRegistry.DiscoverAndInitializeAsync();
 
         await ShowMainWindow(desktop, skipPluginInit: true, isClientMode: true);
     }
@@ -409,7 +409,7 @@ public partial class App : Application
             await Task.Delay(50);
 
             var pluginRegistry = Services.GetRequiredService<IPluginRegistry>();
-            await Task.Run(() => pluginRegistry.DiscoverAndInitialize());
+            await pluginRegistry.DiscoverAndInitializeAsync();
 
             setupVm.LoadingMessage = "Starting up...";
             await Task.Delay(30);
@@ -452,7 +452,7 @@ public partial class App : Application
 
             // Plugin discovery and heavy init on background thread
             var pluginRegistry = Services.GetRequiredService<IPluginRegistry>();
-            await Task.Run(() => pluginRegistry.DiscoverAndInitialize());
+            await pluginRegistry.DiscoverAndInitializeAsync();
 
             unlockVm.LoadingMessage = "Starting up...";
             await Task.Delay(30);
@@ -517,7 +517,7 @@ public partial class App : Application
             await Task.Delay(50);
 
             var pluginRegistry = Services.GetRequiredService<IPluginRegistry>();
-            await Task.Run(() => pluginRegistry.DiscoverAndInitialize());
+            await pluginRegistry.DiscoverAndInitializeAsync();
 
             await ShowMainWindow(desktop, skipPluginInit: true);
             unlockWindow.Close();
