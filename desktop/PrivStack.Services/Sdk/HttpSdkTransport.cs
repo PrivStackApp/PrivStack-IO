@@ -219,6 +219,7 @@ internal sealed class HttpSdkTransport : ISdkTransport
 
     private string? PostJson(string path, string json)
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -228,24 +229,33 @@ internal sealed class HttpSdkTransport : ISdkTransport
             using var stream = response.Content.ReadAsStream();
             using var reader = new StreamReader(stream, Encoding.UTF8);
             var body = reader.ReadToEnd();
+            sw.Stop();
 
             if (!response.IsSuccessStatusCode)
             {
-                _log.Warning("HTTP SDK transport POST {Path} returned {StatusCode}: {Body}",
-                    path, (int)response.StatusCode, body.Length > 200 ? body[..200] : body);
+                _log.Warning("[Client→Server] POST {Path} → {StatusCode} ({Elapsed}ms): {Body}",
+                    path, (int)response.StatusCode, sw.ElapsedMilliseconds,
+                    body.Length > 200 ? body[..200] : body);
+            }
+            else if (sw.ElapsedMilliseconds > 500)
+            {
+                _log.Warning("[Client→Server] POST {Path} → SLOW {Elapsed}ms ({Len}B)",
+                    path, sw.ElapsedMilliseconds, body.Length);
             }
 
             return body;
         }
         catch (Exception ex)
         {
-            _log.Error(ex, "HTTP SDK transport POST {Path} failed", path);
+            sw.Stop();
+            _log.Error(ex, "[Client→Server] POST {Path} FAILED ({Elapsed}ms)", path, sw.ElapsedMilliseconds);
             return null;
         }
     }
 
     private string? GetJson(string path)
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, path);
@@ -254,17 +264,19 @@ internal sealed class HttpSdkTransport : ISdkTransport
             using var stream = response.Content.ReadAsStream();
             using var reader = new StreamReader(stream, Encoding.UTF8);
             var body = reader.ReadToEnd();
+            sw.Stop();
 
             if (!response.IsSuccessStatusCode)
             {
-                _log.Warning("HTTP SDK transport GET {Path} returned {StatusCode}", path, (int)response.StatusCode);
+                _log.Warning("[Client→Server] GET {Path} → {StatusCode} ({Elapsed}ms)", path, (int)response.StatusCode, sw.ElapsedMilliseconds);
             }
 
             return body;
         }
         catch (Exception ex)
         {
-            _log.Error(ex, "HTTP SDK transport GET {Path} failed", path);
+            sw.Stop();
+            _log.Error(ex, "[Client→Server] GET {Path} FAILED ({Elapsed}ms)", path, sw.ElapsedMilliseconds);
             return null;
         }
     }

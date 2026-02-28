@@ -27,7 +27,7 @@ namespace PrivStack.Services.Api;
 /// </summary>
 public sealed class LocalApiServer : ILocalApiServer, IDisposable
 {
-    private static readonly ILogger _log = Log.ForContext<LocalApiServer>();
+    private static ILogger _log => Log.ForContext<LocalApiServer>();
 
     private readonly IPluginRegistry _pluginRegistry;
     private readonly IAppSettingsService _appSettings;
@@ -243,10 +243,19 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             var body = await ReadBodyAsync(ctx);
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
 
+            var (action, entityType) = ExtractSdkAction(body);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var result = transport.Execute(body);
-            return result != null
-                ? Results.Text(result, "application/json")
-                : Results.Json(new { success = false, error_code = "ffi_error", error_message = "Execute returned null" }, statusCode: 500);
+            sw.Stop();
+
+            if (result == null)
+            {
+                _log.Warning("[SDK] execute {Action} {EntityType} → NULL ({Elapsed}ms)", action, entityType, sw.ElapsedMilliseconds);
+                return Results.Json(new { success = false, error_code = "ffi_error", error_message = "Execute returned null" }, statusCode: 500);
+            }
+
+            _log.Debug("[SDK] execute {Action} {EntityType} → {Len}B ({Elapsed}ms)", action, entityType, result.Length, sw.ElapsedMilliseconds);
+            return Results.Text(result, "application/json");
         });
 
         // Cross-plugin search
@@ -255,7 +264,11 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             var body = await ReadBodyAsync(ctx);
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
 
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var result = transport.Search(body);
+            sw.Stop();
+
+            _log.Debug("[SDK] search → {Len}B ({Elapsed}ms)", result?.Length ?? 0, sw.ElapsedMilliseconds);
             return result != null
                 ? Results.Text(result, "application/json")
                 : Results.Json(new { success = false, error_code = "ffi_error", error_message = "Search returned null" }, statusCode: 500);
@@ -267,7 +280,12 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             var body = await ReadBodyAsync(ctx);
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
 
+            var entityType = ExtractJsonField(body, "entity_type");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var result = transport.RegisterEntityType(body);
+            sw.Stop();
+
+            _log.Information("[SDK] register-entity-type '{EntityType}' → {Result} ({Elapsed}ms)", entityType, result, sw.ElapsedMilliseconds);
             return Results.Json(new { result });
         });
 
@@ -275,19 +293,24 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
 
         apiGroup.MapGet("/sdk/db/diagnostics", () =>
         {
+            _log.Debug("[SDK] db/diagnostics");
             var result = transport.DbDiagnostics();
             return Results.Text(result ?? "{}", "application/json");
         });
 
         apiGroup.MapPost("/sdk/db/maintenance", () =>
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var result = transport.DbMaintenance();
+            sw.Stop();
+            _log.Debug("[SDK] db/maintenance → {Result} ({Elapsed}ms)", result, sw.ElapsedMilliseconds);
             return Results.Json(new { error_code = (int)result });
         });
 
         apiGroup.MapPost("/sdk/db/find-orphans", async (HttpContext ctx) =>
         {
             var body = await ReadBodyAsync(ctx) ?? "[]";
+            _log.Debug("[SDK] db/find-orphans");
             var result = transport.FindOrphanEntities(body);
             return Results.Text(result ?? "[]", "application/json");
         });
@@ -295,12 +318,14 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
         apiGroup.MapPost("/sdk/db/delete-orphans", async (HttpContext ctx) =>
         {
             var body = await ReadBodyAsync(ctx) ?? "[]";
+            _log.Debug("[SDK] db/delete-orphans");
             var result = transport.DeleteOrphanEntities(body);
             return Results.Text(result ?? "{\"deleted\":0}", "application/json");
         });
 
         apiGroup.MapPost("/sdk/db/compact", () =>
         {
+            _log.Debug("[SDK] db/compact");
             var result = transport.CompactDatabases();
             return Results.Text(result ?? "{}", "application/json");
         });
@@ -312,6 +337,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             var body = await ReadJsonAsync(ctx);
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
+            _log.Debug("[SDK] vault/is-initialized {VaultId}", vaultId);
             return Results.Json(new { result = transport.VaultIsInitialized(vaultId) });
         });
 
@@ -321,6 +347,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
             var password = body.RootElement.GetProperty("password").GetString()!;
+            _log.Information("[SDK] vault/initialize {VaultId}", vaultId);
             var result = transport.VaultInitialize(vaultId, password);
             return Results.Json(new { error_code = (int)result });
         });
@@ -331,6 +358,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
             var password = body.RootElement.GetProperty("password").GetString()!;
+            _log.Information("[SDK] vault/unlock {VaultId}", vaultId);
             var result = transport.VaultUnlock(vaultId, password);
             return Results.Json(new { error_code = (int)result });
         });
@@ -340,6 +368,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             var body = await ReadJsonAsync(ctx);
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
+            _log.Debug("[SDK] vault/lock {VaultId}", vaultId);
             transport.VaultLock(vaultId);
             return Results.Json(new { error_code = 0 });
         });
@@ -349,6 +378,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             var body = await ReadJsonAsync(ctx);
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
+            _log.Debug("[SDK] vault/is-unlocked {VaultId}", vaultId);
             return Results.Json(new { result = transport.VaultIsUnlocked(vaultId) });
         });
 
@@ -360,6 +390,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
             var dataB64 = body.RootElement.GetProperty("data").GetString()!;
             var data = Convert.FromBase64String(dataB64);
+            _log.Debug("[SDK] vault/blob-store {VaultId}/{BlobId} ({Size}B)", vaultId, blobId, data.Length);
             var result = transport.VaultBlobStore(vaultId, blobId, data);
             return Results.Json(new { error_code = (int)result });
         });
@@ -370,6 +401,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
             var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
+            _log.Debug("[SDK] vault/blob-read {VaultId}/{BlobId}", vaultId, blobId);
             var (data, result) = transport.VaultBlobRead(vaultId, blobId);
             return Results.Json(new { error_code = (int)result, data = Convert.ToBase64String(data) });
         });
@@ -380,6 +412,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var vaultId = body.RootElement.GetProperty("vault_id").GetString()!;
             var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
+            _log.Debug("[SDK] vault/blob-delete {VaultId}/{BlobId}", vaultId, blobId);
             var result = transport.VaultBlobDelete(vaultId, blobId);
             return Results.Json(new { error_code = (int)result });
         });
@@ -397,6 +430,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             string? metadataJson = null;
             if (body.RootElement.TryGetProperty("metadata", out var metaProp) && metaProp.ValueKind == JsonValueKind.String)
                 metadataJson = metaProp.GetString();
+            _log.Debug("[SDK] blob/store {Ns}/{BlobId} ({Size}B)", ns, blobId, data.Length);
             var result = transport.BlobStore(ns, blobId, data, metadataJson);
             return Results.Json(new { error_code = (int)result });
         });
@@ -407,6 +441,7 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var ns = body.RootElement.GetProperty("ns").GetString()!;
             var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
+            _log.Debug("[SDK] blob/read {Ns}/{BlobId}", ns, blobId);
             var (data, result) = transport.BlobRead(ns, blobId);
             return Results.Json(new { error_code = (int)result, data = Convert.ToBase64String(data) });
         });
@@ -417,11 +452,12 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             if (body == null) return Results.BadRequest(new { error = "Request body required" });
             var ns = body.RootElement.GetProperty("ns").GetString()!;
             var blobId = body.RootElement.GetProperty("blob_id").GetString()!;
+            _log.Debug("[SDK] blob/delete {Ns}/{BlobId}", ns, blobId);
             var result = transport.BlobDelete(ns, blobId);
             return Results.Json(new { error_code = (int)result });
         });
 
-        _log.Debug("Mapped SDK passthrough routes");
+        _log.Information("Mapped SDK passthrough routes");
     }
 
     private static async Task<string?> ReadBodyAsync(HttpContext ctx)
@@ -437,6 +473,35 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
         if (body == null) return null;
         try { return JsonDocument.Parse(body); }
         catch { return null; }
+    }
+
+    /// <summary>
+    /// Extracts action and entity_type from an SDK execute request body for logging.
+    /// </summary>
+    private static (string action, string entityType) ExtractSdkAction(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            var action = root.TryGetProperty("action", out var a) ? a.GetString() ?? "?" : "?";
+            var entityType = root.TryGetProperty("entity_type", out var e) ? e.GetString() ?? "?" : "?";
+            return (action, entityType);
+        }
+        catch { return ("?", "?"); }
+    }
+
+    /// <summary>
+    /// Extracts a single string field from JSON for logging.
+    /// </summary>
+    private static string ExtractJsonField(string json, string field)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty(field, out var prop) ? prop.GetString() ?? "?" : "?";
+        }
+        catch { return "?"; }
     }
 
     private void MapProviderRoutes(
