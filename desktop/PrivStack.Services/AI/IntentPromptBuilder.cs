@@ -57,7 +57,7 @@ internal static class IntentPromptBuilder
 
         sb.AppendLine();
         sb.AppendLine($"Today: {now:yyyy-MM-dd dddd HH:mm}");
-        sb.AppendLine($"\"this week\" = {ThisWeekStart(now)} to {ThisWeekEnd(now)}. \"coming up\" = start from NOW, not period start.");
+        sb.AppendLine($"\"this week\" = {ThisWeekStart(now)} to {ThisWeekEnd(now)}. \"coming up\"/\"upcoming\" = NOW to +30 days ({Lookahead30(now)}), don't clip to period boundaries.");
         sb.AppendLine();
 
         AppendSmallExamples(sb, now);
@@ -148,7 +148,7 @@ internal static class IntentPromptBuilder
         sb.AppendLine("Date range rules for calendar queries:");
         sb.AppendLine($"- \"this week\" = {ThisWeekStart(now)} to {ThisWeekEnd(now)}");
         sb.AppendLine($"- \"this month\" = {ThisMonthStart(now)} to {ThisMonthEnd(now)}");
-        sb.AppendLine($"- \"coming up\" / \"upcoming\" = start from NOW ({NowTimestamp(now)}), not period start");
+        sb.AppendLine($"- \"coming up\" / \"upcoming\" / \"do I have\" = start from NOW ({NowTimestamp(now)}), end = +30 days ({Lookahead30(now)}). Don't clip to period boundaries — be generous.");
         sb.AppendLine();
 
         // 4 standard examples + 3 edge cases
@@ -233,15 +233,20 @@ internal static class IntentPromptBuilder
         sb.AppendLine();
         sb.AppendLine("## Date Range Resolution for Queries");
         sb.AppendLine();
-        sb.AppendLine("When the user asks about a time period, resolve it to concrete date boundaries:");
+        sb.AppendLine("Interpret date ranges the way a human would in casual conversation:");
+        sb.AppendLine();
+        sb.AppendLine("**Strict period queries** (\"what's on my calendar this week\"):");
         sb.AppendLine($"- \"this week\" → start_date: {ThisWeekStart(now)} (Monday), end_date: {ThisWeekEnd(now)} (Sunday)");
         sb.AppendLine($"- \"this month\" → start_date: {ThisMonthStart(now)}, end_date: {ThisMonthEnd(now)}");
-        sb.AppendLine($"- \"coming up\" / \"upcoming\" / \"do I have any\" → start_date: {NowTimestamp(now)} (current time, excludes past events)");
-        sb.AppendLine("- \"coming up this month\" → start_date: NOW (current time), end_date: last day of month");
         sb.AppendLine("- \"next week\" → Monday–Sunday of the following week");
         sb.AppendLine("- \"today\" → start_date and end_date both set to today's date");
         sb.AppendLine();
-        sb.AppendLine("Key rule: forward-looking language (\"coming up\", \"upcoming\", \"do I have\", \"what's ahead\") means start_date = NOW (current time), not the start of the period. This prevents returning events that already happened.");
+        sb.AppendLine("**Forward-looking queries** (\"coming up\", \"upcoming\", \"do I have any\", \"what's ahead\"):");
+        sb.AppendLine($"- ALWAYS start from NOW ({NowTimestamp(now)}) — never include past events");
+        sb.AppendLine($"- Use a generous lookahead: at least 30 days from now ({Lookahead30(now)})");
+        sb.AppendLine("- Do NOT clip to calendar boundaries. When someone asks \"any lunches coming up this month?\" on the 26th, they want to see what's next — include the next few weeks even if they cross into the next month");
+        sb.AppendLine("- \"coming up\" without a period qualifier → 30 days from now");
+        sb.AppendLine("- \"coming up this week/month\" → still use 30-day lookahead (the period is conversational, not a hard cutoff)");
         sb.AppendLine();
 
         sb.AppendLine("## Examples");
@@ -303,8 +308,8 @@ internal static class IntentPromptBuilder
         sb.AppendLine("--- Example 8 ---");
         sb.AppendLine("Text: \"Do I have any lunches coming up this month?\"");
         AppendExample(sb, "calendar.list_events", 0.9,
-            "Search upcoming lunches this month",
-            ("start_date", NowTimestamp(now)), ("end_date", ThisMonthEnd(now)), ("search_query", "lunch"));
+            "Search upcoming lunches",
+            ("start_date", NowTimestamp(now)), ("end_date", Lookahead30(now)), ("search_query", "lunch"));
 
         sb.Append("VALID intent_id values: ");
         sb.AppendLine(string.Join(", ", intents.Select(i => i.IntentId)));
@@ -376,4 +381,8 @@ internal static class IntentPromptBuilder
     /// <summary>Current date/time (for "upcoming" / "coming up" queries that should exclude past events).</summary>
     private static string NowTimestamp(DateTimeOffset now) =>
         now.ToString("yyyy-MM-ddTHH:mm:ss");
+
+    /// <summary>30 days from now (generous lookahead for "coming up" queries).</summary>
+    private static string Lookahead30(DateTimeOffset now) =>
+        now.Date.AddDays(30).ToString("yyyy-MM-dd");
 }
