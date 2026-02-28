@@ -9,6 +9,10 @@ on:
         description: 'Number of historical commits to backfill (0 = disabled)'
         required: false
         default: '0'
+      force_update:
+        description: 'Update existing entries instead of skipping duplicates (true/false)'
+        required: false
+        default: 'false'
 
 env:
   API_URL: https://privstack.io
@@ -33,6 +37,7 @@ jobs:
           NC='\033[0m'
 
           BACKFILL_COUNT="${{ github.event.inputs.backfill_count || '0' }}"
+          FORCE_UPDATE="${{ github.event.inputs.force_update || 'false' }}"
 
           # Determine which commits to process
           if [ "$BACKFILL_COUNT" -gt 0 ] 2>/dev/null; then
@@ -219,6 +224,12 @@ jobs:
               DESCRIPTION="$BODY"
             fi
 
+            # Build upsert flag
+            UPSERT_VAL="false"
+            if [ "$FORCE_UPDATE" = "true" ]; then
+              UPSERT_VAL="true"
+            fi
+
             # POST to API
             HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/api/admin/product-updates" \
               -H "Authorization: Bearer ${PRIVSTACK_ADMIN_TOKEN}" \
@@ -233,13 +244,17 @@ jobs:
                 --arg repo "IO" \
                 --arg commit_sha "$SHA" \
                 --arg commit_date "$AUTHOR_DATE" \
-                '{title: $title, slug: $slug, description: $description, tags: $tags, versions: $versions, update_type: $update_type, repo: $repo, commit_sha: $commit_sha, commit_date: $commit_date}')")
+                --argjson upsert "$UPSERT_VAL" \
+                '{title: $title, slug: $slug, description: $description, tags: $tags, versions: $versions, update_type: $update_type, repo: $repo, commit_sha: $commit_sha, commit_date: $commit_date, upsert: $upsert}')")
 
             HTTP_CODE=$(echo "$HTTP_RESPONSE" | tail -1)
             HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
 
             if [ "$HTTP_CODE" = "201" ]; then
               echo -e "${GREEN}Created: $SHORT_SHA $SUBJECT${NC}"
+              PROCESSED=$((PROCESSED + 1))
+            elif [ "$HTTP_CODE" = "200" ]; then
+              echo -e "${GREEN}Updated: $SHORT_SHA $SUBJECT${NC}"
               PROCESSED=$((PROCESSED + 1))
             elif [ "$HTTP_CODE" = "409" ]; then
               echo -e "${YELLOW}Duplicate (skipped): $SHORT_SHA $SUBJECT${NC}"
