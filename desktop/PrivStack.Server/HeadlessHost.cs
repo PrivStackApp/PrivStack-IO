@@ -1,3 +1,7 @@
+using System.Net;
+using LettuceEncrypt;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Services;
 using PrivStack.Services.Native;
@@ -62,6 +66,17 @@ internal static class HeadlessHost
             // Re-run setup even though already complete
             var wizardResult = await HeadlessSetupWizard.RunAsync();
             if (wizardResult != 0) return wizardResult;
+        }
+        else if (options.SetupTls)
+        {
+            // Re-configure TLS only
+            ConsoleUi.WriteSection("TLS Configuration");
+            var existingConfig = HeadlessConfig.Load();
+            var tlsCfg = HeadlessSetupWizard.ConfigureTlsInteractive();
+            existingConfig.Tls = tlsCfg;
+            existingConfig.Save();
+            ConsoleUi.WriteSuccess("TLS configuration saved. Restart the server to apply.");
+            return ExitSuccess;
         }
 
         // Build headless DI container
@@ -176,12 +191,24 @@ internal static class HeadlessHost
         appSettings.Settings.ApiPort = port;
         apiServer.BindAddress = bindAddress;
 
-        // TLS config will be applied in Phase 3 when ILocalApiServer.TlsConfig is added
+        // Apply TLS configuration
+        var tlsOptions = headlessConfig.ToTlsOptions();
+        if (tlsOptions != null)
+        {
+            apiServer.TlsOptions = tlsOptions;
+
+            if (tlsOptions.Mode == TlsMode.LetsEncrypt)
+            {
+                ConfigureLetsEncrypt(apiServer, tlsOptions, bindAddress, port);
+            }
+        }
 
         // Security warning for non-localhost binding
         if (bindAddress is not ("127.0.0.1" or "localhost" or "::1"))
         {
             Console.Error.WriteLine($"[privstack] WARNING: Binding to {bindAddress} exposes the API to the network.");
+            if (tlsOptions == null)
+                Console.Error.WriteLine("[privstack] WARNING: TLS is not enabled. Run --setup-tls to configure HTTPS.");
             Console.Error.WriteLine("[privstack] WARNING: Ensure proper firewall rules and API key secrecy.");
         }
 
@@ -312,6 +339,52 @@ internal static class HeadlessHost
         // Method 5: Redirected stdin — read a line
         var line = Console.ReadLine();
         return string.IsNullOrEmpty(line) ? null : line.Trim();
+    }
+
+    /// <summary>
+    /// Configures LettuceEncrypt for automatic ACME certificate provisioning.
+    /// Sets up Kestrel to listen on HTTPS (configured port) + HTTP port 80 for ACME challenges.
+    /// </summary>
+    private static void ConfigureLetsEncrypt(ILocalApiServer apiServer, TlsOptions tls, string bindAddress, int port)
+    {
+        var server = (LocalApiServer)apiServer;
+        var domain = tls.Domain!;
+        var email = tls.Email!;
+        var certStorePath = tls.CertStorePath ?? Path.Combine(DataPaths.BaseDir, "certs");
+        Directory.CreateDirectory(certStorePath);
+
+        server.OnConfigureServices = services =>
+        {
+            services.AddLettuceEncrypt(opts =>
+            {
+                opts.AcceptTermsOfService = tls.AcceptTermsOfService;
+                opts.DomainNames = [domain];
+                opts.EmailAddress = email;
+                opts.UseStagingServer = tls.UseStaging;
+            }).PersistDataToDirectory(new DirectoryInfo(certStorePath), null);
+        };
+
+        server.OnConfigureKestrel = k =>
+        {
+            var addr = bindAddress is "0.0.0.0"
+                ? IPAddress.Any
+                : IPAddress.Parse(bindAddress);
+
+            // HTTPS on configured port — LettuceEncrypt provides the certificate
+            k.Listen(addr, port, lo =>
+            {
+                lo.UseHttps(h => h.UseLettuceEncrypt(k.ApplicationServices));
+            });
+
+            // HTTP on port 80 for ACME HTTP-01 challenges (required for domain validation)
+            if (port != 80)
+            {
+                k.Listen(addr, 80);
+            }
+        };
+
+        Log.Information("Let's Encrypt configured for domain {Domain} (staging: {Staging})",
+            domain, tls.UseStaging);
     }
 
     private static void WriteError(string message)

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Services;
 using PrivStack.Services.Abstractions;
+using PrivStack.Services.Api;
 using PrivStack.Services.Native;
 
 namespace PrivStack.Server;
@@ -70,22 +71,11 @@ internal static class HeadlessSetupWizard
         }
 
         // Step 5: TLS (optional)
-        TlsConfig? tlsConfig = null;
+        ServerTlsConfig? tlsConfig = null;
         ConsoleUi.WriteSection("TLS Configuration");
         if (ConsoleUi.YesNo("  Enable TLS (HTTPS)?", defaultYes: false))
         {
-            var certPath = ConsoleUi.ReadLine("  Certificate path (.pem or .pfx)");
-            var keyPath = ConsoleUi.ReadLine("  Private key path (.pem)", "");
-
-            if (File.Exists(certPath))
-            {
-                tlsConfig = new TlsConfig { Enabled = true, CertPath = certPath, KeyPath = keyPath };
-                ConsoleUi.WriteSuccess("TLS configured.");
-            }
-            else
-            {
-                ConsoleUi.WriteWarning($"Certificate file not found: {certPath}. TLS disabled.");
-            }
+            tlsConfig = ConfigureTlsInteractive();
         }
 
         // Now execute the setup
@@ -212,6 +202,104 @@ internal static class HeadlessSetupWizard
             ConsoleUi.WriteError($"Setup failed: {ex.Message}");
             Log.Error(ex, "Setup wizard failed");
             return 1;
+        }
+    }
+
+    /// <summary>
+    /// Interactive TLS configuration — offers manual certificate or Let's Encrypt.
+    /// </summary>
+    internal static ServerTlsConfig? ConfigureTlsInteractive()
+    {
+        var modeChoice = ConsoleUi.MenuSelect(
+            "  TLS mode:",
+            "Manual certificate — provide your own PFX/PEM files",
+            "Let's Encrypt — automatic free certificate (requires public domain + port 80)");
+
+        if (modeChoice == 0)
+        {
+            // Manual certificate
+            var certPath = ConsoleUi.ReadLine("  Certificate path (.pem or .pfx)");
+            if (string.IsNullOrEmpty(certPath))
+            {
+                ConsoleUi.WriteWarning("No certificate path provided. TLS disabled.");
+                return null;
+            }
+
+            if (!File.Exists(certPath))
+            {
+                ConsoleUi.WriteWarning($"Certificate file not found: {certPath}. TLS disabled.");
+                return null;
+            }
+
+            var keyPath = "";
+            var certPassword = (string?)null;
+
+            if (certPath.EndsWith(".pem", StringComparison.OrdinalIgnoreCase) ||
+                certPath.EndsWith(".crt", StringComparison.OrdinalIgnoreCase))
+            {
+                keyPath = ConsoleUi.ReadLine("  Private key path (.pem)", "");
+            }
+            else
+            {
+                // PFX/P12 might have a password
+                Console.Error.Write("  Certificate password (leave empty if none): ");
+                var pw = ConsoleUi.ReadPassword("  Certificate password (Enter for none): ");
+                if (!string.IsNullOrEmpty(pw))
+                    certPassword = pw;
+            }
+
+            ConsoleUi.WriteSuccess("Manual TLS configured.");
+            return new ServerTlsConfig
+            {
+                Enabled = true,
+                Mode = TlsMode.Manual,
+                CertPath = certPath,
+                KeyPath = keyPath,
+                CertPassword = certPassword,
+            };
+        }
+        else
+        {
+            // Let's Encrypt
+            Console.Error.WriteLine();
+            Console.Error.WriteLine("  Let's Encrypt requirements:");
+            Console.Error.WriteLine("    - Server must be publicly accessible on the domain");
+            Console.Error.WriteLine("    - Port 80 must be open for ACME HTTP-01 challenges");
+            Console.Error.WriteLine("    - A valid domain name (not an IP address)");
+            Console.Error.WriteLine();
+
+            var domain = ConsoleUi.ReadLine("  Domain name (e.g., privstack.example.com)");
+            if (string.IsNullOrEmpty(domain))
+            {
+                ConsoleUi.WriteWarning("No domain provided. TLS disabled.");
+                return null;
+            }
+
+            var email = ConsoleUi.ReadLine("  Email for Let's Encrypt notifications");
+            if (string.IsNullOrEmpty(email))
+            {
+                ConsoleUi.WriteWarning("Email is required for Let's Encrypt. TLS disabled.");
+                return null;
+            }
+
+            if (!ConsoleUi.YesNo("  Accept Let's Encrypt Terms of Service?", defaultYes: true))
+            {
+                ConsoleUi.WriteWarning("Terms of Service must be accepted. TLS disabled.");
+                return null;
+            }
+
+            var useStaging = ConsoleUi.YesNo("  Use staging environment? (for testing — not trusted by browsers)", defaultYes: false);
+
+            ConsoleUi.WriteSuccess($"Let's Encrypt configured for {domain}");
+            return new ServerTlsConfig
+            {
+                Enabled = true,
+                Mode = TlsMode.LetsEncrypt,
+                Domain = domain,
+                Email = email,
+                AcceptTermsOfService = true,
+                UseStaging = useStaging,
+            };
         }
     }
 }

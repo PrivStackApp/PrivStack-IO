@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using PrivStack.Services.Abstractions;
 using PrivStack.Services.Plugin;
@@ -20,6 +22,7 @@ namespace PrivStack.Services.Api;
 /// Kestrel-based local HTTP API server.
 /// Discovers <see cref="IApiProvider"/> capability providers and maps their routes.
 /// Authenticates via X-API-Key header (or Authorization: Bearer).
+/// Supports TLS via manual certificates or extensibility hooks for ACME providers.
 /// </summary>
 public sealed class LocalApiServer : ILocalApiServer, IDisposable
 {
@@ -40,6 +43,25 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
     public bool IsRunning => _app != null;
     public int? Port => IsRunning ? _appSettings.Settings.ApiPort : null;
     public string BindAddress { get; set; } = "127.0.0.1";
+    public TlsOptions? TlsOptions { get; set; }
+
+    /// <summary>
+    /// Hook for registering additional services before the app is built.
+    /// Used by PrivStack.Server to register LettuceEncrypt for ACME TLS.
+    /// </summary>
+    public Action<IServiceCollection>? OnConfigureServices { get; set; }
+
+    /// <summary>
+    /// Hook for custom Kestrel configuration. When set, replaces the default Kestrel setup.
+    /// Used by PrivStack.Server for Let's Encrypt Kestrel integration.
+    /// </summary>
+    public Action<KestrelServerOptions>? OnConfigureKestrel { get; set; }
+
+    /// <summary>
+    /// Hook for adding middleware after the app is built but before routes are mapped.
+    /// Used by PrivStack.Server for ACME challenge middleware.
+    /// </summary>
+    public Action<WebApplication>? OnConfigureApp { get; set; }
 
     public async Task StartAsync(CancellationToken ct = default)
     {
@@ -61,18 +83,48 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
 
         var builder = WebApplication.CreateSlimBuilder();
         var bind = BindAddress;
-        builder.WebHost.ConfigureKestrel(k =>
+        var useTls = TlsOptions != null;
+
+        // Configure Kestrel
+        if (OnConfigureKestrel != null)
         {
-            if (bind is "127.0.0.1" or "localhost" or "::1")
-                k.ListenLocalhost(port);
-            else
-                k.Listen(IPAddress.Parse(bind), port);
-        });
+            // Delegated configuration (e.g., Let's Encrypt with ACME challenge port)
+            builder.WebHost.ConfigureKestrel(OnConfigureKestrel);
+        }
+        else if (TlsOptions is { Mode: TlsMode.Manual })
+        {
+            // Manual TLS certificate
+            var cert = TlsOptions.LoadCertificate();
+            builder.WebHost.ConfigureKestrel(k =>
+            {
+                if (bind is "127.0.0.1" or "localhost" or "::1")
+                    k.ListenLocalhost(port, lo => lo.UseHttps(cert));
+                else
+                    k.Listen(IPAddress.Parse(bind), port, lo => lo.UseHttps(cert));
+            });
+        }
+        else
+        {
+            // No TLS — plain HTTP
+            builder.WebHost.ConfigureKestrel(k =>
+            {
+                if (bind is "127.0.0.1" or "localhost" or "::1")
+                    k.ListenLocalhost(port);
+                else
+                    k.Listen(IPAddress.Parse(bind), port);
+            });
+        }
 
         // Suppress ASP.NET Core's default console logging — we use Serilog
         builder.Logging.ClearProviders();
 
+        // Allow Server project to register additional services (e.g., LettuceEncrypt)
+        OnConfigureServices?.Invoke(builder.Services);
+
         _app = builder.Build();
+
+        // Allow Server project to add middleware (e.g., ACME challenge handler)
+        OnConfigureApp?.Invoke(_app);
 
         // Shell routes (no auth for status)
         var workspaceName = _workspaceService.GetActiveWorkspace()?.Name;
@@ -120,8 +172,9 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             MapProviderRoutes(apiGroup, provider, routeManifest);
         }
 
-        _log.Information("Local API server starting on http://{Bind}:{Port} with {RouteCount} plugin routes",
-            bind, port, routeManifest.Count);
+        var protocol = useTls ? "https" : "http";
+        _log.Information("Local API server starting on {Protocol}://{Bind}:{Port} with {RouteCount} plugin routes",
+            protocol, bind, port, routeManifest.Count);
 
         await _app.StartAsync(ct);
     }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using PrivStack.Services;
+using PrivStack.Services.Api;
 
 namespace PrivStack.Server;
 
@@ -26,7 +27,7 @@ public sealed class HeadlessConfig
     public int Port { get; set; } = 9720;
 
     [JsonPropertyName("tls")]
-    public TlsConfig? Tls { get; set; }
+    public ServerTlsConfig? Tls { get; set; }
 
     [JsonPropertyName("policy_path")]
     public string? PolicyPath { get; set; }
@@ -56,6 +57,28 @@ public sealed class HeadlessConfig
         var json = JsonSerializer.Serialize(this, _jsonOptions);
         File.WriteAllText(path, json);
     }
+
+    /// <summary>
+    /// Converts the server TLS config to the shared TlsOptions used by LocalApiServer.
+    /// Returns null if TLS is not enabled.
+    /// </summary>
+    public TlsOptions? ToTlsOptions()
+    {
+        if (Tls is not { Enabled: true }) return null;
+
+        return new TlsOptions
+        {
+            Mode = Tls.Mode,
+            CertPath = Tls.CertPath,
+            KeyPath = Tls.KeyPath,
+            CertPassword = Tls.CertPassword,
+            Domain = Tls.Domain,
+            Email = Tls.Email,
+            AcceptTermsOfService = Tls.AcceptTermsOfService,
+            UseStaging = Tls.UseStaging,
+            CertStorePath = Tls.CertStorePath ?? Path.Combine(DataPaths.BaseDir, "certs"),
+        };
+    }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -66,14 +89,43 @@ public enum UnlockMethod
     EnvironmentVariable,
 }
 
-public sealed class TlsConfig
+/// <summary>
+/// TLS configuration for the headless server.
+/// Supports manual certificates (PFX/PEM) and automatic Let's Encrypt provisioning.
+/// </summary>
+public sealed class ServerTlsConfig
 {
     [JsonPropertyName("enabled")]
     public bool Enabled { get; set; }
+
+    [JsonPropertyName("mode")]
+    public TlsMode Mode { get; set; } = TlsMode.Manual;
+
+    // ── Manual mode ──
 
     [JsonPropertyName("cert_path")]
     public string CertPath { get; set; } = "";
 
     [JsonPropertyName("key_path")]
     public string KeyPath { get; set; } = "";
+
+    [JsonPropertyName("cert_password")]
+    public string? CertPassword { get; set; }
+
+    // ── Let's Encrypt (ACME) mode ──
+
+    [JsonPropertyName("domain")]
+    public string? Domain { get; set; }
+
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+
+    [JsonPropertyName("accept_tos")]
+    public bool AcceptTermsOfService { get; set; }
+
+    [JsonPropertyName("use_staging")]
+    public bool UseStaging { get; set; }
+
+    [JsonPropertyName("cert_store_path")]
+    public string? CertStorePath { get; set; }
 }
