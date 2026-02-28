@@ -122,83 +122,93 @@ jobs:
             # Build JSON tags array
             TAGS_JSON=$(echo "$TAGS" | tr ',' '\n' | grep -v '^$' | sed 's/.*/"&"/' | paste -sd ',' | sed 's/^/[/;s/$/]/')
 
-            # Version extraction
+            # Version extraction — always include current version for touched components
             VERSIONS_JSON="null"
             VERSION_ENTRIES=""
 
-            # Helper: extract <Version> from a .csproj via git show
+            # Helpers: read version from a file at a given commit
             extract_csproj_version() {
               git show "$1:$2" 2>/dev/null | sed -n 's/.*<Version>\([^<]*\)<\/Version>.*/\1/p' | head -1
             }
-
-            # Helper: extract <PrivStackSdkVersion> from Directory.Build.props
             extract_sdk_prop_version() {
               git show "$1:$2" 2>/dev/null | sed -n 's/.*<PrivStackSdkVersion>\([^<]*\)<\/PrivStackSdkVersion>.*/\1/p' | head -1
             }
-
-            # Helper: extract version from Cargo.toml [workspace.package] or [package] section
             extract_cargo_version() {
               git show "$1:$2" 2>/dev/null | sed -n '/^\[workspace\.package\]/,/^\[/s/^version = "\([^"]*\)".*/\1/p; /^\[package\]/,/^\[/s/^version = "\([^"]*\)".*/\1/p' | head -1
             }
 
-            # Helper: compare versions and append to VERSION_ENTRIES
-            check_version() {
+            # Append version entry: from→to if changed, otherwise just current version
+            add_version_entry() {
               local label="$1" new_ver="$2" old_ver="$3"
-              if [ -n "$new_ver" ] && [ -n "$old_ver" ] && [ "$new_ver" != "$old_ver" ]; then
+              if [ -z "$new_ver" ]; then return; fi
+              if [ -n "$old_ver" ] && [ "$new_ver" != "$old_ver" ]; then
                 VERSION_ENTRIES="$VERSION_ENTRIES,\"$label\":{\"from\":\"$old_ver\",\"to\":\"$new_ver\"}"
+              else
+                VERSION_ENTRIES="$VERSION_ENTRIES,\"$label\":{\"version\":\"$new_ver\"}"
               fi
             }
 
-            # SDK version property in Directory.Build.props
-            PROPS_FILE="desktop/Directory.Build.props"
-            if echo "$CHANGED_FILES" | grep -q "$PROPS_FILE"; then
-              check_version "SDK" \
-                "$(extract_sdk_prop_version "$SHA" "$PROPS_FILE")" \
-                "$(extract_sdk_prop_version "$SHA^" "$PROPS_FILE")"
+            # Map: tag name → version file path + extraction method
+            # For each tag present, read the current version at this commit
+            SEEN_VERSIONS=""
+
+            if echo "$TAGS" | grep -q "Core"; then
+              add_version_entry "Core" \
+                "$(extract_cargo_version "$SHA" "core/Cargo.toml")" \
+                "$(extract_cargo_version "$SHA^" "core/Cargo.toml")"
+              SEEN_VERSIONS="$SEEN_VERSIONS,Core"
             fi
 
-            # All desktop .csproj files (Desktop, Services, UI.Adaptive, Server)
-            CSPROJ_MAP="desktop/PrivStack.Desktop/PrivStack.Desktop.csproj:Desktop
-            desktop/PrivStack.Sdk/PrivStack.Sdk.csproj:SDK Package
-            desktop/PrivStack.Services/PrivStack.Services.csproj:Services
-            desktop/PrivStack.UI.Adaptive/PrivStack.UI.Adaptive.csproj:UI Components
-            desktop/PrivStack.Server/PrivStack.Server.csproj:Server"
-
-            while IFS=: read -r csproj_path csproj_label; do
-              csproj_path=$(echo "$csproj_path" | xargs)
-              csproj_label=$(echo "$csproj_label" | xargs)
-              if echo "$CHANGED_FILES" | grep -q "$csproj_path"; then
-                check_version "$csproj_label" \
-                  "$(extract_csproj_version "$SHA" "$csproj_path")" \
-                  "$(extract_csproj_version "$SHA^" "$csproj_path")"
-              fi
-            done <<< "$CSPROJ_MAP"
-
-            # Rust core (workspace Cargo.toml)
-            CORE_CARGO="core/Cargo.toml"
-            if echo "$CHANGED_FILES" | grep -q "$CORE_CARGO"; then
-              check_version "Core" \
-                "$(extract_cargo_version "$SHA" "$CORE_CARGO")" \
-                "$(extract_cargo_version "$SHA^" "$CORE_CARGO")"
+            if echo "$TAGS" | grep -q "Relay"; then
+              add_version_entry "Relay" \
+                "$(extract_cargo_version "$SHA" "relay/Cargo.toml")" \
+                "$(extract_cargo_version "$SHA^" "relay/Cargo.toml")"
+              SEEN_VERSIONS="$SEEN_VERSIONS,Relay"
             fi
 
-            # Relay
-            RELAY_CARGO="relay/Cargo.toml"
-            if echo "$CHANGED_FILES" | grep -q "$RELAY_CARGO"; then
-              check_version "Relay" \
-                "$(extract_cargo_version "$SHA" "$RELAY_CARGO")" \
-                "$(extract_cargo_version "$SHA^" "$RELAY_CARGO")"
+            if echo "$TAGS" | grep -q "Desktop Shell"; then
+              add_version_entry "Desktop" \
+                "$(extract_csproj_version "$SHA" "desktop/PrivStack.Desktop/PrivStack.Desktop.csproj")" \
+                "$(extract_csproj_version "$SHA^" "desktop/PrivStack.Desktop/PrivStack.Desktop.csproj")"
+              SEEN_VERSIONS="$SEEN_VERSIONS,Desktop"
+            fi
+
+            if echo "$TAGS" | grep -q "SDK"; then
+              add_version_entry "SDK" \
+                "$(extract_sdk_prop_version "$SHA" "desktop/Directory.Build.props")" \
+                "$(extract_sdk_prop_version "$SHA^" "desktop/Directory.Build.props")"
+              SEEN_VERSIONS="$SEEN_VERSIONS,SDK"
+            fi
+
+            if echo "$TAGS" | grep -q "UI Components"; then
+              add_version_entry "UI Components" \
+                "$(extract_csproj_version "$SHA" "desktop/PrivStack.UI.Adaptive/PrivStack.UI.Adaptive.csproj")" \
+                "$(extract_csproj_version "$SHA^" "desktop/PrivStack.UI.Adaptive/PrivStack.UI.Adaptive.csproj")"
+              SEEN_VERSIONS="$SEEN_VERSIONS,UI Components"
+            fi
+
+            if echo "$TAGS" | grep -q "Services"; then
+              add_version_entry "Services" \
+                "$(extract_csproj_version "$SHA" "desktop/PrivStack.Services/PrivStack.Services.csproj")" \
+                "$(extract_csproj_version "$SHA^" "desktop/PrivStack.Services/PrivStack.Services.csproj")"
+              SEEN_VERSIONS="$SEEN_VERSIONS,Services"
+            fi
+
+            if echo "$TAGS" | grep -q "Server"; then
+              add_version_entry "Server" \
+                "$(extract_csproj_version "$SHA" "desktop/PrivStack.Server/PrivStack.Server.csproj")" \
+                "$(extract_csproj_version "$SHA^" "desktop/PrivStack.Server/PrivStack.Server.csproj")"
+              SEEN_VERSIONS="$SEEN_VERSIONS,Server"
             fi
 
             if [ -n "$VERSION_ENTRIES" ]; then
               VERSIONS_JSON="{${VERSION_ENTRIES#,}}"
             fi
 
-            # Determine update type from the highest version bump detected
+            # Determine update type from version bumps (from→to entries only)
             UPDATE_TYPE="patch"
             if [ "$VERSIONS_JSON" != "null" ]; then
-              # Collect all version pairs and find the highest bump level
-              for entry in $(echo "$VERSIONS_JSON" | jq -r 'to_entries[] | "\(.value.from)|\(.value.to)"'); do
+              for entry in $(echo "$VERSIONS_JSON" | jq -r 'to_entries[] | select(.value.from) | "\(.value.from)|\(.value.to)"' 2>/dev/null); do
                 OLD_VER=$(echo "$entry" | cut -d'|' -f1)
                 NEW_VER=$(echo "$entry" | cut -d'|' -f2)
                 OLD_MAJOR=$(echo "$OLD_VER" | cut -d. -f1)
