@@ -191,7 +191,9 @@
 
         <!-- ═══ Chat Tab ═══ -->
         <Panel Grid.Row="1" Name="ChatPanel" IsVisible="{Binding IsChatTab}" ClipToBounds="True">
-            <ScrollViewer Name="MessageScrollViewer" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer Name="MessageScrollViewer"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
                 <ItemsControl ItemsSource="{Binding ChatMessages}"
                               ItemTemplate="{StaticResource MessageBubbleTemplate}"
                               Margin="8"/>
@@ -208,7 +210,8 @@
 
         <!-- ═══ Intents Tab ═══ -->
         <Panel Grid.Row="1" Name="IntentsPanel" IsVisible="{Binding IsIntentsTab}" ClipToBounds="True">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
                 <ItemsControl ItemsSource="{Binding IntentMessages}"
                               ItemTemplate="{StaticResource MessageBubbleTemplate}"
                               Margin="8"/>
@@ -225,7 +228,8 @@
 
         <!-- ═══ History Tab ═══ -->
         <Panel Grid.Row="1" Name="HistoryPanel" IsVisible="{Binding IsHistoryTab}" ClipToBounds="True">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
                 <ItemsControl ItemsSource="{Binding ConversationHistory}" Margin="8">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="tray:ConversationSessionViewModel">
