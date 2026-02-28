@@ -1,13 +1,16 @@
 using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Services;
 using PrivStack.Services.Abstractions;
+using PrivStack.Services.Native;
 using PrivStack.Services.Plugin;
 using PrivStack.Services.Sdk;
 using PrivStack.Sdk;
 using Serilog;
+using NativeLib = PrivStack.Services.Native.NativeLibrary;
 
 namespace PrivStack.Server;
 
@@ -142,6 +145,9 @@ internal sealed class HeadlessPluginRegistry : IPluginRegistry
         _log.Information("Found {Count} plugin types across {DirCount} directories",
             pluginTypes.Count, pluginDirs.Count);
 
+        // Register system entity types (entity_metadata, property_definition, etc.)
+        RegisterSystemEntitySchemas();
+
         // Initialize discovered plugins
         foreach (var (type, _) in pluginTypes)
         {
@@ -164,6 +170,9 @@ internal sealed class HeadlessPluginRegistry : IPluginRegistry
                     _log.Debug("Plugin {Id} is disabled, skipping", pluginId);
                     continue;
                 }
+
+                // Register entity schemas BEFORE initialization (Rust core needs them to handle SDK messages)
+                RegisterEntitySchemas(plugin);
 
                 // Initialize
                 var host = HostFactory.CreateHost(pluginId);
@@ -352,4 +361,117 @@ internal sealed class HeadlessPluginRegistry : IPluginRegistry
     public void SetExperimentalPluginsEnabled(bool enabled) { }
     public Task<bool> LoadPluginFromDirectoryAsync(string pluginDirectory, CancellationToken ct = default) => Task.FromResult(false);
     public bool UnloadPlugin(string pluginId) => false;
+
+    // ── Schema Registration ─────────────────────────────────────────────
+
+    private static readonly JsonSerializerOptions _schemaJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+    };
+
+    /// <summary>
+    /// Registers a plugin's entity schemas with the Rust core via FFI.
+    /// Must be called before <see cref="IAppPlugin.InitializeAsync"/> so the
+    /// core engine knows about entity types when handling SDK messages.
+    /// </summary>
+    private static void RegisterEntitySchemas(IAppPlugin plugin)
+    {
+        var schemas = plugin.EntitySchemas;
+        if (schemas.Count == 0) return;
+
+        foreach (var schema in schemas)
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(schema, _schemaJsonOptions);
+                var result = NativeLib.RegisterEntityType(json);
+
+                if (result == 0)
+                    _log.Information("Registered entity type '{EntityType}' from plugin {PluginId}",
+                        schema.EntityType, plugin.Metadata.Id);
+                else
+                    _log.Error("Failed to register entity type '{EntityType}' from plugin {PluginId}: error code {Code}",
+                        schema.EntityType, plugin.Metadata.Id, result);
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex, "Exception registering entity type '{EntityType}' from plugin {PluginId}",
+                    schema.EntityType, plugin.Metadata.Id);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Registers system entity schemas (entity_metadata, property definitions, etc.)
+    /// that aren't owned by any plugin but required by core services.
+    /// </summary>
+    private static void RegisterSystemEntitySchemas()
+    {
+        EntitySchema[] systemSchemas =
+        [
+            new EntitySchema
+            {
+                EntityType = "entity_metadata",
+                MergeStrategy = MergeStrategy.LwwPerField,
+                IndexedFields =
+                [
+                    IndexedField.Text("/target_type", searchable: false),
+                    IndexedField.Text("/target_id", searchable: false),
+                    IndexedField.Tag("/tags"),
+                    IndexedField.Json("/properties"),
+                ]
+            },
+            new EntitySchema
+            {
+                EntityType = "property_definition",
+                MergeStrategy = MergeStrategy.LwwPerField,
+                IndexedFields =
+                [
+                    IndexedField.Text("/name"),
+                    IndexedField.Text("/type", searchable: false),
+                    IndexedField.Text("/group_id", searchable: false),
+                    IndexedField.Number("/sort_order"),
+                ]
+            },
+            new EntitySchema
+            {
+                EntityType = "property_group",
+                MergeStrategy = MergeStrategy.LwwPerField,
+                IndexedFields =
+                [
+                    IndexedField.Text("/name"),
+                    IndexedField.Number("/sort_order"),
+                ]
+            },
+            new EntitySchema
+            {
+                EntityType = "property_template",
+                MergeStrategy = MergeStrategy.LwwPerField,
+                IndexedFields =
+                [
+                    IndexedField.Text("/name"),
+                    IndexedField.Json("/entries"),
+                ]
+            },
+        ];
+
+        foreach (var schema in systemSchemas)
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(schema, _schemaJsonOptions);
+                var result = NativeLib.RegisterEntityType(json);
+
+                if (result == 0)
+                    _log.Debug("Registered system entity type '{EntityType}'", schema.EntityType);
+                else
+                    _log.Warning("Failed to register system entity type '{EntityType}': error code {Code}",
+                        schema.EntityType, result);
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex, "Exception registering system entity type '{EntityType}'", schema.EntityType);
+            }
+        }
+    }
 }
