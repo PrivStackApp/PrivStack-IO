@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -26,16 +27,19 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
 
     private readonly IPluginRegistry _pluginRegistry;
     private readonly IAppSettingsService _appSettings;
+    private readonly IWorkspaceService _workspaceService;
     private WebApplication? _app;
 
-    public LocalApiServer(IPluginRegistry pluginRegistry, IAppSettingsService appSettings)
+    public LocalApiServer(IPluginRegistry pluginRegistry, IAppSettingsService appSettings, IWorkspaceService workspaceService)
     {
         _pluginRegistry = pluginRegistry;
         _appSettings = appSettings;
+        _workspaceService = workspaceService;
     }
 
     public bool IsRunning => _app != null;
     public int? Port => IsRunning ? _appSettings.Settings.ApiPort : null;
+    public string BindAddress { get; set; } = "127.0.0.1";
 
     public async Task StartAsync(CancellationToken ct = default)
     {
@@ -56,9 +60,13 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
         }
 
         var builder = WebApplication.CreateSlimBuilder();
+        var bind = BindAddress;
         builder.WebHost.ConfigureKestrel(k =>
         {
-            k.ListenLocalhost(port);
+            if (bind is "127.0.0.1" or "localhost" or "::1")
+                k.ListenLocalhost(port);
+            else
+                k.Listen(IPAddress.Parse(bind), port);
         });
 
         // Suppress ASP.NET Core's default console logging — we use Serilog
@@ -67,7 +75,15 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
         _app = builder.Build();
 
         // Shell routes (no auth for status)
-        _app.MapGet("/api/v1/status", () => Results.Ok(new { status = "ok", version = "1" }));
+        var workspaceName = _workspaceService.GetActiveWorkspace()?.Name;
+        var workspaceId = _workspaceService.GetActiveWorkspace()?.Id;
+        _app.MapGet("/api/v1/status", () => Results.Ok(new
+        {
+            status = "ok",
+            version = "1",
+            workspace = workspaceName,
+            workspace_id = workspaceId,
+        }));
 
         // All other routes require API key
         var apiGroup = _app.MapGroup("/api/v1").AddEndpointFilter(async (context, next) =>
@@ -104,8 +120,8 @@ public sealed class LocalApiServer : ILocalApiServer, IDisposable
             MapProviderRoutes(apiGroup, provider, routeManifest);
         }
 
-        _log.Information("Local API server starting on http://127.0.0.1:{Port} with {RouteCount} plugin routes",
-            port, routeManifest.Count);
+        _log.Information("Local API server starting on http://{Bind}:{Port} with {RouteCount} plugin routes",
+            bind, port, routeManifest.Count);
 
         await _app.StartAsync(ct);
     }

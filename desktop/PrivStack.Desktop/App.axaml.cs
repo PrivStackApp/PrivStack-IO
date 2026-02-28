@@ -26,7 +26,7 @@ public partial class App : Application
     /// <summary>
     /// DI container — available for the transition period while Views still need service locator.
     /// </summary>
-    public static IServiceProvider Services { get; private set; } = null!;
+    public static IServiceProvider Services { get; internal set; } = null!;
 
     public override void RegisterServices()
     {

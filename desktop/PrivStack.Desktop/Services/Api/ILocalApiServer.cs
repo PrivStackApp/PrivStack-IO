@@ -8,6 +8,7 @@ public interface ILocalApiServer
 {
     bool IsRunning { get; }
     int? Port { get; }
+    string BindAddress { get; set; }
     Task StartAsync(CancellationToken ct = default);
     Task StopAsync();
 }
