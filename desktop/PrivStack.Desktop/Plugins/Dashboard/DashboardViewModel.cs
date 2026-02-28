@@ -306,6 +306,32 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
                 });
             }
 
+            // 3b. Add any loaded plugins not already covered by server or manifest data
+            //     (e.g. dev-loaded plugins via project references without marketplace manifests)
+            var existingIds = new HashSet<string>(
+                AllPlugins.Select(p => p.Id), StringComparer.OrdinalIgnoreCase);
+
+            foreach (var plugin in _pluginRegistry.Plugins)
+            {
+                if (existingIds.Contains(plugin.Metadata.Id))
+                    continue;
+
+                AllPlugins.Add(new DashboardPluginItem
+                {
+                    Id = plugin.Metadata.Id,
+                    Name = plugin.Metadata.Name,
+                    Description = plugin.Metadata.Description,
+                    Author = plugin.Metadata.Author,
+                    InstalledVersion = plugin.Metadata.Version.ToString(),
+                    LatestVersion = plugin.Metadata.Version.ToString(),
+                    Category = plugin.Metadata.Category.ToString(),
+                    Icon = plugin.Metadata.Icon ?? "Package",
+                    IsInstalled = true,
+                    TrustTier = "Official",
+                    ReleaseStage = plugin.Metadata.ReleaseStage.ToString().ToLowerInvariant()
+                });
+            }
+
             // 4. Populate workspace activation state on each plugin item
             foreach (var item in AllPlugins)
             {
