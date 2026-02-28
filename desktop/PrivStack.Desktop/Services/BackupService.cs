@@ -25,6 +25,10 @@ public class BackupService : IBackupService
     public BackupService(IAppSettingsService settings)
     {
         _settings = settings;
+
+        // In client mode, the server manages its own backups — don't start local backups
+        if (App.IsClientMode) return;
+
         LoadLastBackupTime();
         StartScheduledBackups();
     }

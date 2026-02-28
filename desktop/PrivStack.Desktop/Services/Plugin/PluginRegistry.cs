@@ -1655,6 +1655,9 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
     {
         if (plugin is not IVaultConsumer vaultConsumer) return;
 
+        // In client mode, the server manages vault state — vaults are already unlocked there
+        if (App.IsClientMode) return;
+
         var passwordCache = App.Services.GetService<IMasterPasswordCache>();
         var cachedPassword = passwordCache?.Get();
         if (string.IsNullOrEmpty(cachedPassword)) return;
