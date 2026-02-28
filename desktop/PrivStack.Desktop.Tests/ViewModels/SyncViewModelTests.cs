@@ -1,5 +1,5 @@
-using PrivStack.Desktop.Models;
-using PrivStack.Desktop.Native;
+using PrivStack.Services.Models;
+using PrivStack.Services.Native;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.ViewModels;
 
@@ -229,21 +229,21 @@ public class SyncViewModelTests
     public void DiscoveredPeer_DiscoveryBrush_NotNull_ForMdns()
     {
         var peer = new DiscoveredPeer { DiscoveryMethod = "Mdns" };
-        peer.DiscoveryBrush.Should().NotBeNull();
+        peer.DiscoveryCategory.Should().NotBeNull();
     }
 
     [Fact]
     public void DiscoveredPeer_DiscoveryBrush_NotNull_ForDht()
     {
         var peer = new DiscoveredPeer { DiscoveryMethod = "Dht" };
-        peer.DiscoveryBrush.Should().NotBeNull();
+        peer.DiscoveryCategory.Should().NotBeNull();
     }
 
     [Fact]
     public void DiscoveredPeer_DiscoveryBrush_NotNull_ForUnknown()
     {
         var peer = new DiscoveredPeer { DiscoveryMethod = "Unknown" };
-        peer.DiscoveryBrush.Should().NotBeNull();
+        peer.DiscoveryCategory.Should().NotBeNull();
     }
 
     [Fact]

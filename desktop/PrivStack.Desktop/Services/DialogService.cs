@@ -8,7 +8,7 @@ namespace PrivStack.Desktop.Services;
 
 public class DialogService : IDialogService
 {
-    private static readonly ILogger _log = Services.Log.ForContext<DialogService>();
+    private static readonly ILogger _log = Log.ForContext<DialogService>();
     private Window? _owner;
 
     /// <summary>

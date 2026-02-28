@@ -387,7 +387,7 @@ public sealed class WhisperService : INotifyPropertyChanged, IDisposable
     /// </summary>
     public bool IsAvailable()
     {
-        var settings = App.Services.GetRequiredService<Abstractions.IAppSettingsService>().Settings;
+        var settings = App.Services.GetRequiredService<IAppSettingsService>().Settings;
         if (!settings.SpeechToTextEnabled)
         {
             return false;

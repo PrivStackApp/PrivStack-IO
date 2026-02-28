@@ -5,7 +5,7 @@ using Avalonia.Interactivity;
 using AvaloniaEdit;
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Desktop.Controls;
-using PrivStack.Desktop.Models;
+using PrivStack.Services.Models;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.Plugin;
@@ -18,6 +18,7 @@ namespace PrivStack.Desktop.Views;
 public partial class MainWindow : Window
 {
     private readonly IAppSettingsService _settings = App.Services.GetRequiredService<IAppSettingsService>();
+    private readonly IWindowSettingsService _windowSettings = App.Services.GetRequiredService<IWindowSettingsService>();
     private readonly IResponsiveLayoutService _responsiveLayout = App.Services.GetRequiredService<IResponsiveLayoutService>();
     private UniversalSearchService? _universalSearch;
     private bool _isInitialized;
@@ -67,7 +68,7 @@ public partial class MainWindow : Window
         SetupBalloonPositioning();
 
         // Apply saved window settings
-        _settings.ApplyToWindow(this);
+        _windowSettings.ApplyToWindow(this);
 
         // Hook up window events for saving state
         this.Opened += OnWindowOpened;
@@ -156,7 +157,7 @@ public partial class MainWindow : Window
     {
         _isInitialized = true;
 
-        App.Services.GetRequiredService<IDialogService>().SetOwner(this);
+        (App.Services.GetRequiredService<IDialogService>() as DialogService)?.SetOwner(this);
 
         if (DataContext is MainWindowViewModel vm)
         {
@@ -218,7 +219,7 @@ public partial class MainWindow : Window
     {
         if (_isInitialized && WindowState == WindowState.Normal)
         {
-            _settings.UpdateWindowBounds(this);
+            _windowSettings.UpdateWindowBounds(this);
         }
     }
 
@@ -228,7 +229,7 @@ public partial class MainWindow : Window
 
         if (e.Property == WidthProperty || e.Property == HeightProperty || e.Property == WindowStateProperty)
         {
-            _settings.UpdateWindowBounds(this);
+            _windowSettings.UpdateWindowBounds(this);
             UpdateContentAreaWidth();
             UpdateAiTrayMaxHeight();
         }
@@ -236,7 +237,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
-        _settings.UpdateWindowBounds(this);
+        _windowSettings.UpdateWindowBounds(this);
         _settings.Flush();
 
         // Close floating AI window if open

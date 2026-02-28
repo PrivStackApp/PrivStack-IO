@@ -49,6 +49,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PrivStack.Services\PrivStack.Services.csproj" />
     <ProjectReference Include="..\PrivStack.Sdk\PrivStack.Sdk.csproj" />
     <ProjectReference Include="..\PrivStack.UI.Adaptive\PrivStack.UI.Adaptive.csproj" />
   </ItemGroup>

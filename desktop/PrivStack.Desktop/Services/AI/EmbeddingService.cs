@@ -1,6 +1,7 @@
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using Microsoft.ML.Tokenizers;
+using PrivStack.Services.AI;
 using Serilog;
 
 namespace PrivStack.Desktop.Services.AI;
@@ -9,7 +10,7 @@ namespace PrivStack.Desktop.Services.AI;
 /// Wraps ONNX Runtime inference for the nomic-embed-text-v1.5 embedding model.
 /// Thread-safe via SemaphoreSlim(1) — same pattern as <see cref="LocalLlamaProvider"/>.
 /// </summary>
-internal sealed class EmbeddingService : IDisposable
+internal sealed class EmbeddingService : PrivStack.Services.AI.IEmbeddingService, IDisposable
 {
     private static readonly ILogger _log = Log.ForContext<EmbeddingService>();
     private const int EmbeddingDim = 768;

@@ -11,7 +11,7 @@ using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Desktop.ViewModels;
 using PrivStack.Sdk.Capabilities;
 using Serilog;
-using NativeLib = PrivStack.Desktop.Native.NativeLibrary;
+using NativeLib = PrivStack.Services.Native.NativeLibrary;
 
 namespace PrivStack.Desktop.Views;
 

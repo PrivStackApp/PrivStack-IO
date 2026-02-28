@@ -4,8 +4,8 @@ using Avalonia;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using PrivStack.Desktop.Models;
-using PrivStack.Desktop.Native;
+using PrivStack.Services.Models;
+using PrivStack.Services.Native;
 using PrivStack.Desktop.Services;
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Desktop.Services.Abstractions;
@@ -122,12 +122,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private UpdateViewModel? _updateVM;
     public UpdateViewModel UpdateVM => _updateVM ??= new UpdateViewModel(
-        App.Services.GetRequiredService<Services.Abstractions.IUpdateService>(),
+        App.Services.GetRequiredService<IUpdateService>(),
         App.Services.GetRequiredService<IDialogService>(),
         App.Services.GetRequiredService<IUiDispatcher>(),
         _appSettings,
-        App.Services.GetRequiredService<Services.OAuthLoginService>(),
-        App.Services.GetRequiredService<Services.PrivStackApiClient>());
+        App.Services.GetRequiredService<OAuthLoginService>(),
+        App.Services.GetRequiredService<PrivStackApiClient>());
 
     private SettingsViewModel? _settingsVM;
     public SettingsViewModel SettingsVM
@@ -191,14 +191,14 @@ public partial class MainWindowViewModel : ViewModelBase
             App.Services.GetRequiredService<IIntentEngine>(),
             App.Services.GetRequiredService<IUiDispatcher>(),
             App.Services.GetRequiredService<IAppSettingsService>(),
-            App.Services.GetRequiredService<Services.AI.AiService>(),
-            App.Services.GetRequiredService<Services.AI.AiMemoryService>(),
-            App.Services.GetRequiredService<Services.AI.AiMemoryExtractor>(),
-            App.Services.GetRequiredService<Services.AI.AiConversationStore>(),
-            App.Services.GetRequiredService<Services.InfoPanelService>(),
+            App.Services.GetRequiredService<AiService>(),
+            App.Services.GetRequiredService<AiMemoryService>(),
+            App.Services.GetRequiredService<AiMemoryExtractor>(),
+            App.Services.GetRequiredService<AiConversationStore>(),
+            App.Services.GetRequiredService<InfoPanelService>(),
             App.Services.GetRequiredService<IPluginRegistry>(),
             App.Services.GetRequiredService<IPrivStackSdk>(),
-            App.Services.GetRequiredService<Services.AI.RagSearchService>(),
+            App.Services.GetRequiredService<RagSearchService>(),
             App.Services.GetRequiredService<IDatasetService>());
         vm.NavigateToLinkedItemFunc = NavigateToLinkedItemAsync;
         return vm;
@@ -279,9 +279,9 @@ public partial class MainWindowViewModel : ViewModelBase
             if (_infoPanelVM == null)
             {
                 _infoPanelVM = new InfoPanelViewModel(
-                    App.Services.GetRequiredService<Services.InfoPanelService>(),
-                    App.Services.GetRequiredService<Services.BacklinkService>(),
-                    App.Services.GetRequiredService<Services.EntityMetadataService>(),
+                    App.Services.GetRequiredService<InfoPanelService>(),
+                    App.Services.GetRequiredService<BacklinkService>(),
+                    App.Services.GetRequiredService<EntityMetadataService>(),
                     _appSettings,
                     _pluginRegistry,
                     App.Services.GetRequiredService<ISyncOutboundService>(),
@@ -385,7 +385,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 return null;
             }
 
-            var fullPath = Path.Combine(Services.DataPaths.BaseDir, imgPath);
+            var fullPath = Path.Combine(DataPaths.BaseDir, imgPath);
             if (!File.Exists(fullPath))
             {
                 _userProfileImage?.Dispose();
@@ -505,7 +505,7 @@ public partial class MainWindowViewModel : ViewModelBase
         });
 
         // Activate dataset insight orchestrator (subscribes to messenger)
-        _ = App.Services.GetRequiredService<Services.AI.DatasetInsightOrchestrator>();
+        _ = App.Services.GetRequiredService<DatasetInsightOrchestrator>();
 
         // Eagerly initialize the AI suggestion tray so it subscribes to IntentEngine.SuggestionAdded
         // before any plugin signals arrive. Lazy init caused missed notifications (balloon + badge)
@@ -601,11 +601,11 @@ public partial class MainWindowViewModel : ViewModelBase
             // Also search FFI (WASM plugins)
             await Task.Run(() =>
             {
-                var resultPtr = Native.NativeLibrary.PluginSearchItems(searchQuery, maxResults * 2);
+                var resultPtr = PrivStack.Services.Native.NativeLibrary.PluginSearchItems(searchQuery, maxResults * 2);
                 if (resultPtr == nint.Zero) return;
 
                 var json = System.Runtime.InteropServices.Marshal.PtrToStringUTF8(resultPtr);
-                Native.NativeLibrary.FreeString(resultPtr);
+                PrivStack.Services.Native.NativeLibrary.FreeString(resultPtr);
                 if (string.IsNullOrEmpty(json)) return;
 
                 try
@@ -673,7 +673,7 @@ public partial class MainWindowViewModel : ViewModelBase
             if (navItemId != null)
                 await SelectTab(navItemId);
 
-            await Task.Run(() => Native.NativeLibrary.PluginNavigateToItem(pluginId, itemId));
+            await Task.Run(() => PrivStack.Services.Native.NativeLibrary.PluginNavigateToItem(pluginId, itemId));
 
             if (navItemId != null
                 && _pluginViewModelCache.TryGetValue(navItemId, out var vm)
@@ -724,7 +724,7 @@ public partial class MainWindowViewModel : ViewModelBase
         // Fire off PluginNavigateToItem in the background to update plugin state (selected_page_id, etc.)
         // Don't await - we'll use cached data for immediate render, state update happens in parallel
         Serilog.Log.Debug("NavigateToPluginItem: [T+{T}ms] Firing FFI PluginNavigateToItem (background)", sw.ElapsedMilliseconds);
-        _ = Task.Run(() => Native.NativeLibrary.PluginNavigateToItem(pluginId, itemId));
+        _ = Task.Run(() => PrivStack.Services.Native.NativeLibrary.PluginNavigateToItem(pluginId, itemId));
 
         if (navItemId != null
             && _pluginViewModelCache.TryGetValue(navItemId, out var vm)
@@ -785,7 +785,7 @@ public partial class MainWindowViewModel : ViewModelBase
         App.Services.GetService<ViewStatePrefetchService>()?.SetActivePlugin(plugin.Metadata.Id);
 
         // Notify InfoPanel which plugin is active
-        App.Services.GetRequiredService<Services.InfoPanelService>().SetActivePlugin(plugin.Metadata.Id);
+        App.Services.GetRequiredService<InfoPanelService>().SetActivePlugin(plugin.Metadata.Id);
 
         CurrentViewModel = GetOrCreatePluginViewModel(tabName, plugin);
 
@@ -1052,7 +1052,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // Clear info panel active item during tab transition;
         // the new plugin will re-set it via OnNavigatedToAsync
-        var infoPanelService = App.Services.GetRequiredService<Services.InfoPanelService>();
+        var infoPanelService = App.Services.GetRequiredService<InfoPanelService>();
         infoPanelService.ClearActiveItem();
 
         SelectedTab = tabName;

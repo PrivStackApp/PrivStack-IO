@@ -1,0 +1,64 @@
+using PrivStack.Services.Models;
+
+namespace PrivStack.Services.Native;
+
+/// <summary>
+/// Interface for PrivStack Cloud Sync (S3-backed multi-device sync + sharing).
+/// Distinct from <see cref="ICloudStorageService"/> which handles Google Drive / iCloud.
+/// </summary>
+public interface ICloudSyncService
+{
+    // ── Configuration ──
+    void Configure(string configJson);
+
+    // ── Authentication ──
+    CloudAuthTokens Authenticate(string email, string password);
+    void AuthenticateWithTokens(string accessToken, string refreshToken, long userId);
+    CloudAuthTokens? GetCurrentTokens();
+    void Logout();
+    bool IsAuthenticated { get; }
+
+    // ── Key Management ──
+    string SetupPassphrase(string passphrase);
+    string SetupUnifiedRecovery(string passphrase);
+    void EnterPassphrase(string passphrase);
+    void RecoverFromMnemonic(string mnemonic);
+    bool HasKeypair { get; }
+
+    // ── Workspaces ──
+    CloudWorkspaceInfo RegisterWorkspace(string workspaceId, string name);
+    List<CloudWorkspaceInfo> ListWorkspaces();
+    void DeleteWorkspace(string workspaceId);
+    CloudQuota GetQuota(string workspaceId);
+
+    // ── Sync Engine ──
+    void StartSync(string workspaceId);
+    void StopSync();
+    bool IsSyncing { get; }
+    CloudSyncStatus GetStatus();
+    void ForceFlush();
+    void ClearCursors();
+    void PushEvent(string entityId, string entityType, string jsonData);
+    uint PushAllEntities();
+
+    // ── Sharing ──
+    CloudShareInfo ShareEntity(string entityId, string entityType, string? entityName,
+        string workspaceId, string recipientEmail, string permission);
+    void RevokeShare(string entityId, string recipientEmail);
+    void AcceptShare(string invitationToken);
+    List<CloudShareInfo> ListEntityShares(string entityId);
+    List<SharedWithMeInfo> GetSharedWithMe();
+
+    // ── Devices ──
+    void RegisterDevice(string name, string platform);
+    List<CloudDeviceInfo> ListDevices();
+
+    // ── Blobs ──
+    void UploadBlob(string workspaceId, string blobId, string? entityId, byte[] data, byte[] dek);
+    byte[] DownloadBlob(string s3Key, byte[] dek);
+    List<CloudBlobMeta> GetEntityBlobs(string entityId);
+
+    // ── Compaction ──
+    bool NeedsCompaction(int batchCount);
+    void RequestCompaction(string entityId, string workspaceId);
+}

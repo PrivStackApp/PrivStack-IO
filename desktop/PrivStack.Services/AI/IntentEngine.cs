@@ -1,0 +1,720 @@
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Channels;
+using CommunityToolkit.Mvvm.Messaging;
+using PrivStack.Services.Abstractions;
+using PrivStack.Services.Plugin;
+using PrivStack.Sdk.Capabilities;
+using PrivStack.Sdk.Messaging;
+using PrivStack.Sdk.Services;
+using Serilog;
+
+namespace PrivStack.Services.AI;
+
+/// <summary>
+/// Shell-side intent classification engine. Subscribes to IntentSignalMessage,
+/// collects IIntentProvider descriptors, uses IAiService to classify signals,
+/// and surfaces IntentSuggestion objects for the UI.
+/// </summary>
+internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessage>, IDisposable
+{
+    private static readonly ILogger _log = Log.ForContext<IntentEngine>();
+    private const int MaxSuggestions = 50;
+    private const int QueueCapacity = 20;
+    private static readonly TimeSpan SuggestionMaxAge = TimeSpan.FromDays(7);
+
+    private static readonly TimeSpan DebounceInterval = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan DeduplicationWindow = TimeSpan.FromMinutes(5);
+
+    private readonly IAppSettingsService _appSettings;
+    private readonly IAiService _aiService;
+    private readonly IPluginRegistry _pluginRegistry;
+    private readonly AiModelManager _modelManager;
+    private readonly Channel<IntentSignalMessage> _signalChannel;
+    private readonly List<IntentSuggestion> _suggestions = [];
+    private readonly object _suggestionsLock = new();
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _recentAnalyses = new();
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _lastPluginSignal = new();
+    private readonly CancellationTokenSource _disposeCts = new();
+    private readonly string _suggestionsFilePath;
+    private Task? _consumerTask;
+    private System.Timers.Timer? _persistTimer;
+
+    public IntentEngine(
+        IAppSettingsService appSettings,
+        IAiService aiService,
+        IPluginRegistry pluginRegistry,
+        AiModelManager modelManager)
+    {
+        _appSettings = appSettings;
+        _aiService = aiService;
+        _pluginRegistry = pluginRegistry;
+        _modelManager = modelManager;
+        _suggestionsFilePath = Path.Combine(DataPaths.BaseDir, "intent-suggestions.json");
+        _signalChannel = Channel.CreateBounded<IntentSignalMessage>(
+            new BoundedChannelOptions(QueueCapacity)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleReader = true,
+            });
+
+        LoadSuggestionsFromDisk();
+
+        WeakReferenceMessenger.Default.Register<IntentSignalMessage>(this);
+        _consumerTask = Task.Run(() => ConsumeSignalsAsync(_disposeCts.Token));
+    }
+
+    // ── IIntentEngine ─────────────────────────────────────────────────
+
+    public bool IsEnabled =>
+        _appSettings.Settings.AiEnabled &&
+        _appSettings.Settings.AiIntentEnabled &&
+        _aiService.IsAvailable;
+
+    public IReadOnlyList<IntentSuggestion> PendingSuggestions
+    {
+        get
+        {
+            lock (_suggestionsLock)
+                return _suggestions.ToList().AsReadOnly();
+        }
+    }
+
+    public event EventHandler<IntentSuggestion>? SuggestionAdded;
+    public event EventHandler<string>? SuggestionRemoved;
+    public event EventHandler? SuggestionsCleared;
+
+    public async Task AnalyzeAsync(IntentSignalMessage signal, CancellationToken ct = default)
+    {
+        if (!IsEnabled) return;
+        if (string.IsNullOrWhiteSpace(signal.Content)) return;
+
+        var allIntents = GetAllAvailableIntents();
+        if (allIntents.Count == 0) return;
+
+        var tier = DetermineModelTier();
+
+        // Small tier: filter intents so small models aren't overwhelmed
+        // Medium/Large: use all intents (model can handle it)
+        var intents = tier == ModelTier.Small
+            ? FilterIntentsForSignal(allIntents, signal)
+            : (signal.SignalType == IntentSignalType.UserRequest ? allIntents : FilterIntentsForSignal(allIntents, signal));
+        if (intents.Count == 0) return;
+
+        var maxTokens = tier switch
+        {
+            ModelTier.Large => 1024,
+            ModelTier.Medium => 768,
+            _ => 384,
+        };
+
+        try
+        {
+            var systemPrompt = IntentPromptBuilder.BuildSystemPrompt(intents, DateTimeOffset.Now, tier);
+            var userPrompt = IntentPromptBuilder.BuildUserPrompt(
+                signal.Content, signal.EntityType, signal.EntityTitle);
+
+            _log.Debug("Intent classification using {Tier} tier prompt, MaxTokens={MaxTokens}",
+                tier, maxTokens);
+
+            var response = await _aiService.CompleteAsync(new AiRequest
+            {
+                SystemPrompt = systemPrompt,
+                UserPrompt = userPrompt,
+                MaxTokens = maxTokens,
+                Temperature = 0.2,
+                FeatureId = "intent.classify",
+            }, ct);
+
+            if (!response.Success || string.IsNullOrWhiteSpace(response.Content))
+            {
+                _log.Debug("Intent classification returned no results for signal from {Plugin}",
+                    signal.SourcePluginId);
+                return;
+            }
+
+            _log.Debug("Intent classification raw response: {Response}", response.Content);
+            ParseAndAddSuggestions(response.Content, signal, allIntents);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "Intent classification failed for signal from {Plugin}", signal.SourcePluginId);
+        }
+    }
+
+    public async Task<IntentResult> ExecuteAsync(
+        string suggestionId,
+        IReadOnlyDictionary<string, string>? slotOverrides = null,
+        CancellationToken ct = default)
+    {
+        IntentSuggestion? suggestion;
+        lock (_suggestionsLock)
+        {
+            suggestion = _suggestions.FirstOrDefault(s => s.SuggestionId == suggestionId);
+        }
+
+        if (suggestion == null)
+            return IntentResult.Failure("Suggestion not found or already dismissed.");
+
+        var provider = _pluginRegistry
+            .GetCapabilityProviders<IIntentProvider>()
+            .FirstOrDefault(p => p.GetSupportedIntents()
+                .Any(i => i.IntentId == suggestion.MatchedIntent.IntentId));
+
+        if (provider == null)
+            return IntentResult.Failure($"No provider found for intent '{suggestion.MatchedIntent.IntentId}'.");
+
+        var finalSlots = new Dictionary<string, string>(suggestion.ExtractedSlots);
+        if (slotOverrides != null)
+        {
+            foreach (var (key, value) in slotOverrides)
+                finalSlots[key] = value;
+        }
+
+        var request = new IntentRequest
+        {
+            IntentId = suggestion.MatchedIntent.IntentId,
+            Slots = finalSlots,
+            SourceEntityId = suggestion.SourceSignal.EntityId,
+            SourcePluginId = suggestion.SourceSignal.SourcePluginId,
+            SourceLinkType = MapEntityTypeToLinkType(suggestion.SourceSignal.EntityType),
+        };
+
+        try
+        {
+            var result = await provider.ExecuteIntentAsync(request, ct);
+
+            if (result.Success && !string.IsNullOrEmpty(result.CreatedEntityId)
+                && !string.IsNullOrEmpty(suggestion.SourceSignal.EntityId))
+            {
+                WeakReferenceMessenger.Default.Send(new IntentExecutedMessage
+                {
+                    SourcePluginId = suggestion.SourceSignal.SourcePluginId,
+                    SourceEntityType = suggestion.SourceSignal.EntityType ?? "",
+                    SourceEntityId = suggestion.SourceSignal.EntityId,
+                    CreatedEntityId = result.CreatedEntityId,
+                    CreatedEntityType = result.CreatedEntityType ?? "",
+                    NavigationLinkType = result.NavigationLinkType,
+                });
+            }
+
+            RemoveSuggestion(suggestionId);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "Intent execution failed: {IntentId}", suggestion.MatchedIntent.IntentId);
+            return IntentResult.Failure(ex.Message);
+        }
+    }
+
+    public async Task<IntentResult> ExecuteDirectAsync(
+        string intentId,
+        IReadOnlyDictionary<string, string> slots,
+        CancellationToken ct = default)
+    {
+        var providers = _pluginRegistry.GetCapabilityProviders<IIntentProvider>();
+
+        // Exact match first
+        IIntentProvider? provider = null;
+        IntentDescriptor? descriptor = null;
+
+        foreach (var p in providers)
+        {
+            var match = p.GetSupportedIntents()
+                .FirstOrDefault(i => i.IntentId == intentId);
+            if (match != null)
+            {
+                provider = p;
+                descriptor = match;
+                break;
+            }
+        }
+
+        var resolvedIntentId = intentId;
+
+        // Fuzzy fallback: AI sometimes shortens IDs (e.g. "tasks.update" instead of "tasks.update_task")
+        if (provider == null)
+        {
+            _log.Warning("No exact match for intent '{IntentId}', trying prefix match", intentId);
+            foreach (var p in providers)
+            {
+                var match = p.GetSupportedIntents()
+                    .FirstOrDefault(i => i.IntentId.StartsWith(intentId, StringComparison.OrdinalIgnoreCase));
+                if (match != null)
+                {
+                    provider = p;
+                    descriptor = match;
+                    resolvedIntentId = match.IntentId;
+                    _log.Information("Fuzzy-resolved intent '{Original}' to '{Resolved}'", intentId, resolvedIntentId);
+                    break;
+                }
+            }
+        }
+
+        if (provider == null)
+            return IntentResult.Failure($"No provider found for intent '{intentId}'.");
+
+        // Validate slot names against the intent descriptor and strip unknown ones
+        var warnings = new List<string>();
+        var validatedSlots = ValidateSlots(slots, descriptor!, warnings);
+
+        var request = new IntentRequest
+        {
+            IntentId = resolvedIntentId,
+            Slots = validatedSlots,
+        };
+
+        try
+        {
+            var result = await provider.ExecuteIntentAsync(request, ct);
+
+            // Attach slot validation warnings to the result
+            if (warnings.Count > 0)
+            {
+                var allWarnings = result.Warnings != null
+                    ? [..result.Warnings, ..warnings]
+                    : warnings.AsReadOnly() as IReadOnlyList<string>;
+                result = result with { Warnings = allWarnings };
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "Direct intent execution failed: {IntentId}", resolvedIntentId);
+            return IntentResult.Failure(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Validates slot names against the intent descriptor. Unknown slots are stripped
+    /// and warnings are added. Returns the filtered slot dictionary.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> ValidateSlots(
+        IReadOnlyDictionary<string, string> slots,
+        IntentDescriptor descriptor,
+        List<string> warnings)
+    {
+        if (descriptor.Slots.Count == 0 || slots.Count == 0)
+            return slots;
+
+        var knownSlotNames = new HashSet<string>(
+            descriptor.Slots.Select(s => s.Name),
+            StringComparer.OrdinalIgnoreCase);
+
+        var unknownSlots = slots.Keys
+            .Where(k => !knownSlotNames.Contains(k))
+            .ToList();
+
+        if (unknownSlots.Count == 0)
+            return slots;
+
+        // Build helpful warning with the valid slot names
+        var validNames = string.Join(", ", descriptor.Slots.Select(s => s.Name));
+        foreach (var unknown in unknownSlots)
+        {
+            _log.Warning("Intent '{IntentId}' received unknown slot '{Slot}' — stripping. Valid slots: {ValidSlots}",
+                descriptor.IntentId, unknown, validNames);
+            warnings.Add($"Unknown slot \"{unknown}\" was ignored for {descriptor.IntentId}. Valid slots: {validNames}");
+        }
+
+        // Return only known slots
+        return slots
+            .Where(kvp => knownSlotNames.Contains(kvp.Key))
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+    }
+
+    public void Dismiss(string suggestionId) => RemoveSuggestion(suggestionId);
+
+    public void ClearAll()
+    {
+        lock (_suggestionsLock)
+            _suggestions.Clear();
+        SchedulePersist();
+        SuggestionsCleared?.Invoke(this, EventArgs.Empty);
+    }
+
+    public IReadOnlyList<IntentDescriptor> GetAllAvailableIntents()
+    {
+        var providers = _pluginRegistry.GetCapabilityProviders<IIntentProvider>();
+        return providers.SelectMany(p =>
+        {
+            try { return p.GetSupportedIntents(); }
+            catch (Exception ex)
+            {
+                _log.Warning(ex, "Failed to get intents from provider");
+                return [];
+            }
+        }).ToList().AsReadOnly();
+    }
+
+    // ── IRecipient<IntentSignalMessage> ──────────────────────────────
+
+    public void Receive(IntentSignalMessage message)
+    {
+        if (!IsEnabled) return;
+        if (!_appSettings.Settings.AiIntentAutoAnalyze &&
+            message.SignalType != IntentSignalType.UserRequest)
+            return;
+
+        _signalChannel.Writer.TryWrite(message);
+    }
+
+    // ── Signal Consumer ──────────────────────────────────────────────
+
+    private async Task ConsumeSignalsAsync(CancellationToken ct)
+    {
+        await foreach (var signal in _signalChannel.Reader.ReadAllAsync(ct))
+        {
+            try
+            {
+                // UserRequest signals bypass debounce
+                if (signal.SignalType != IntentSignalType.UserRequest)
+                {
+                    // Per-plugin debounce
+                    var now = DateTimeOffset.UtcNow;
+                    if (_lastPluginSignal.TryGetValue(signal.SourcePluginId, out var lastTime) &&
+                        now - lastTime < DebounceInterval)
+                    {
+                        await Task.Delay(DebounceInterval, ct);
+                    }
+                    _lastPluginSignal[signal.SourcePluginId] = DateTimeOffset.UtcNow;
+
+                    // Deduplication
+                    var dedupKey = ComputeDeduplicationKey(signal);
+                    if (_recentAnalyses.TryGetValue(dedupKey, out var analyzedAt) &&
+                        DateTimeOffset.UtcNow - analyzedAt < DeduplicationWindow)
+                    {
+                        continue;
+                    }
+                    _recentAnalyses[dedupKey] = DateTimeOffset.UtcNow;
+                }
+
+                await AnalyzeAsync(signal, ct);
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex)
+            {
+                _log.Error(ex, "Error processing intent signal from {Plugin}", signal.SourcePluginId);
+            }
+        }
+    }
+
+    // ── Entity Type → Link Type Mapping ─────────────────────────────
+
+    private static readonly Dictionary<string, string> EntityTypeToLinkType = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["email_message"] = "email",
+        ["page"] = "note",
+        ["task"] = "task",
+        ["event"] = "calendar_event",
+        ["contact"] = "contact",
+        ["journal_entry"] = "journal",
+        ["vault_file"] = "file",
+        ["file"] = "file",
+        ["snippet"] = "snippet",
+        ["feed"] = "rss_feed",
+        ["web_clip"] = "web_clip",
+    };
+
+    private static string? MapEntityTypeToLinkType(string? entityType)
+    {
+        if (string.IsNullOrEmpty(entityType)) return null;
+        return EntityTypeToLinkType.GetValueOrDefault(entityType);
+    }
+
+    // ── Model Tier Detection ────────────────────────────────────────
+
+    private ModelTier DetermineModelTier()
+    {
+        var providerId = _appSettings.Settings.AiProvider;
+
+        // Cloud providers get the full-detail Large tier
+        if (providerId != "local")
+            return ModelTier.Large;
+
+        // Local provider: check model parameter count
+        var modelName = _appSettings.Settings.AiLocalModel;
+        if (!string.IsNullOrEmpty(modelName))
+        {
+            var paramB = _modelManager.GetModelParameterBillions(modelName);
+            if (paramB >= 7)
+                return ModelTier.Medium;
+        }
+
+        return ModelTier.Small;
+    }
+
+    // ── Private Helpers ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Core intent IDs that are relevant for general text content analysis.
+    /// Keeps the prompt small so small local models can classify reliably.
+    /// </summary>
+    private static readonly HashSet<string> TextContentIntents =
+    [
+        "calendar.create_event",
+        "tasks.create_task",
+        "contacts.create_contact",
+        "email.draft_email",
+    ];
+
+    private static readonly HashSet<string> EmailIntents =
+    [
+        "calendar.create_event",
+        "tasks.create_task",
+        "contacts.create_contact",
+    ];
+
+    private static IReadOnlyList<IntentDescriptor> FilterIntentsForSignal(
+        IReadOnlyList<IntentDescriptor> allIntents, IntentSignalMessage signal)
+    {
+        // UserRequest = on-demand analysis — show all intents
+        if (signal.SignalType == IntentSignalType.UserRequest)
+            return allIntents;
+
+        var relevant = signal.SignalType switch
+        {
+            IntentSignalType.EmailReceived => EmailIntents,
+            _ => TextContentIntents,
+        };
+
+        return allIntents.Where(i => relevant.Contains(i.IntentId)).ToList().AsReadOnly();
+    }
+
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+    };
+
+    /// <summary>
+    /// Extracts the outermost JSON object from potentially noisy LLM output.
+    /// Local models often append explanatory text or BOM bytes after the JSON.
+    /// </summary>
+    private static string? ExtractJsonObject(string raw)
+    {
+        var start = raw.IndexOf('{');
+        if (start < 0) return null;
+
+        var depth = 0;
+        var inString = false;
+        var escape = false;
+
+        for (var i = start; i < raw.Length; i++)
+        {
+            var c = raw[i];
+
+            if (escape) { escape = false; continue; }
+            if (c == '\\' && inString) { escape = true; continue; }
+            if (c == '"') { inString = !inString; continue; }
+            if (inString) continue;
+
+            if (c == '{') depth++;
+            else if (c == '}')
+            {
+                depth--;
+                if (depth == 0)
+                    return raw[start..(i + 1)];
+            }
+        }
+
+        return null; // unbalanced braces
+    }
+
+    private void ParseAndAddSuggestions(
+        string aiContent,
+        IntentSignalMessage signal,
+        IReadOnlyList<IntentDescriptor> intents)
+    {
+        try
+        {
+            // Strip markdown fences if present
+            var cleaned = aiContent.Trim();
+            if (cleaned.StartsWith("```"))
+            {
+                var firstNewline = cleaned.IndexOf('\n');
+                if (firstNewline >= 0) cleaned = cleaned[(firstNewline + 1)..];
+                if (cleaned.EndsWith("```")) cleaned = cleaned[..^3];
+                cleaned = cleaned.Trim();
+            }
+
+            // Extract just the JSON object — local LLMs often append extra text/BOM bytes
+            var json = ExtractJsonObject(cleaned);
+            if (json == null)
+            {
+                _log.Debug("No JSON object found in intent classification response");
+                return;
+            }
+
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("intents", out var intentsArray))
+                return;
+
+            foreach (var item in intentsArray.EnumerateArray())
+            {
+                var intentId = item.GetProperty("intent_id").GetString();
+                if (string.IsNullOrEmpty(intentId)) continue;
+
+                var descriptor = intents.FirstOrDefault(i => i.IntentId == intentId);
+                if (descriptor == null)
+                {
+                    _log.Debug("AI returned unknown intent ID: {IntentId}", intentId);
+                    continue;
+                }
+
+                var confidence = item.TryGetProperty("confidence", out var confProp)
+                    ? confProp.GetDouble() : 0.5;
+                var summary = item.TryGetProperty("summary", out var sumProp)
+                    ? sumProp.GetString() ?? descriptor.DisplayName
+                    : descriptor.DisplayName;
+
+                var slots = new Dictionary<string, string>();
+                if (item.TryGetProperty("slots", out var slotsObj) &&
+                    slotsObj.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var slot in slotsObj.EnumerateObject())
+                    {
+                        var value = slot.Value.ValueKind == JsonValueKind.String
+                            ? slot.Value.GetString()
+                            : slot.Value.GetRawText();
+                        if (!string.IsNullOrEmpty(value))
+                            slots[slot.Name] = value;
+                    }
+                }
+
+                var suggestion = new IntentSuggestion
+                {
+                    SuggestionId = Guid.NewGuid().ToString("N"),
+                    MatchedIntent = descriptor,
+                    Summary = summary,
+                    Confidence = confidence,
+                    SourceSignal = signal,
+                    ExtractedSlots = slots,
+                };
+
+                AddSuggestion(suggestion);
+            }
+        }
+        catch (JsonException ex)
+        {
+            _log.Warning(ex, "Failed to parse intent classification response");
+        }
+    }
+
+    private void AddSuggestion(IntentSuggestion suggestion)
+    {
+        lock (_suggestionsLock)
+        {
+            // FIFO eviction
+            while (_suggestions.Count >= MaxSuggestions)
+            {
+                var oldest = _suggestions[0];
+                _suggestions.RemoveAt(0);
+                SuggestionRemoved?.Invoke(this, oldest.SuggestionId);
+            }
+            _suggestions.Add(suggestion);
+        }
+        SchedulePersist();
+        SuggestionAdded?.Invoke(this, suggestion);
+    }
+
+    private void RemoveSuggestion(string suggestionId)
+    {
+        lock (_suggestionsLock)
+        {
+            var idx = _suggestions.FindIndex(s => s.SuggestionId == suggestionId);
+            if (idx >= 0) _suggestions.RemoveAt(idx);
+        }
+        SchedulePersist();
+        SuggestionRemoved?.Invoke(this, suggestionId);
+    }
+
+    private static string ComputeDeduplicationKey(IntentSignalMessage signal)
+    {
+        var raw = $"{signal.SourcePluginId}:{signal.EntityId}:{signal.Content}";
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
+        return Convert.ToHexString(hash[..8]);
+    }
+
+    // ── Persistence ─────────────────────────────────────────────────
+
+    private static readonly JsonSerializerOptions _persistOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false,
+    };
+
+    private void LoadSuggestionsFromDisk()
+    {
+        try
+        {
+            if (!File.Exists(_suggestionsFilePath)) return;
+
+            var json = File.ReadAllText(_suggestionsFilePath);
+            var loaded = JsonSerializer.Deserialize<List<IntentSuggestion>>(json, _persistOptions);
+            if (loaded == null) return;
+
+            var cutoff = DateTimeOffset.UtcNow - SuggestionMaxAge;
+            lock (_suggestionsLock)
+            {
+                foreach (var s in loaded)
+                {
+                    if (s.CreatedAt >= cutoff && _suggestions.Count < MaxSuggestions)
+                        _suggestions.Add(s);
+                }
+            }
+
+            _log.Debug("Loaded {Count} persisted intent suggestions", _suggestions.Count);
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Failed to load persisted intent suggestions");
+        }
+    }
+
+    private void SchedulePersist()
+    {
+        _persistTimer?.Stop();
+        _persistTimer?.Dispose();
+        _persistTimer = new System.Timers.Timer(2000) { AutoReset = false };
+        _persistTimer.Elapsed += (_, _) => PersistSuggestionsToDisk();
+        _persistTimer.Start();
+    }
+
+    private void PersistSuggestionsToDisk()
+    {
+        try
+        {
+            List<IntentSuggestion> snapshot;
+            lock (_suggestionsLock)
+                snapshot = [.. _suggestions];
+
+            var json = JsonSerializer.Serialize(snapshot, _persistOptions);
+            File.WriteAllText(_suggestionsFilePath, json);
+            _log.Debug("Persisted {Count} intent suggestions to disk", snapshot.Count);
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Failed to persist intent suggestions");
+        }
+    }
+
+    // ── IDisposable ──────────────────────────────────────────────────
+
+    public void Dispose()
+    {
+        _disposeCts.Cancel();
+        _signalChannel.Writer.TryComplete();
+        _persistTimer?.Stop();
+        _persistTimer?.Dispose();
+        PersistSuggestionsToDisk();
+        WeakReferenceMessenger.Default.Unregister<IntentSignalMessage>(this);
+        _disposeCts.Dispose();
+    }
+}

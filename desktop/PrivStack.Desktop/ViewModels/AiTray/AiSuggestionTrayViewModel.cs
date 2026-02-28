@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
+using PrivStack.Services.AI;
 using PrivStack.Desktop.Services.AI;
 using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Sdk;

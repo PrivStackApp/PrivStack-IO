@@ -4,7 +4,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
-using PrivStack.Desktop.Models;
+using PrivStack.Services.Models;
 using PrivStack.Desktop.ViewModels;
 using PrivStack.Sdk.Capabilities;
 

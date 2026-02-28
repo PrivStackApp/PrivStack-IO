@@ -1,7 +1,7 @@
 namespace PrivStack.Desktop.Tests.Models;
 
 using System.Text.Json;
-using PrivStack.Desktop.Models;
+using PrivStack.Services.Models;
 
 public class PropertyModelsTests
 {

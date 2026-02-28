@@ -1,5 +1,5 @@
-using PrivStack.Desktop.Models;
-using PrivStack.Desktop.Native;
+using PrivStack.Services.Models;
+using PrivStack.Services.Native;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.ViewModels;

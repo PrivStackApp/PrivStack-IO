@@ -11,7 +11,7 @@ using System.Runtime.Loader;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
-using PrivStack.Desktop.Models;
+using PrivStack.Services.Models;
 using PrivStack.Desktop.Sdk;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
@@ -24,7 +24,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using PrivStack.Desktop.Views.Dialogs;
 using PrivStack.Desktop.Plugins.Dashboard;
 using PrivStack.Desktop.Plugins.Graph;
-using NativeLib = PrivStack.Desktop.Native.NativeLibrary;
+using NativeLib = PrivStack.Services.Native.NativeLibrary;
 using IAppPlugin = PrivStack.Sdk.IAppPlugin;
 using NavigationItem = PrivStack.Sdk.NavigationItem;
 using PluginState = PrivStack.Sdk.PluginState;
@@ -405,23 +405,24 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
         _log.Information("ReinitializeAsync complete. Active: {Active}/{Total}", ActivePlugins.Count, _plugins.Count);
     }
 
-    public void SetMainViewModel(MainWindowViewModel mainViewModel)
+    public void SetMainViewModel(object? mainViewModel)
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(mainViewModel);
 
-        _mainViewModel = mainViewModel;
+        _mainViewModel = mainViewModel as MainWindowViewModel
+            ?? throw new ArgumentException($"Expected MainWindowViewModel, got {mainViewModel.GetType().Name}");
 
         foreach (var plugin in ActivePlugins)
         {
-            RegisterCommandProvider(plugin, mainViewModel);
+            RegisterCommandProvider(plugin, _mainViewModel);
         }
 
         // Register QuickActionService as a command provider so quick actions appear in the palette
-        var quickActionService = App.Services.GetService<QuickActionService>();
+        var quickActionService = ServiceProviderAccessor.Services.GetService<QuickActionService>();
         if (quickActionService != null)
         {
-            mainViewModel.CommandPaletteVM.RegisterProvider(quickActionService);
+            _mainViewModel.CommandPaletteVM.RegisterProvider(quickActionService);
         }
 
         _log.Debug("MainViewModel set, command providers registered");
@@ -430,7 +431,7 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
     /// <summary>
     /// Gets the MainWindowViewModel for cross-plugin navigation.
     /// </summary>
-    public MainWindowViewModel? GetMainViewModel()
+    public object? GetMainViewModel()
     {
         ThrowIfDisposed();
         return _mainViewModel;
@@ -1176,7 +1177,7 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
                 schemasJsonStr,
                 permissionsJson);
 
-            if (result != Native.PrivStackError.Ok)
+            if (result != PrivStackError.Ok)
             {
                 _log.Error("Failed to load Wasm plugin {Id} via FFI: {Error}", metadata.Id, result);
                 return true;
@@ -1210,7 +1211,7 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
             var permissionsJson = BuildPermissionsJson(Path.GetFileNameWithoutExtension(wasmPath));
 
             var result = NativeLib.PluginLoadWasm(wasmPath, permissionsJson, out var pluginIdPtr);
-            if (result != Native.PrivStackError.Ok)
+            if (result != PrivStackError.Ok)
             {
                 _log.Error("Failed to load Wasm component {Path}: {Error}", wasmPath, result);
                 return true;
@@ -1279,7 +1280,7 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
                 NativeLib.FreeString(pluginIdPtr);
             }
 
-            if (result != Native.PrivStackError.Ok)
+            if (result != PrivStackError.Ok)
             {
                 // Do NOT fall back to metadata-only — that creates a broken plugin
                 // with no runtime (get_view_state/handle_command will always fail).
@@ -1394,7 +1395,7 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
 
             // Install via FFI (validates manifest, loads wasm into sandbox)
             var result = NativeLib.PluginInstallPpk(ppkPath);
-            if (result != Native.PrivStackError.Ok)
+            if (result != PrivStackError.Ok)
             {
                 _log.Error("Failed to install .ppk {Id}: {Error}", metadata.Id, result);
                 return false;
@@ -1666,7 +1667,7 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
                 {
                     NativeLib.VaultCreate(vaultId);
                     var initResult = NativeLib.VaultInitialize(vaultId, cachedPassword);
-                    if (initResult != Native.PrivStackError.Ok && initResult != Native.PrivStackError.VaultAlreadyInitialized)
+                    if (initResult != PrivStackError.Ok && initResult != PrivStackError.VaultAlreadyInitialized)
                     {
                         _log.Warning("Failed to initialize plugin vault {VaultId} for {PluginId}: {Result}",
                             vaultId, plugin.Metadata.Id, initResult);
@@ -1677,7 +1678,7 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
                 if (!NativeLib.VaultIsUnlocked(vaultId))
                 {
                     var unlockResult = NativeLib.VaultUnlock(vaultId, cachedPassword);
-                    if (unlockResult != Native.PrivStackError.Ok)
+                    if (unlockResult != PrivStackError.Ok)
                         _log.Warning("Failed to unlock plugin vault {VaultId} for {PluginId}: {Result}",
                             vaultId, plugin.Metadata.Id, unlockResult);
                     else

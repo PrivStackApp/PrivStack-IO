@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PrivStack.Services.AI;
 using PrivStack.Desktop.Services.AI;
 using PrivStack.Sdk.Capabilities;
 using PrivStack.Sdk.Helpers;

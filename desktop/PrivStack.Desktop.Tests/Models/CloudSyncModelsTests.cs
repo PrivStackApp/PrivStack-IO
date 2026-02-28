@@ -1,5 +1,5 @@
 using System.Text.Json;
-using PrivStack.Desktop.Models;
+using PrivStack.Services.Models;
 
 namespace PrivStack.Desktop.Tests.Models;
 
@@ -158,35 +158,35 @@ public class CloudSyncModelsTests
     public void CloudQuota_SeverityBrush_NotNull_WhenLow()
     {
         var quota = new CloudQuota { UsagePercent = 50.0 };
-        quota.SeverityBrush.Should().NotBeNull();
+        quota.SeverityLevel.Should().NotBeNull();
     }
 
     [Fact]
     public void CloudQuota_SeverityBrush_NotNull_AtExactly80()
     {
         var quota = new CloudQuota { UsagePercent = 80.0 };
-        quota.SeverityBrush.Should().NotBeNull();
+        quota.SeverityLevel.Should().NotBeNull();
     }
 
     [Fact]
     public void CloudQuota_SeverityBrush_NotNull_JustAbove80()
     {
         var quota = new CloudQuota { UsagePercent = 80.1 };
-        quota.SeverityBrush.Should().NotBeNull();
+        quota.SeverityLevel.Should().NotBeNull();
     }
 
     [Fact]
     public void CloudQuota_SeverityBrush_NotNull_AtExactly95()
     {
         var quota = new CloudQuota { UsagePercent = 95.0 };
-        quota.SeverityBrush.Should().NotBeNull();
+        quota.SeverityLevel.Should().NotBeNull();
     }
 
     [Fact]
     public void CloudQuota_SeverityBrush_NotNull_JustAbove95()
     {
         var quota = new CloudQuota { UsagePercent = 95.1 };
-        quota.SeverityBrush.Should().NotBeNull();
+        quota.SeverityLevel.Should().NotBeNull();
     }
 
     // ── CloudWorkspaceInfo ──

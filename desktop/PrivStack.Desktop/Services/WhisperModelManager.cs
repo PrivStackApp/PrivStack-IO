@@ -155,7 +155,7 @@ public sealed class WhisperModelManager : INotifyPropertyChanged
     /// </summary>
     public string GetDefaultModelName()
     {
-        var settings = App.Services.GetRequiredService<Abstractions.IAppSettingsService>().Settings;
+        var settings = App.Services.GetRequiredService<IAppSettingsService>().Settings;
         return settings.WhisperModelSize ?? "base.en";
     }
 

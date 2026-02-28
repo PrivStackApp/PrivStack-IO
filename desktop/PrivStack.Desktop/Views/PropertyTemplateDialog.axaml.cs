@@ -41,7 +41,7 @@ public partial class PropertyTemplateDialog : UserControl
         var source = e.Source as Control;
         while (source != null)
         {
-            if (source is Button btn && btn.DataContext is Models.PropertyTemplate template)
+            if (source is Button btn && btn.DataContext is PropertyTemplate template)
             {
                 // Don't select when the delete button was clicked
                 if (btn.Command == vm.DeleteTemplateCommand) return;

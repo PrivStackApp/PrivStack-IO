@@ -9,12 +9,12 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
-using PrivStack.Desktop.Models;
-using PrivStack.Desktop.Services;
+using PrivStack.Services.Models;
+using PrivStack.Services;
 using PrivStack.Sdk;
 using PrivStack.UI.Adaptive;
 using Serilog;
-using NativeLib = PrivStack.Desktop.Native.NativeLibrary;
+using NativeLib = PrivStack.Services.Native.NativeLibrary;
 
 namespace PrivStack.Desktop.Services.Plugin;
 
@@ -115,7 +115,7 @@ internal sealed class WasmPluginProxy : ObservableObject, IAppPlugin
     {
         State = PluginState.Active;
         var result = NativeLib.PluginActivate(_pluginId);
-        if (result != Native.PrivStackError.Ok)
+        if (result != PrivStackError.Ok)
             _log.Warning("Wasm plugin activate() call failed for {PluginId}: {Error}", _pluginId, result);
         _log.Debug("Wasm plugin activated: {PluginId}", _pluginId);
     }
@@ -195,7 +195,7 @@ internal sealed class WasmPluginProxy : ObservableObject, IAppPlugin
 
         // Unload from the Rust side
         var result = NativeLib.PluginUnload(_pluginId);
-        if (result != Native.PrivStackError.Ok)
+        if (result != PrivStackError.Ok)
         {
             _log.Warning("Failed to unload Wasm plugin {PluginId}: {Error}", _pluginId, result);
         }
@@ -401,7 +401,7 @@ internal sealed class WasmViewModelProxy : ViewModelBase
         string? cachedViewData = null;
         try
         {
-            var prefetchService = App.Services?.GetService<ViewStatePrefetchService>();
+            var prefetchService = ServiceProviderAccessor.Services?.GetService<ViewStatePrefetchService>();
 
             // Try entity-specific cache first if provided
             if (forPluginId != null && forEntityId != null)

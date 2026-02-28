@@ -1,5 +1,5 @@
 using System.Text.Json;
-using PrivStack.Desktop.Models;
+using PrivStack.Services.Models;
 using Serilog;
 
 namespace PrivStack.Desktop.Services;

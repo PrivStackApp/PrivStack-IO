@@ -9,16 +9,16 @@ using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
-using PrivStack.Desktop.Models;
-using PrivStack.Desktop.Native;
+using PrivStack.Services.Models;
+using PrivStack.Services.Native;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
-using PrivStack.Desktop.Services.Biometric;
-using PrivStack.Desktop.Services.Api;
-using PrivStack.Desktop.Services.Connections;
+using PrivStack.Services.Biometric;
+using PrivStack.Services.Api;
+using PrivStack.Services.Connections;
 using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Sdk;
-using NativeLib = PrivStack.Desktop.Native.NativeLibrary;
+using NativeLib = PrivStack.Services.Native.NativeLibrary;
 
 namespace PrivStack.Desktop.ViewModels;
 
@@ -187,17 +187,6 @@ public partial class PluginPermissionItem : ObservableObject
 }
 
 /// <summary>
-/// Backup frequency options.
-/// </summary>
-public enum BackupFrequency
-{
-    Manual,
-    Hourly,
-    Daily,
-    Weekly
-}
-
-/// <summary>
 /// Backup type options.
 /// </summary>
 public enum BackupType
@@ -304,7 +293,7 @@ public partial class SettingsViewModel : ViewModelBase
                 return null;
             }
 
-            var fullPath = Path.Combine(Services.DataPaths.BaseDir, ProfileImagePath);
+            var fullPath = Path.Combine(DataPaths.BaseDir, ProfileImagePath);
             if (!File.Exists(fullPath))
             {
                 _cachedProfileBitmap?.Dispose();
@@ -335,7 +324,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     public void SetProfileImage(string sourcePath)
     {
-        var destPath = Path.Combine(Services.DataPaths.BaseDir, "profile-image.png");
+        var destPath = Path.Combine(DataPaths.BaseDir, "profile-image.png");
 
         try
         {
@@ -361,7 +350,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         if (string.IsNullOrEmpty(ProfileImagePath)) return;
 
-        var fullPath = Path.Combine(Services.DataPaths.BaseDir, ProfileImagePath);
+        var fullPath = Path.Combine(DataPaths.BaseDir, ProfileImagePath);
         try { if (File.Exists(fullPath)) File.Delete(fullPath); } catch { /* best effort */ }
 
         _cachedProfileBitmap?.Dispose();
@@ -412,7 +401,7 @@ public partial class SettingsViewModel : ViewModelBase
         DataDirectoryType.Custom => string.IsNullOrEmpty(DataDirectory) ? "Select a folder..." : DataDirectory,
         DataDirectoryType.GoogleDrive => GetGoogleDrivePath() ?? "Not available",
         DataDirectoryType.ICloud => GetICloudPath() ?? "Not available",
-        DataDirectoryType.PrivStackCloud => Services.DataPaths.WorkspaceDataDir ?? GetDefaultDataPath(),
+        DataDirectoryType.PrivStackCloud => DataPaths.WorkspaceDataDir ?? GetDefaultDataPath(),
         _ => GetDefaultDataPath()
     };
 
@@ -460,7 +449,7 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private string _version = string.Empty;
 
-    public string CoreVersion => $"v{Native.PrivStackService.Version}";
+    public string CoreVersion => $"v{PrivStackService.Version}";
 
     public string ShellVersion
     {
@@ -1404,7 +1393,7 @@ public partial class SettingsViewModel : ViewModelBase
         item.IsExpanded = false;
 
         // Evict cached ViewModel and re-navigate to force a full reload
-        var mainVm = _pluginRegistry.GetMainViewModel();
+        var mainVm = _pluginRegistry.GetMainViewModel() as MainWindowViewModel;
         if (mainVm != null)
         {
             var plugin = _pluginRegistry.GetPlugin(item.Id);
@@ -1516,7 +1505,7 @@ public partial class SettingsViewModel : ViewModelBase
         var settings = _settingsService.Settings;
         UserDisplayName = settings.UserDisplayName ?? Environment.UserName ?? "User";
         ProfileImagePath = settings.ProfileImagePath;
-        Version = $"v{Native.PrivStackService.Version}";
+        Version = $"v{PrivStackService.Version}";
 
         // Get storage location from active workspace (per-workspace, not global)
         var workspaceService = App.Services.GetRequiredService<IWorkspaceService>();
@@ -1533,8 +1522,8 @@ public partial class SettingsViewModel : ViewModelBase
         else
             SelectedDirectoryType = DataDirectoryType.Default;
 
-        var defaultDataDir = Services.DataPaths.BaseDir;
-        DataDirectory = Services.DataPaths.WorkspaceDataDir
+        var defaultDataDir = DataPaths.BaseDir;
+        DataDirectory = DataPaths.WorkspaceDataDir
             ?? storageLocation?.CustomPath
             ?? defaultDataDir;
 
@@ -1963,7 +1952,7 @@ public partial class SettingsViewModel : ViewModelBase
         // Remove profile image file if it exists
         if (!string.IsNullOrEmpty(_settingsService.Settings.ProfileImagePath))
         {
-            var fullPath = Path.Combine(Services.DataPaths.BaseDir, _settingsService.Settings.ProfileImagePath);
+            var fullPath = Path.Combine(DataPaths.BaseDir, _settingsService.Settings.ProfileImagePath);
             try { if (File.Exists(fullPath)) File.Delete(fullPath); } catch { /* best effort */ }
         }
 
@@ -2074,7 +2063,7 @@ public partial class SettingsViewModel : ViewModelBase
     /// </summary>
     private async Task RefreshAllPluginsAsync()
     {
-        var mainVm = _pluginRegistry.GetMainViewModel();
+        var mainVm = _pluginRegistry.GetMainViewModel() as MainWindowViewModel;
         if (mainVm == null) return;
 
         foreach (var plugin in _pluginRegistry.Plugins)
@@ -2170,10 +2159,10 @@ public partial class SettingsViewModel : ViewModelBase
     /// </summary>
     private static string GetDefaultDataPath()
     {
-        return Services.DataPaths.BaseDir;
+        return DataPaths.BaseDir;
     }
 
-    private static string? GetGoogleDrivePath() => Services.CloudPathResolver.GetGoogleDrivePath();
+    private static string? GetGoogleDrivePath() => CloudPathResolver.GetGoogleDrivePath();
 
-    private static string? GetICloudPath() => Services.CloudPathResolver.GetICloudPath();
+    private static string? GetICloudPath() => CloudPathResolver.GetICloudPath();
 }

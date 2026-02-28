@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using PrivStack.Desktop.Models;
+using PrivStack.Services.Models;
 
 namespace PrivStack.Desktop.Tests.Services;
 

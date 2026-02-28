@@ -1,5 +1,5 @@
 using Avalonia.Controls;
-using PrivStack.Desktop.Services.Abstractions;
+using PrivStack.Services.Abstractions;
 using PrivStack.Sdk;
 
 namespace PrivStack.Desktop.Sdk;
@@ -30,7 +30,7 @@ internal sealed class SdkDialogServiceAdapter : ISdkDialogService
 
     public async Task<TResult?> ShowDialogAsync<TResult>(Func<object> windowFactory) where TResult : class
     {
-        var owner = _dialogService.Owner;
+        var owner = (_dialogService as PrivStack.Desktop.Services.DialogService)?.Owner;
         if (owner == null) return default;
 
         var windowObj = windowFactory();

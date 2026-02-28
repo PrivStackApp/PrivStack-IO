@@ -1,5 +1,6 @@
 using System.Text;
-using PrivStack.Desktop.Services;
+using PrivStack.Services;
+using PrivStack.Services.AI;
 using PrivStack.Sdk.Services;
 using Serilog;
 

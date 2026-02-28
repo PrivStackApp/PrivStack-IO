@@ -1,7 +1,6 @@
 using Avalonia;
 using Avalonia.WebView.Desktop;
-using PrivStack.Desktop.Services;
-using PrivStack.Desktop.Services.Headless;
+using PrivStack.Services;
 using System;
 using System.IO;
 
@@ -24,13 +23,6 @@ sealed class Program
         try
         {
             Log.Information("Application starting with args: {Args}", string.Join(", ", args));
-
-            if (TryParseHeadlessOptions(args, out var headlessOptions))
-            {
-                Log.Information("Headless mode detected");
-                return HeadlessHost.RunAsync(headlessOptions).GetAwaiter().GetResult();
-            }
-
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
             return 0;
         }
@@ -43,62 +35,6 @@ sealed class Program
         {
             Log.Shutdown();
         }
-    }
-
-    internal static bool TryParseHeadlessOptions(string[] args, out HeadlessOptions options)
-    {
-        options = default!;
-        bool headless = false;
-        string? workspace = null;
-        int? port = null;
-        string bindAddress = "127.0.0.1";
-        bool showApiKey = false;
-        bool generateApiKey = false;
-
-        for (int i = 0; i < args.Length; i++)
-        {
-            switch (args[i])
-            {
-                case "--headless":
-                    headless = true;
-                    break;
-
-                case "--workspace" when i + 1 < args.Length:
-                    workspace = args[++i];
-                    break;
-
-                case "--port" when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var p))
-                        port = p;
-                    break;
-
-                case "--bind" when i + 1 < args.Length:
-                    bindAddress = args[++i];
-                    break;
-
-                case "--show-api-key":
-                    showApiKey = true;
-                    headless = true;
-                    break;
-
-                case "--generate-api-key":
-                    generateApiKey = true;
-                    headless = true;
-                    break;
-            }
-        }
-
-        if (!headless) return false;
-
-        options = new HeadlessOptions
-        {
-            WorkspaceName = workspace,
-            Port = port,
-            BindAddress = bindAddress,
-            ShowApiKey = showApiKey,
-            GenerateApiKey = generateApiKey,
-        };
-        return true;
     }
 
     /// <summary>

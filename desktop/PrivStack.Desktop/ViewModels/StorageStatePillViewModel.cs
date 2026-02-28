@@ -4,8 +4,8 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
-using PrivStack.Desktop.Models;
-using PrivStack.Desktop.Native;
+using PrivStack.Services.Models;
+using PrivStack.Services.Native;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
 

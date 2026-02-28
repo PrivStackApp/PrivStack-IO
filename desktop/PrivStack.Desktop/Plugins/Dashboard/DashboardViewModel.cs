@@ -3,12 +3,13 @@ using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
-using PrivStack.Desktop.Models.PluginRegistry;
+using PrivStack.Services.Models.PluginRegistry;
 using PrivStack.Desktop.Plugins.Dashboard.Models;
 using PrivStack.Desktop.Plugins.Dashboard.Services;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.Plugin;
+using PrivStack.Desktop.ViewModels;
 using PrivStack.Sdk;
 using PrivStack.Sdk.Capabilities;
 using Serilog;
@@ -25,7 +26,7 @@ public enum DashboardTab
 /// ViewModel for the Dashboard plugin — manages system metrics, data metrics,
 /// the official plugin catalog, and install/update/uninstall flows.
 /// </summary>
-public partial class DashboardViewModel : ViewModelBase
+public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
 {
     private static readonly ILogger _log = Serilog.Log.ForContext<DashboardViewModel>();
 
@@ -36,7 +37,7 @@ public partial class DashboardViewModel : ViewModelBase
     private readonly EntityMetadataService _entityMetadataService;
     private readonly LinkProviderCacheService _linkProviderCache;
     private readonly IWorkspaceService _workspaceService;
-    private readonly Native.IPrivStackRuntime _runtime;
+    private readonly PrivStack.Services.Native.IPrivStackRuntime _runtime;
     private List<OfficialPluginInfo> _serverPlugins = [];
 
     internal DashboardViewModel(
@@ -47,7 +48,7 @@ public partial class DashboardViewModel : ViewModelBase
         EntityMetadataService entityMetadataService,
         LinkProviderCacheService linkProviderCache,
         IWorkspaceService workspaceService,
-        Native.IPrivStackRuntime runtime)
+        PrivStack.Services.Native.IPrivStackRuntime runtime)
     {
         _installService = installService;
         _pluginRegistry = pluginRegistry;
@@ -487,7 +488,7 @@ public partial class DashboardViewModel : ViewModelBase
 
         try
         {
-            var mainVm = _pluginRegistry.GetMainViewModel();
+            var mainVm = _pluginRegistry.GetMainViewModel() as MainWindowViewModel;
             if (mainVm != null)
             {
                 await mainVm.NavigateToPluginItemAsync(table.PluginId, table.ParentId);
@@ -866,7 +867,7 @@ public partial class DashboardViewModel : ViewModelBase
                 await _pluginRegistry.LoadPluginFromDirectoryAsync(pluginDir);
             }
 
-            var mainVm = _pluginRegistry.GetMainViewModel();
+            var mainVm = _pluginRegistry.GetMainViewModel() as MainWindowViewModel;
             if (mainVm != null)
             {
                 await mainVm.ReloadPluginAsync(navId);
@@ -891,7 +892,7 @@ public partial class DashboardViewModel : ViewModelBase
     {
         try
         {
-            var mainVm = _pluginRegistry.GetMainViewModel();
+            var mainVm = _pluginRegistry.GetMainViewModel() as MainWindowViewModel;
             var plugin = _pluginRegistry.GetPlugin(pluginId);
             var navId = plugin?.NavigationItem?.Id;
             if (navId != null && mainVm != null)

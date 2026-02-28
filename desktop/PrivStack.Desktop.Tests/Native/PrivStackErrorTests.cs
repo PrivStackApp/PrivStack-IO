@@ -1,4 +1,4 @@
-using PrivStack.Desktop.Native;
+using PrivStack.Services.Native;
 
 namespace PrivStack.Desktop.Tests.Native;
 

@@ -124,7 +124,7 @@ public sealed class QuickActionService : ICommandProvider
 
     public IEnumerable<CommandDefinition> GetCommands()
     {
-        var mainVm = _pluginRegistry.GetMainViewModel();
+        var mainVm = _pluginRegistry.GetMainViewModel() as MainWindowViewModel;
         if (mainVm == null) yield break;
 
         foreach (var entry in GetAllActions())

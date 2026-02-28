@@ -4,7 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Styling;
-using PrivStack.Desktop.Models;
+using PrivStack.Services.Models;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Sdk;
 using Serilog;

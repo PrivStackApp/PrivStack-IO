@@ -2,10 +2,10 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using PrivStack.Desktop.Native;
+using PrivStack.Services.Native;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
-using PrivStack.Desktop.Services.Biometric;
+using PrivStack.Services.Biometric;
 using Serilog;
 
 namespace PrivStack.Desktop.ViewModels;

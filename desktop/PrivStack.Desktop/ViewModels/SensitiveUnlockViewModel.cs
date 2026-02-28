@@ -2,7 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
-using PrivStack.Desktop.Services.Biometric;
+using PrivStack.Services.Biometric;
 using Serilog;
 
 namespace PrivStack.Desktop.ViewModels;

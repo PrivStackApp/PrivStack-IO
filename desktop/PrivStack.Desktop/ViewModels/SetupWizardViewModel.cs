@@ -6,11 +6,11 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using PrivStack.Desktop.Models;
-using PrivStack.Desktop.Native;
+using PrivStack.Services.Models;
+using PrivStack.Services.Native;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
-using PrivStack.Desktop.Services.Biometric;
+using PrivStack.Services.Biometric;
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Sdk;
 

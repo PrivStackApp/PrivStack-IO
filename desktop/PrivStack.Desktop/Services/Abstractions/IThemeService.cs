@@ -1,5 +1,5 @@
 using System.ComponentModel;
-using PrivStack.Desktop.Models;
+using PrivStack.Services.Models;
 
 namespace PrivStack.Desktop.Services.Abstractions;
 

@@ -7,11 +7,11 @@ using System.Linq;
 using Avalonia.Markup.Xaml;
 using AvaloniaWebView;
 using Microsoft.Extensions.DependencyInjection;
-using PrivStack.Desktop.Native;
+using PrivStack.Services.Native;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
-using PrivStack.Desktop.Services.Api;
-using PrivStack.Desktop.Services.FileSync;
+using PrivStack.Services.Api;
+using PrivStack.Services.FileSync;
 using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Sdk.Capabilities;
 using PrivStack.Desktop.ViewModels;
@@ -43,6 +43,7 @@ public partial class App : Application
     {
         // Build the DI container before anything else
         Services = ServiceRegistration.Configure();
+        PrivStack.Services.ServiceProviderAccessor.Services = Services;
 
         Log.Debug("Avalonia XAML loader starting");
         AvaloniaXamlLoader.Load(this);
@@ -296,7 +297,7 @@ public partial class App : Application
             Services.GetRequiredService<IPrivStackRuntime>(),
             Services.GetRequiredService<IWorkspaceService>(),
             Services.GetRequiredService<IMasterPasswordCache>(),
-            Services.GetRequiredService<Services.Biometric.IBiometricService>(),
+            Services.GetRequiredService<IBiometricService>(),
             Services.GetRequiredService<IAppSettingsService>());
         var unlockWindow = new UnlockWindow(unlockVm);
 
@@ -353,7 +354,7 @@ public partial class App : Application
     {
         if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop) return;
 
-        Services.GetService<Services.Abstractions.IMasterPasswordCache>()?.Clear();
+        Services.GetService<IMasterPasswordCache>()?.Clear();
 
         var currentWindow = desktop.MainWindow;
         ShowUnlockScreen(desktop);
@@ -491,7 +492,7 @@ public partial class App : Application
                 }
 
                 // Eagerly resolve RAG index service so its auto-init task runs on startup
-                _ = Services.GetRequiredService<Services.AI.RagIndexService>();
+                _ = Services.GetRequiredService<RagIndexService>();
 
 
                 var bridgePath = FindBridgePath();

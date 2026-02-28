@@ -1,5 +1,5 @@
 using System.Text.Json;
-using PrivStack.Desktop.Models;
+using PrivStack.Services.Models;
 using PrivStack.Desktop.Services;
 
 namespace PrivStack.Desktop.Tests.Services;

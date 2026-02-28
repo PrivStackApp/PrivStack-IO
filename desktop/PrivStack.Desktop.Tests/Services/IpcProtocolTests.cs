@@ -1,6 +1,6 @@
 namespace PrivStack.Desktop.Tests.Services;
 
-using PrivStack.Desktop.Services.Ipc;
+using PrivStack.Services.Ipc;
 
 public class IpcProtocolTests
 {

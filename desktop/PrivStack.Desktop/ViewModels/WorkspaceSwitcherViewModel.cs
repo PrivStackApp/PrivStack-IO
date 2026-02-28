@@ -2,8 +2,8 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
-using PrivStack.Desktop.Models;
-using PrivStack.Desktop.Native;
+using PrivStack.Services.Models;
+using PrivStack.Services.Native;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.Plugin;
@@ -94,8 +94,8 @@ public partial class WorkspaceSwitcherViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(DataDirectoryDisplay))]
     private string _customDataDirectory = string.Empty;
 
-    public bool IsGoogleDriveAvailable => !string.IsNullOrEmpty(Services.CloudPathResolver.GetGoogleDrivePath());
-    public bool IsICloudAvailable => !string.IsNullOrEmpty(Services.CloudPathResolver.GetICloudPath());
+    public bool IsGoogleDriveAvailable => !string.IsNullOrEmpty(CloudPathResolver.GetGoogleDrivePath());
+    public bool IsICloudAvailable => !string.IsNullOrEmpty(CloudPathResolver.GetICloudPath());
     public bool IsCustomDirectorySelected => SelectedDirectoryType == DataDirectoryType.Custom;
 
     [ObservableProperty]
@@ -107,8 +107,8 @@ public partial class WorkspaceSwitcherViewModel : ViewModelBase
     {
         DataDirectoryType.Default => DataPaths.BaseDir,
         DataDirectoryType.Custom => string.IsNullOrEmpty(CustomDataDirectory) ? "Select a folder..." : CustomDataDirectory,
-        DataDirectoryType.GoogleDrive => Services.CloudPathResolver.GetGoogleDrivePath() ?? "Not available",
-        DataDirectoryType.ICloud => Services.CloudPathResolver.GetICloudPath() ?? "Not available",
+        DataDirectoryType.GoogleDrive => CloudPathResolver.GetGoogleDrivePath() ?? "Not available",
+        DataDirectoryType.ICloud => CloudPathResolver.GetICloudPath() ?? "Not available",
         _ => DataPaths.BaseDir
     };
 

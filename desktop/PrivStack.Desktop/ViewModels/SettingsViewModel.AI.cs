@@ -4,8 +4,8 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Desktop.Services;
-using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.AI;
+using PrivStack.Services.AI;
 using PrivStack.Sdk;
 using PrivStack.Sdk.Services;
 
@@ -192,7 +192,7 @@ public partial class SettingsViewModel
     {
         get
         {
-            var (_, reason) = Services.PlatformDetector.RecommendLocalModel();
+            var (_, reason) = PlatformDetector.RecommendLocalModel();
             return reason;
         }
     }
@@ -201,7 +201,7 @@ public partial class SettingsViewModel
     {
         get
         {
-            var (modelId, _) = Services.PlatformDetector.RecommendLocalModel();
+            var (modelId, _) = PlatformDetector.RecommendLocalModel();
             return modelId;
         }
     }
@@ -287,7 +287,7 @@ public partial class SettingsViewModel
     {
         try
         {
-            AiRecommendation = Services.PlatformDetector.GetFullRecommendation();
+            AiRecommendation = PlatformDetector.GetFullRecommendation();
             HardwareReport = AiRecommendation.Hardware;
         }
         catch { /* detection may fail on unusual platforms */ }
@@ -318,7 +318,7 @@ public partial class SettingsViewModel
         try
         {
             var modelManager = App.Services.GetRequiredService<AiModelManager>();
-            var (recommendedId, _) = Services.PlatformDetector.RecommendLocalModel();
+            var (recommendedId, _) = PlatformDetector.RecommendLocalModel();
             foreach (var modelName in modelManager.AvailableModels)
             {
                 var displayName = modelName == recommendedId

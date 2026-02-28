@@ -469,34 +469,3 @@ public class BackupService : IBackupService
         StartScheduledBackups();
     }
 }
-
-/// <summary>
-/// Information about an existing backup file.
-/// </summary>
-public record BackupInfo(string Path, DateTime CreatedAt, long SizeBytes)
-{
-    public string FormattedSize => SizeBytes switch
-    {
-        < 1024 => $"{SizeBytes} B",
-        < 1024 * 1024 => $"{SizeBytes / 1024.0:F1} KB",
-        < 1024 * 1024 * 1024 => $"{SizeBytes / (1024.0 * 1024.0):F1} MB",
-        _ => $"{SizeBytes / (1024.0 * 1024.0 * 1024.0):F1} GB"
-    };
-}
-
-/// <summary>
-/// Event args for backup completion.
-/// </summary>
-public class BackupCompletedEventArgs : EventArgs
-{
-    public bool Success { get; }
-    public string? BackupPath { get; }
-    public string? ErrorMessage { get; }
-
-    public BackupCompletedEventArgs(bool success, string? backupPath, string? errorMessage)
-    {
-        Success = success;
-        BackupPath = backupPath;
-        ErrorMessage = errorMessage;
-    }
-}

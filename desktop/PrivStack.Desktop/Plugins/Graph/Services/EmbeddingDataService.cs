@@ -10,7 +10,7 @@ using System.Text.Json;
 using PrivStack.UI.Adaptive.Models;
 using PrivStack.UI.Adaptive.Services;
 using Serilog;
-using NativeLib = PrivStack.Desktop.Native.NativeLibrary;
+using NativeLib = PrivStack.Services.Native.NativeLibrary;
 
 namespace PrivStack.Desktop.Plugins.Graph.Services;
 

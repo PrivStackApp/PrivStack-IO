@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using PrivStack.Desktop.Services.Connections;
+using PrivStack.Services.Connections;
 using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Sdk.Capabilities;
 using Serilog;
