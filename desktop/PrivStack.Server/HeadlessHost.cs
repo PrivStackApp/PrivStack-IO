@@ -47,8 +47,7 @@ internal static class HeadlessHost
             if (!Console.IsInputRedirected && options.Setup)
             {
                 // Interactive terminal + --setup → run the setup wizard
-                var wizardResult = await HeadlessSetupWizard.RunAsync();
-                if (wizardResult != 0) return wizardResult;
+                return await HeadlessSetupWizard.RunAsync();
             }
             else if (!Console.IsInputRedirected)
             {
@@ -64,8 +63,7 @@ internal static class HeadlessHost
         else if (options.Setup)
         {
             // Re-run setup even though already complete
-            var wizardResult = await HeadlessSetupWizard.RunAsync();
-            if (wizardResult != 0) return wizardResult;
+            return await HeadlessSetupWizard.RunAsync();
         }
         else if (options.SetupNetwork)
         {
