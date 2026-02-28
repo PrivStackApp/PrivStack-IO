@@ -3,8 +3,9 @@
              xmlns:vm="using:PrivStack.Desktop.ViewModels"
              xmlns:controls="using:PrivStack.Desktop.Controls"
              xmlns:services="using:PrivStack.Desktop.Services"
+             xmlns:svc="using:PrivStack.Services"
              xmlns:converters="using:PrivStack.Desktop.Converters"
-             xmlns:models="using:PrivStack.Desktop.Models"
+             xmlns:models="using:PrivStack.Services.Models"
              xmlns:sdk="using:PrivStack.Sdk"
              xmlns:adaptive="using:PrivStack.UI.Adaptive.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -718,7 +719,7 @@
                                 <!-- Forward links list -->
                                 <ItemsControl ItemsSource="{Binding ForwardLinks}">
                                     <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="services:BacklinkEntry">
+                                        <DataTemplate x:DataType="svc:BacklinkEntry">
                                             <Button Command="{Binding #InfoPanelRoot.((vm:InfoPanelViewModel)DataContext).NavigateToForwardLinkCommand}"
                                                     CommandParameter="{Binding}"
                                                     Background="Transparent"
@@ -817,7 +818,7 @@
                                 <!-- Backlinks list -->
                                 <ItemsControl ItemsSource="{Binding Backlinks}">
                                     <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="services:BacklinkEntry">
+                                        <DataTemplate x:DataType="svc:BacklinkEntry">
                                             <Button Command="{Binding #InfoPanelRoot.((vm:InfoPanelViewModel)DataContext).NavigateToBacklinkCommand}"
                                                     CommandParameter="{Binding}"
                                                     Background="Transparent"
