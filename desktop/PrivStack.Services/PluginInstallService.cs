@@ -16,7 +16,11 @@ public sealed class PluginInstallService : IPluginInstallService
 {
     private static readonly ILogger _log = Log.ForContext<PluginInstallService>();
 
-    private static readonly HttpClient Http = new()
+    private static readonly HttpClient Http = new(new System.Net.Http.SocketsHttpHandler
+    {
+        PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+        ConnectTimeout = TimeSpan.FromSeconds(10),
+    })
     {
         Timeout = TimeSpan.FromMinutes(5)
     };

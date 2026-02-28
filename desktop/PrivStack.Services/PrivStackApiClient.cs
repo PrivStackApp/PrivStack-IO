@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -14,7 +15,11 @@ public sealed class PrivStackApiClient
 {
     public const string ApiBaseUrl = "https://privstack.io";
 
-    private static readonly HttpClient Http = new()
+    private static readonly HttpClient Http = new(new SocketsHttpHandler
+    {
+        PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+        ConnectTimeout = TimeSpan.FromSeconds(10),
+    })
     {
         Timeout = TimeSpan.FromSeconds(30)
     };

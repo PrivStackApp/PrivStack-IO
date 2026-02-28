@@ -13,7 +13,11 @@ public sealed class RegistryUpdateService : IUpdateService
 {
     private static ILogger Logger => Log.ForContext<RegistryUpdateService>();
 
-    private static readonly HttpClient Http = new()
+    private static readonly HttpClient Http = new(new System.Net.Http.SocketsHttpHandler
+    {
+        PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+        ConnectTimeout = TimeSpan.FromSeconds(10),
+    })
     {
         Timeout = TimeSpan.FromMinutes(10)
     };
