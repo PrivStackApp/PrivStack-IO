@@ -259,6 +259,8 @@ public partial class AiSuggestionTrayViewModel
                     actions.Count, queries.Count, response.Content.Length);
                 if (actions.Count == 0 && response.Content.Contains("[ACTION]", StringComparison.OrdinalIgnoreCase))
                     _log.Warning("Response contained [ACTION] text but parsing found 0 blocks — possible format issue");
+                else if (actions.Count == 0 && response.Content.Contains("\"intent_id\"", StringComparison.Ordinal))
+                    _log.Warning("Response contained \"intent_id\" but no actions were recovered — bare JSON extraction also failed");
                 var content = AiPersona.Sanitize(cleanContent, tier, isCloud: isCloud);
 
                 assistantMsg.Content = content;
@@ -588,6 +590,7 @@ public partial class AiSuggestionTrayViewModel
         For example, if the user asks to create a note while viewing Finance, use the notes.create_note action.
         If no relevant action exists in the descriptions above, say you can't do that yet — do NOT pretend you did it.
         Slot values must be strings or arrays of strings. For list-type slots like add_checklist or tags, you may use a JSON array: "add_checklist": ["item 1", "item 2"].
+        For "content" or "description" text slots, always use a plain markdown string — NEVER a JSON document object like {"type": "doc", "content": [...]}.
         Use the slot name "add_checklist" (not "checklist") when adding checklist items to a task.
         After executing actions, you will see [Action Results] showing what succeeded or failed. Use this feedback to correct errors on subsequent turns.
         """;
@@ -793,7 +796,7 @@ public partial class AiSuggestionTrayViewModel
     /// Extracts balanced JSON objects following [ACTION] tags. Uses brace-depth counting
     /// instead of regex to handle nested arrays/objects in slot values (e.g. checklist arrays).
     /// </summary>
-    private static (string CleanText, List<ParsedAction> Actions) ParseActionBlocks(string text)
+    internal static (string CleanText, List<ParsedAction> Actions) ParseActionBlocks(string text)
     {
         var actions = new List<ParsedAction>();
         var spans = new List<(int Start, int End)>(); // regions to strip
@@ -870,6 +873,17 @@ public partial class AiSuggestionTrayViewModel
             searchFrom = braceEnd + 1;
         }
 
+        // Fallback: if no [ACTION] tags found, try extracting bare intent JSON
+        if (actions.Count == 0)
+        {
+            var bareResults = ExtractBareIntentJson(text);
+            foreach (var (action, start, end) in bareResults)
+            {
+                actions.Add(action);
+                spans.Add((start, end));
+            }
+        }
+
         // Strip matched regions in reverse order to preserve indices
         var clean = text;
         for (var i = spans.Count - 1; i >= 0; i--)
@@ -880,10 +894,87 @@ public partial class AiSuggestionTrayViewModel
     }
 
     /// <summary>
+    /// Fallback extractor for bare intent JSON objects (no [ACTION] wrapper tags).
+    /// Only called when the primary parser found nothing. Scans for JSON objects
+    /// containing an "intent_id" property and extracts them as actions.
+    /// </summary>
+    internal static List<(ParsedAction Action, int Start, int End)> ExtractBareIntentJson(string text)
+    {
+        var results = new List<(ParsedAction, int, int)>();
+
+        var searchFrom = 0;
+        while (searchFrom < text.Length)
+        {
+            var braceStart = text.IndexOf('{', searchFrom);
+            if (braceStart < 0) break;
+
+            // Quick peek: check if "intent_id" appears within 200 chars to avoid wasted parsing
+            var peekEnd = Math.Min(braceStart + 200, text.Length);
+            var peekSpan = text.AsSpan(braceStart, peekEnd - braceStart);
+            if (peekSpan.IndexOf("\"intent_id\"", StringComparison.Ordinal) < 0)
+            {
+                searchFrom = braceStart + 1;
+                continue;
+            }
+
+            // Extract balanced JSON using brace-depth counting
+            var depth = 0;
+            var braceEnd = -1;
+            var inString = false;
+            var escaped = false;
+            for (var i = braceStart; i < text.Length; i++)
+            {
+                var c = text[i];
+                if (escaped) { escaped = false; continue; }
+                if (c == '\\' && inString) { escaped = true; continue; }
+                if (c == '"') { inString = !inString; continue; }
+                if (inString) continue;
+                if (c == '{') depth++;
+                else if (c == '}') { depth--; if (depth == 0) { braceEnd = i; break; } }
+            }
+
+            if (braceEnd < 0) { searchFrom = braceStart + 1; continue; }
+
+            var json = text[braceStart..(braceEnd + 1)];
+
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("intent_id", out var intentIdEl))
+                {
+                    var intentId = intentIdEl.GetString();
+                    if (!string.IsNullOrEmpty(intentId))
+                    {
+                        var slots = new Dictionary<string, string>();
+                        if (root.TryGetProperty("slots", out var slotsEl))
+                        {
+                            foreach (var prop in slotsEl.EnumerateObject())
+                                slots[prop.Name] = FlattenSlotValue(prop.Value);
+                        }
+
+                        _log.Warning("Recovered bare intent JSON without [ACTION] tags: {IntentId}", intentId);
+                        results.Add((new ParsedAction(intentId, slots), braceStart, braceEnd + 1));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Debug(ex, "Failed to parse bare JSON candidate: {Json}", json);
+            }
+
+            searchFrom = braceEnd + 1;
+        }
+
+        return results;
+    }
+
+    /// <summary>
     /// Converts a JSON slot value to a flat string. Arrays are joined with newlines
     /// (supports checklist items, tags, etc. sent as JSON arrays by the AI).
     /// </summary>
-    private static string FlattenSlotValue(JsonElement value)
+    internal static string FlattenSlotValue(JsonElement value)
     {
         return value.ValueKind switch
         {
@@ -897,7 +988,7 @@ public partial class AiSuggestionTrayViewModel
         };
     }
 
-    private sealed record ParsedAction(string IntentId, Dictionary<string, string> Slots);
+    internal sealed record ParsedAction(string IntentId, Dictionary<string, string> Slots);
 
     // ── QUERY Format Header (injected when embedded datasets are present, cloud-only) ──
 
