@@ -64,7 +64,7 @@ impl BlobStore {
 
         // Cap memory/threads — DuckDB defaults to ~80% RAM per connection
         if db_path.to_str() != Some(":memory:") {
-            conn.execute_batch("PRAGMA memory_limit='128MB'; PRAGMA threads=1;")
+            conn.execute_batch("PRAGMA memory_limit='32MB'; PRAGMA threads=1;")
                 .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
         }
 
@@ -120,7 +120,7 @@ impl BlobStore {
 
         // Cap memory/threads — DuckDB defaults to ~80% RAM per connection
         if db_path.to_str() != Some(":memory:") {
-            conn.execute_batch("PRAGMA memory_limit='128MB'; PRAGMA threads=1;")
+            conn.execute_batch("PRAGMA memory_limit='32MB'; PRAGMA threads=1;")
                 .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
         }
 

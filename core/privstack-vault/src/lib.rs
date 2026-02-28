@@ -473,7 +473,7 @@ impl VaultManager {
 
         // Cap memory/threads — DuckDB defaults to ~80% RAM per connection
         if db_path.to_str() != Some(":memory:") {
-            conn.execute_batch("PRAGMA memory_limit='64MB'; PRAGMA threads=1;")
+            conn.execute_batch("PRAGMA memory_limit='16MB'; PRAGMA threads=1;")
                 .map_err(|e| VaultError::Storage(e.to_string()))?;
         }
 

@@ -44,7 +44,7 @@ pub fn open_datasets_db(path: &std::path::Path) -> DatasetResult<duckdb::Connect
                 );
                 if std::fs::remove_file(&wal_path).is_ok() {
                     let c = duckdb::Connection::open(path)?;
-                    c.execute_batch("PRAGMA memory_limit='256MB'; PRAGMA threads=2;")?;
+                    c.execute_batch("PRAGMA memory_limit='64MB'; PRAGMA threads=2;")?;
                     return Ok(c);
                 }
             }
@@ -52,6 +52,6 @@ pub fn open_datasets_db(path: &std::path::Path) -> DatasetResult<duckdb::Connect
         }
     };
     // Cap memory/threads — DuckDB defaults to ~80% RAM per connection
-    conn.execute_batch("PRAGMA memory_limit='256MB'; PRAGMA threads=2;")?;
+    conn.execute_batch("PRAGMA memory_limit='64MB'; PRAGMA threads=2;")?;
     Ok(conn)
 }
