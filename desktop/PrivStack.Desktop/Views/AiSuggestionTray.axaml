@@ -424,26 +424,33 @@
                 </Border>
 
                 <!-- Input Row -->
-                <StackPanel Spacing="6" VerticalAlignment="Bottom">
+                <Grid VerticalAlignment="Bottom">
                     <TextBox Name="ChatInputBox"
                              Text="{Binding ChatInputText, Mode=TwoWay}"
                              Watermark="{Binding ChatWatermark}"
                              FontSize="{DynamicResource ThemeFontSizeSm}"
                              CornerRadius="{DynamicResource ThemeRadiusSm}"
-                             Padding="8,6"
+                             Padding="8,6,40,6"
                              AcceptsReturn="True"
                              TextWrapping="Wrap"
+                             MinHeight="60"
                              MaxHeight="200"/>
-                    <Button Content="Send"
-                            Command="{Binding SendChatMessageCommand}"
+                    <Button Command="{Binding SendChatMessageCommand}"
                             Background="{DynamicResource ThemePrimaryBrush}"
                             Foreground="{DynamicResource ThemeTextOnAccentBrush}"
-                            Padding="12,6"
-                            FontSize="{DynamicResource ThemeFontSizeSm}"
-                            CornerRadius="{DynamicResource ThemeRadiusSm}"
+                            Width="28" Height="28"
+                            Padding="0"
+                            CornerRadius="14"
                             HorizontalAlignment="Right"
-                            Cursor="Hand"/>
-                </StackPanel>
+                            VerticalAlignment="Bottom"
+                            Margin="0,0,6,6"
+                            Cursor="Hand"
+                            ToolTip.Tip="Send (Enter)">
+                        <PathIcon Data="M2,21L23,12L2,3V10L17,12L2,14V21Z"
+                                  Width="14" Height="14"
+                                  Foreground="White"/>
+                    </Button>
+                </Grid>
             </Panel>
         </Border>
     </Grid>
