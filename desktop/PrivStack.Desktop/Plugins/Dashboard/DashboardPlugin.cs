@@ -3,6 +3,7 @@ using PrivStack.Desktop.Plugins.Dashboard.Services;
 using PrivStack.Desktop.Services;
 using PrivStack.Desktop.Services.Abstractions;
 using PrivStack.Desktop.Services.Plugin;
+using PrivStack.Services.Diagnostics;
 using PrivStack.Sdk;
 
 namespace PrivStack.Desktop.Plugins.Dashboard;
@@ -18,7 +19,7 @@ public sealed class DashboardPlugin : PluginBase<DashboardViewModel>
         Id = "privstack.dashboard",
         Name = "Dashboard",
         Description = "System overview, plugin marketplace, and management dashboard",
-        Version = new Version(1, 4, 0),
+        Version = new Version(1, 5, 0),
         Author = "PrivStack",
         Icon = "LayoutDashboard",
         NavigationOrder = 50,
@@ -47,8 +48,19 @@ public sealed class DashboardPlugin : PluginBase<DashboardViewModel>
         var linkProviderCache = App.Services.GetRequiredService<LinkProviderCacheService>();
         var workspaceService = App.Services.GetRequiredService<IWorkspaceService>();
         var runtime = App.Services.GetRequiredService<IPrivStackRuntime>();
+        var tracker = SubsystemTracker.Instance;
+
+        // Register plugin subsystems dynamically
+        if (tracker != null)
+        {
+            foreach (var plugin in pluginRegistry.ActivePlugins)
+            {
+                tracker.Register($"plugin.{plugin.Metadata.Id}", plugin.Metadata.Name, "Plugin");
+            }
+        }
+
         return new DashboardViewModel(installService, pluginRegistry, metricsService, sdk,
-            entityMetadataService, linkProviderCache, workspaceService, runtime);
+            entityMetadataService, linkProviderCache, workspaceService, runtime, tracker);
     }
 
     public override async Task OnNavigatedToAsync(CancellationToken cancellationToken = default)

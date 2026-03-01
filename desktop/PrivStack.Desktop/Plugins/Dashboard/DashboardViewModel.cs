@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Services.Models.PluginRegistry;
+using PrivStack.Services.Diagnostics;
 using PrivStack.Desktop.Plugins.Dashboard.Models;
 using PrivStack.Desktop.Plugins.Dashboard.Services;
 using PrivStack.Desktop.Services;
@@ -20,7 +21,8 @@ namespace PrivStack.Desktop.Plugins.Dashboard;
 public enum DashboardTab
 {
     Overview,
-    Data
+    Data,
+    Subsystems
 }
 
 /// <summary>
@@ -39,6 +41,7 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
     private readonly LinkProviderCacheService _linkProviderCache;
     private readonly IWorkspaceService _workspaceService;
     private readonly PrivStack.Services.Native.IPrivStackRuntime _runtime;
+    private readonly SubsystemTracker? _subsystemTracker;
     private List<OfficialPluginInfo> _serverPlugins = [];
     private DispatcherTimer? _liveMetricsTimer;
 
@@ -50,7 +53,8 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
         EntityMetadataService entityMetadataService,
         LinkProviderCacheService linkProviderCache,
         IWorkspaceService workspaceService,
-        PrivStack.Services.Native.IPrivStackRuntime runtime)
+        PrivStack.Services.Native.IPrivStackRuntime runtime,
+        SubsystemTracker? subsystemTracker = null)
     {
         _installService = installService;
         _pluginRegistry = pluginRegistry;
@@ -60,6 +64,7 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
         _linkProviderCache = linkProviderCache;
         _workspaceService = workspaceService;
         _runtime = runtime;
+        _subsystemTracker = subsystemTracker;
     }
 
     // --- Tab State ---
@@ -67,10 +72,12 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOverviewTab))]
     [NotifyPropertyChangedFor(nameof(IsDataTab))]
+    [NotifyPropertyChangedFor(nameof(IsSubsystemsTab))]
     private DashboardTab _activeTab = DashboardTab.Overview;
 
     public bool IsOverviewTab => ActiveTab == DashboardTab.Overview;
     public bool IsDataTab => ActiveTab == DashboardTab.Data;
+    public bool IsSubsystemsTab => ActiveTab == DashboardTab.Subsystems;
 
     // --- Plugin Marketplace ---
 
@@ -164,6 +171,22 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
 
     public ObservableCollection<PluginDataInfo> PluginDataItems { get; } = [];
 
+    // --- Subsystems Metrics (Subsystems tab) ---
+
+    [ObservableProperty]
+    private string _subsystemThreadCount = "—";
+
+    [ObservableProperty]
+    private string _subsystemManagedHeap = "—";
+
+    [ObservableProperty]
+    private string _subsystemNativeTotal = "—";
+
+    [ObservableProperty]
+    private int _activeSubsystemCount;
+
+    public ObservableCollection<SubsystemItemViewModel> SubsystemItems { get; } = [];
+
     // --- Computed ---
 
     public int InstalledCount => AllPlugins.Count(p => p.IsInstalled);
@@ -230,6 +253,10 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
         if (tab == DashboardTab.Data)
         {
             await LoadDataMetricsAsync();
+        }
+        else if (tab == DashboardTab.Subsystems)
+        {
+            RefreshSubsystemMetrics();
         }
     }
 
@@ -483,10 +510,78 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
                 TotalVaultSize = SystemMetricsHelper.FormatBytes(dataResult.TotalVaultBytes);
                 TotalStorageSize = SystemMetricsHelper.FormatBytes(dataResult.TotalStorageBytes);
             }
+
+            // Subsystems tab live refresh
+            if (ActiveTab == DashboardTab.Subsystems)
+            {
+                RefreshSubsystemMetrics();
+            }
         }
         catch (Exception ex)
         {
             _log.Debug(ex, "Live metrics tick failed");
+        }
+    }
+
+    // =========================================================================
+    // Subsystems tab metrics
+    // =========================================================================
+
+    private void RefreshSubsystemMetrics()
+    {
+        if (_subsystemTracker == null) return;
+
+        try
+        {
+            // Refresh native (Rust) counters from FFI
+            _subsystemTracker.RefreshNativeCounters();
+            _subsystemTracker.UpdateRateSamples();
+
+            var snapshots = _subsystemTracker.GetSnapshots();
+
+            // Summary cards
+            var totalThreads = snapshots.Sum(s => s.ActiveTaskCount);
+            var totalManaged = GC.GetTotalMemory(false);
+            var totalNative = snapshots.Sum(s => Math.Max(0, s.NativeBytes));
+            var activeCount = snapshots.Count(s => s.ActiveTaskCount > 0);
+
+            SubsystemThreadCount = totalThreads.ToString();
+            SubsystemManagedHeap = SystemMetricsHelper.FormatBytes(totalManaged);
+            SubsystemNativeTotal = SystemMetricsHelper.FormatBytes(totalNative);
+            ActiveSubsystemCount = activeCount;
+
+            // Update or create items
+            foreach (var snap in snapshots)
+            {
+                var existing = SubsystemItems.FirstOrDefault(i => i.Id == snap.Id);
+                if (existing == null)
+                {
+                    existing = new SubsystemItemViewModel
+                    {
+                        Id = snap.Id,
+                        DisplayName = snap.DisplayName,
+                        Category = snap.Category,
+                    };
+                    SubsystemItems.Add(existing);
+                }
+
+                existing.ActiveTaskCount = snap.ActiveTaskCount;
+                existing.NativeBytes = snap.NativeBytes;
+                existing.ManagedAllocBytes = snap.ManagedAllocBytes;
+
+                // Format display strings
+                var totalMem = Math.Max(0, snap.NativeBytes) + snap.ManagedAllocBytes;
+                existing.MemoryDisplay = totalMem > 0
+                    ? SystemMetricsHelper.FormatBytes(totalMem)
+                    : "—";
+                existing.AllocRateDisplay = snap.ManagedAllocRate > 0
+                    ? $"{SystemMetricsHelper.FormatBytes(snap.ManagedAllocRate)}/s"
+                    : "—";
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Debug(ex, "Subsystem metrics refresh failed");
         }
     }
 

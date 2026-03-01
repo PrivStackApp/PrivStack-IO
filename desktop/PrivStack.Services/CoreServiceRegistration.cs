@@ -5,6 +5,7 @@ using PrivStack.Services.AI;
 using PrivStack.Services.Api;
 using PrivStack.Services.Biometric;
 using PrivStack.Services.Connections;
+using PrivStack.Services.Diagnostics;
 using PrivStack.Services.FileSync;
 using PrivStack.Services.Native;
 using PrivStack.Services.Plugin;
@@ -95,6 +96,18 @@ public static class CoreServiceRegistration
         services.AddSingleton<INavigationService, NavigationServiceAdapter>();
         services.AddSingleton<DatasetInsightOrchestrator>();
 
+        // Subsystem memory tracker
+        services.AddSingleton<SubsystemTracker>(sp =>
+        {
+            var tracker = new SubsystemTracker();
+            SubsystemTracker.Instance = tracker;
+            foreach (var def in SubsystemDefinitions.BuiltIn)
+                tracker.Register(def.Id, def.DisplayName, def.Category);
+            // Register the native untagged bucket
+            tracker.Register("runtime.native", "Native (Rust)", "Runtime");
+            return tracker;
+        });
+
         // RAG pipeline (indexing + search — embedding implementation registered by caller)
         services.AddSingleton<EmbeddingModelManager>();
         services.AddSingleton<RagIndexService>();
@@ -122,5 +135,8 @@ public static class CoreServiceRegistration
         // Wire license read-only detection from SdkHost into the expiration service
         var expirationService = provider.GetRequiredService<LicenseExpirationService>();
         sdkHost.LicenseReadOnlyBlocked += (_, _) => expirationService.OnMutationBlocked();
+
+        // Eagerly resolve the SubsystemTracker to set the static Instance
+        _ = provider.GetRequiredService<SubsystemTracker>();
     }
 }

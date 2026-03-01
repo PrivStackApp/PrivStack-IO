@@ -52,11 +52,15 @@ macro_rules! ffi_debug {
     };
 }
 
+pub mod allocator;
 mod cloud;
 mod datasets;
 mod rag;
 #[cfg(target_os = "android")]
 mod android_jni;
+
+#[global_allocator]
+static ALLOC: allocator::TrackingAllocator = allocator::TrackingAllocator;
 
 use privstack_blobstore::BlobStore;
 use privstack_license::{
@@ -1067,7 +1071,8 @@ pub extern "C" fn privstack_auth_is_unlocked() -> bool {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn privstack_auth_initialize(
     master_password: *const c_char,
-) -> PrivStackError { unsafe {
+) -> PrivStackError {
+    allocator::with_subsystem(allocator::SUB_CRYPTO, || unsafe {
     if master_password.is_null() {
         return PrivStackError::NullPointer;
     }
@@ -1143,7 +1148,8 @@ pub unsafe extern "C" fn privstack_auth_initialize(
         Err(privstack_vault::VaultError::Storage(_)) => PrivStackError::StorageError,
         Err(_) => PrivStackError::AuthError,
     }
-}}
+    })
+}
 
 /// Unlocks the app with a master password.
 ///
@@ -1160,7 +1166,8 @@ pub unsafe extern "C" fn privstack_auth_initialize(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn privstack_auth_unlock(
     master_password: *const c_char,
-) -> PrivStackError { unsafe {
+) -> PrivStackError {
+    allocator::with_subsystem(allocator::SUB_CRYPTO, || unsafe {
     if master_password.is_null() {
         return PrivStackError::NullPointer;
     }
@@ -1232,7 +1239,8 @@ pub unsafe extern "C" fn privstack_auth_unlock(
         Ok(_) => PrivStackError::Ok,
         Err(_) => PrivStackError::AuthError,
     }
-}}
+    })
+}
 
 /// Locks the app, securing all sensitive data.
 ///
@@ -2439,7 +2447,8 @@ pub extern "C" fn privstack_sync_is_running() -> bool {
 /// - `out_json` must be a valid pointer.
 /// - The returned string must be freed with `privstack_free_string`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn privstack_sync_status(out_json: *mut *mut c_char) -> PrivStackError { unsafe {
+pub unsafe extern "C" fn privstack_sync_status(out_json: *mut *mut c_char) -> PrivStackError {
+    allocator::with_subsystem(allocator::SUB_SYNC, || unsafe {
     if out_json.is_null() {
         return PrivStackError::NullPointer;
     }
@@ -2492,7 +2501,8 @@ pub unsafe extern "C" fn privstack_sync_status(out_json: *mut *mut c_char) -> Pr
         }
         Err(_) => PrivStackError::JsonError,
     }
-}}
+    })
+}
 
 /// Polls for the next sync event.
 ///
@@ -4531,13 +4541,15 @@ impl SdkResponse {
 /// - `request_json` must be a valid null-terminated UTF-8 string.
 /// - The returned pointer must be freed with `privstack_free_string`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn privstack_execute(request_json: *const c_char) -> *mut c_char { unsafe {
-    let response = execute_inner(request_json);
-    let json = serde_json::to_string(&response).unwrap_or_else(|_| {
-        r#"{"success":false,"error_code":"json_error","error_message":"Failed to serialize response"}"#.to_string()
-    });
-    CString::new(json).unwrap_or_default().into_raw()
-}}
+pub unsafe extern "C" fn privstack_execute(request_json: *const c_char) -> *mut c_char {
+    allocator::with_subsystem(allocator::SUB_FFI, || unsafe {
+        let response = execute_inner(request_json);
+        let json = serde_json::to_string(&response).unwrap_or_else(|_| {
+            r#"{"success":false,"error_code":"json_error","error_message":"Failed to serialize response"}"#.to_string()
+        });
+        CString::new(json).unwrap_or_default().into_raw()
+    })
+}
 
 unsafe fn execute_inner(request_json: *const c_char) -> SdkResponse {
     if request_json.is_null() {
@@ -6234,6 +6246,17 @@ pub extern "C" fn privstack_compact_databases() -> *mut c_char {
         }
         None => to_c_string("{}"),
     }
+}
+
+/// Returns per-subsystem native memory usage as JSON.
+/// Caller must free with `privstack_free_string`.
+///
+/// Response format: `[{"id":0,"bytes":1234,"allocs":56}, ...]`
+#[unsafe(no_mangle)]
+pub extern "C" fn privstack_subsystem_memory() -> *mut c_char {
+    let snap = allocator::snapshot_all();
+    let json = serde_json::to_string(&snap).unwrap_or_else(|_| "[]".to_string());
+    to_c_string(&json)
 }
 
 /// Helper: allocate a C string from a Rust &str. Caller must free with `privstack_free_string`.

@@ -52,10 +52,10 @@ internal sealed class RagIndexService : IRecipient<EntitySyncedMessage>, IDispos
             });
 
         WeakReferenceMessenger.Default.Register<EntitySyncedMessage>(this);
-        _consumerTask = Task.Run(() => ConsumeAsync(_disposeCts.Token));
+        _consumerTask = Diagnostics.SubsystemTracker.RunTaggedStatic("ai.rag", () => ConsumeAsync(_disposeCts.Token));
 
         // Auto-initialize if model is already downloaded (deferred to allow plugins to activate first)
-        _ = Task.Run(async () =>
+        _ = Diagnostics.SubsystemTracker.RunTaggedStatic("ai.rag", async () =>
         {
             // Wait for plugins to activate before attempting full index
             await Task.Delay(TimeSpan.FromSeconds(5), _disposeCts.Token);

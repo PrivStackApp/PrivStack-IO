@@ -217,6 +217,17 @@ internal static partial class NativeLibrary
     public static partial nint CompactDatabases();
 
     // ============================================================
+    // Subsystem Memory Tracking
+    // ============================================================
+
+    /// <summary>
+    /// Returns per-subsystem native memory usage as JSON.
+    /// Caller must free with FreeString.
+    /// </summary>
+    [LibraryImport(LibraryName, EntryPoint = "privstack_subsystem_memory")]
+    public static partial nint SubsystemMemory();
+
+    // ============================================================
     // Vault Management Functions
     // ============================================================
 

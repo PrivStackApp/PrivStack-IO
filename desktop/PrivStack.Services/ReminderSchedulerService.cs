@@ -58,7 +58,7 @@ public sealed class ReminderSchedulerService : IDisposable
         _log.Information("ReminderSchedulerService started (interval={Interval}s)", PollInterval.TotalSeconds);
 
         // Initial poll on background thread
-        _ = Task.Run(PollAsync);
+        _ = Diagnostics.SubsystemTracker.RunTaggedStatic("reminders", async () => await PollAsync());
     }
 
     private async Task PollAsync()

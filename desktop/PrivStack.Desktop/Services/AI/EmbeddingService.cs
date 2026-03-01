@@ -81,10 +81,15 @@ internal sealed class EmbeddingService : PrivStack.Services.AI.IEmbeddingService
                 IntraOpNumThreads = Environment.ProcessorCount > 4 ? 4 : 2,
             };
 
-            _session = await Task.Run(() => new InferenceSession(_modelManager.ModelPath, sessionOptions), ct);
+            _session = await Task.Run(() =>
+            {
+                using var _ = PrivStack.Services.Diagnostics.SubsystemTracker.Instance?.EnterScope("ai.embedding");
+                return new InferenceSession(_modelManager.ModelPath, sessionOptions);
+            }, ct);
 
             _tokenizer = await Task.Run(() =>
             {
+                using var _ = PrivStack.Services.Diagnostics.SubsystemTracker.Instance?.EnterScope("ai.embedding");
                 using var vocabStream = File.OpenRead(_modelManager.VocabPath);
                 return Microsoft.ML.Tokenizers.WordPieceTokenizer.Create(vocabStream);
             }, ct);

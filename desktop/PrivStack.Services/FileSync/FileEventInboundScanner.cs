@@ -57,7 +57,7 @@ internal sealed class FileEventInboundScanner : IDisposable
         _timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
 
         // Start the polling loop
-        _ = PollLoopAsync(_cts.Token);
+        _ = Diagnostics.SubsystemTracker.RunTaggedStatic("core.sync", () => PollLoopAsync(_cts.Token));
 
         // Best-effort FileSystemWatcher for faster detection
         StartWatcher();

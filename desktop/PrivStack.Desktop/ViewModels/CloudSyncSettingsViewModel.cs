@@ -705,7 +705,7 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
         // Subsequent changes are pushed incrementally via SyncOutboundService.PushEvent.
         if (pushAllEntities)
         {
-            _ = Task.Run(() =>
+            _ = PrivStack.Services.Diagnostics.SubsystemTracker.RunTaggedStatic("core.cloud", () =>
             {
                 try
                 {
@@ -731,7 +731,7 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
         _statusRefreshCts = new CancellationTokenSource();
         var ct = _statusRefreshCts.Token;
 
-        _ = Task.Run(async () =>
+        _ = PrivStack.Services.Diagnostics.SubsystemTracker.RunTaggedStatic("core.cloud", async () =>
         {
             while (!ct.IsCancellationRequested)
             {
@@ -746,7 +746,7 @@ public partial class CloudSyncSettingsViewModel : ViewModelBase
                 try { await RefreshStatusAsync(); }
                 catch { /* swallow — timer will retry */ }
             }
-        }, ct);
+        });
     }
 
     private void LoadState()

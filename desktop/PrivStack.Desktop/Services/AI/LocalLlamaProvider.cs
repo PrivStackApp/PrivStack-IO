@@ -243,6 +243,7 @@ internal sealed class LocalLlamaProvider : IAiProvider
 
         await Task.Run(() =>
         {
+            using var _ = PrivStack.Services.Diagnostics.SubsystemTracker.Instance?.EnterScope("ai.llm");
             var gpu = PlatformDetector.DetectGpu();
             var modelParams = new LLama.Common.ModelParams(modelPath)
             {

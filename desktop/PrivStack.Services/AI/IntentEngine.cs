@@ -63,7 +63,7 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
         LoadSuggestionsFromDisk();
 
         WeakReferenceMessenger.Default.Register<IntentSignalMessage>(this);
-        _consumerTask = Task.Run(() => ConsumeSignalsAsync(_disposeCts.Token));
+        _consumerTask = Diagnostics.SubsystemTracker.RunTaggedStatic("ai.intent", () => ConsumeSignalsAsync(_disposeCts.Token));
     }
 
     // ── IIntentEngine ─────────────────────────────────────────────────

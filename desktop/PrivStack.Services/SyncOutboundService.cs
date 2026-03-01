@@ -122,6 +122,7 @@ internal sealed class SyncOutboundService : ISyncOutboundService, IDisposable
 
     private void OnDebounceElapsed(string entityId)
     {
+        using var _ = Diagnostics.SubsystemTracker.Instance?.EnterScope("core.sync");
         if (!_pending.TryRemove(entityId, out var entry)) return;
 
         try

@@ -20,7 +20,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.15.3"
+version = "1.15.4"
 edition = "2024"
 license = "Proprietary"
 repository = "https://github.com/PrivStackApp/PrivStack-IO"

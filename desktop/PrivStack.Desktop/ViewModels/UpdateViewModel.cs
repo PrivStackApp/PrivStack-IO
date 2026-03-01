@@ -338,7 +338,7 @@ public partial class UpdateViewModel : ViewModelBase
         _autoCheckTimer.Start();
 
         // Also check immediately (startup check — silent)
-        _ = CheckForUpdatesAsync();
+        _ = PrivStack.Services.Diagnostics.SubsystemTracker.RunTaggedStatic("updates", async () => await CheckForUpdatesAsync());
     }
 
     public void StopAutoCheck()

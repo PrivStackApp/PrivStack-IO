@@ -189,6 +189,7 @@ public sealed class WhisperService : INotifyPropertyChanged, IDisposable
             var useBeamSearch = BeamSearchEnabled;
             await Task.Run(() =>
             {
+                using var _ = PrivStack.Services.Diagnostics.SubsystemTracker.Instance?.EnterScope("ai.whisper");
                 var builder = WhisperFactory.FromPath(modelPath)
                     .CreateBuilder()
                     .WithLanguage("en")

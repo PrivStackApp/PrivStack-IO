@@ -36,7 +36,7 @@ public sealed class IpcServer : IIpcServer, IDisposable
         _cts = new CancellationTokenSource();
 
         _log.Information("IPC server starting on pipe: {PipeName}", _pipeName);
-        _listenerTask = Task.Run(() => ListenAsync(_cts.Token));
+        _listenerTask = Diagnostics.SubsystemTracker.RunTaggedStatic("ipc", () => ListenAsync(_cts.Token));
     }
 
     public void Stop()
