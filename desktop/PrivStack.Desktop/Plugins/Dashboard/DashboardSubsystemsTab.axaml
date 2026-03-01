@@ -1,0 +1,144 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PrivStack.Desktop.Plugins.Dashboard"
+             xmlns:models="using:PrivStack.Desktop.Plugins.Dashboard.Models"
+             x:Class="PrivStack.Desktop.Plugins.Dashboard.DashboardSubsystemsTab"
+             x:DataType="vm:DashboardViewModel">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="24" MaxWidth="900" HorizontalAlignment="Center"
+                    Margin="24,0,24,80">
+
+            <!-- Summary Cards -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Subsystem Overview" Classes="section-heading"/>
+                <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <!-- Active Threads -->
+                    <Border Classes="stat-card" Margin="0,0,12,12" MinWidth="180">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Active Threads" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding SubsystemThreadCount}" FontSize="20" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                        </StackPanel>
+                    </Border>
+                    <!-- Managed Heap -->
+                    <Border Classes="stat-card" Margin="0,0,12,12" MinWidth="180">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Managed Heap" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding SubsystemManagedHeap}" FontSize="20" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                        </StackPanel>
+                    </Border>
+                    <!-- Native Memory -->
+                    <Border Classes="stat-card" Margin="0,0,12,12" MinWidth="180">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Native Memory" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding SubsystemNativeTotal}" FontSize="20" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                        </StackPanel>
+                    </Border>
+                    <!-- Active Subsystems -->
+                    <Border Classes="stat-card" Margin="0,0,12,12" MinWidth="180">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Active Subsystems" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding ActiveSubsystemCount}" FontSize="20" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
+            </StackPanel>
+
+            <!-- Subsystem Groups -->
+            <ItemsControl ItemsSource="{Binding SubsystemGroups}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:SubsystemGroupViewModel">
+                        <StackPanel Spacing="6" Margin="0,0,0,16">
+                            <!-- Category header -->
+                            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,4">
+                                <TextBlock Text="{Binding Category}"
+                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                <TextBlock Text="{Binding Summary}"
+                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Column headers (per group) -->
+                            <Grid ColumnDefinitions="24,*,50,180,90" Margin="0,0,0,2">
+                                <TextBlock Grid.Column="1" Text="Name"
+                                           FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                <TextBlock Grid.Column="2" Text="Tasks"
+                                           FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Column="3" Text="Memory"
+                                           FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Column="4" Text="Alloc Rate"
+                                           FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           HorizontalAlignment="Right"/>
+                            </Grid>
+
+                            <!-- Items -->
+                            <ItemsControl ItemsSource="{Binding Items}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:SubsystemItemViewModel">
+                                        <Border Padding="6,8" CornerRadius="6" Margin="0,0,0,1"
+                                                Background="{DynamicResource ThemeSurfaceElevatedBrush}">
+                                            <Grid ColumnDefinitions="24,*,50,180,90">
+                                                <!-- Status dot -->
+                                                <Panel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                    <Ellipse Width="7" Height="7"
+                                                             Fill="{DynamicResource ThemeSuccessBrush}"
+                                                             IsVisible="{Binding IsActive}"/>
+                                                    <Ellipse Width="7" Height="7"
+                                                             Fill="{DynamicResource ThemeTextMutedBrush}"
+                                                             IsVisible="{Binding !IsActive}"
+                                                             Opacity="0.4"/>
+                                                </Panel>
+
+                                                <!-- Name -->
+                                                <TextBlock Grid.Column="1" Text="{Binding DisplayName}"
+                                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                           VerticalAlignment="Center"/>
+
+                                                <!-- Task Count -->
+                                                <TextBlock Grid.Column="2" Text="{Binding ActiveTaskCount}"
+                                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                                                <!-- Memory -->
+                                                <TextBlock Grid.Column="3" Text="{Binding MemoryDisplay}"
+                                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                           HorizontalAlignment="Right" VerticalAlignment="Center"/>
+
+                                                <!-- Alloc Rate -->
+                                                <TextBlock Grid.Column="4" Text="{Binding AllocRateDisplay}"
+                                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                           HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

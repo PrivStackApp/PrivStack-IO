@@ -1,0 +1,414 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PrivStack.Desktop.Plugins.Dashboard"
+             xmlns:models="using:PrivStack.Desktop.Plugins.Dashboard.Models"
+             xmlns:sdk="using:PrivStack.Sdk.Capabilities"
+             xmlns:controls="using:PrivStack.Desktop.Controls"
+             x:Class="PrivStack.Desktop.Plugins.Dashboard.DashboardDataTab"
+             x:DataType="vm:DashboardViewModel">
+
+    <Border Background="{DynamicResource ThemeSurfaceBrush}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="24" MaxWidth="900" HorizontalAlignment="Center"
+                        Margin="24,24,24,80">
+                <!-- Storage Overview Cards -->
+                <TextBlock Text="Storage Overview" Classes="section-heading"/>
+                <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <!-- Database -->
+                    <Border Classes="stat-card" Margin="0,0,12,12" MinWidth="180">
+                        <StackPanel Spacing="12">
+                            <Border Width="40" Height="40" CornerRadius="10"
+                                    Background="{DynamicResource ThemeInfoMutedBrush}">
+                                <controls:IconControl Icon="Database" Size="18"
+                                                      Stroke="{DynamicResource ThemeInfoBrush}"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="{Binding TotalDatabaseSize}" Classes="hero-number"/>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Database" FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontWeight="Medium"/>
+                                <TextBlock Text="{Binding TotalDatabaseEstimate}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           IsVisible="{Binding TotalDatabaseEstimate, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                <TextBlock Text="Entity storage" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <!-- Files -->
+                    <Border Classes="stat-card" Margin="0,0,12,12" MinWidth="180">
+                        <StackPanel Spacing="12">
+                            <Border Width="40" Height="40" CornerRadius="10"
+                                    Background="{DynamicResource ThemeWarningMutedBrush}">
+                                <controls:IconControl Icon="Folder" Size="18"
+                                                      Stroke="{DynamicResource ThemeWarningBrush}"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="{Binding TotalFilesSize}" Classes="hero-number"/>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Files" FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontWeight="Medium"/>
+                                <TextBlock Text="Media library" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <!-- Vault -->
+                    <Border Classes="stat-card" Margin="0,0,12,12" MinWidth="180">
+                        <StackPanel Spacing="12">
+                            <Border Width="40" Height="40" CornerRadius="10"
+                                    Background="{DynamicResource ThemeSuccessMutedBrush}">
+                                <controls:IconControl Icon="Lock" Size="18"
+                                                      Stroke="{DynamicResource ThemeSuccessBrush}"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="{Binding TotalVaultSize}" Classes="hero-number"/>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Vault" FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontWeight="Medium"/>
+                                <TextBlock Text="{Binding TotalVaultEstimate}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           IsVisible="{Binding TotalVaultEstimate, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                <TextBlock Text="Encrypted blobs" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <!-- Total -->
+                    <Border Classes="stat-card" Margin="0,0,12,12" MinWidth="180"
+                            Background="{DynamicResource ThemePrimaryMutedBrush}">
+                        <StackPanel Spacing="12">
+                            <Border Width="40" Height="40" CornerRadius="10"
+                                    Background="{DynamicResource ThemePrimaryMutedBrush}">
+                                <controls:IconControl Icon="Database" Size="18"
+                                                      Stroke="{DynamicResource ThemePrimaryBrush}"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="{Binding TotalStorageSize}" Classes="hero-number"/>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Total" FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontWeight="Medium"/>
+                                <TextBlock Text="{Binding TotalStorageEstimate}"
+                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                           IsVisible="{Binding TotalStorageEstimate, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                <TextBlock Text="All storage" FontSize="{DynamicResource ThemeFontSizeXsSm}"
+                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
+
+                <!-- Plugin Data Table -->
+                <TextBlock Text="Plugin Data" Classes="section-heading"
+                           Margin="0,8,0,0"/>
+
+                <ItemsControl ItemsSource="{Binding PluginDataItems}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:PluginDataInfo">
+                            <Border Margin="0,0,0,8" CornerRadius="8"
+                                    Background="{DynamicResource ThemeSurfaceElevatedBrush}">
+                                <StackPanel>
+                                    <!-- Clickable Header -->
+                                    <Button Background="Transparent" Padding="16" HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch" Cursor="Hand"
+                                            Command="{Binding $parent[UserControl].((vm:DashboardViewModel)DataContext).TogglePluginExpandedCommand}"
+                                            CommandParameter="{Binding}">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <TextBlock Grid.Column="0" Text="&#x25B8;"
+                                                       FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                       VerticalAlignment="Center" Margin="0,0,10,0"
+                                                       IsVisible="{Binding !IsExpanded}"/>
+                                            <TextBlock Grid.Column="0" Text="&#x25BE;"
+                                                       FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                       VerticalAlignment="Center" Margin="0,0,10,0"
+                                                       IsVisible="{Binding IsExpanded}"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}"
+                                                       FontSize="{DynamicResource ThemeFontSizeMd}" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding Summary}"
+                                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                       FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+
+                                    <!-- Expanded detail (tables) -->
+                                    <StackPanel Spacing="4" Margin="16,0,16,16"
+                                                IsVisible="{Binding IsExpanded}">
+                                        <ItemsControl ItemsSource="{Binding Tables}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="sdk:DataTableInfo">
+                                                    <Border Padding="12,8" Margin="0,2" CornerRadius="4"
+                                                            Background="{DynamicResource ThemeBackgroundBrush}">
+                                                        <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                                <TextBlock Text="{Binding Name}"
+                                                                           FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                    <TextBlock Text="{Binding EntityType}"
+                                                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                                                    <TextBlock Text="·" FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                                               IsVisible="{Binding HasParent}"/>
+                                                                    <Button Background="Transparent" Padding="0" Cursor="Hand"
+                                                                            IsVisible="{Binding HasParent}"
+                                                                            Command="{Binding $parent[UserControl].((vm:DashboardViewModel)DataContext).NavigateToTableParentCommand}"
+                                                                            CommandParameter="{Binding}"
+                                                                            ToolTip.Tip="Open in plugin">
+                                                                        <TextBlock Text="{Binding ParentName}"
+                                                                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                                   Foreground="{DynamicResource ThemePrimaryBrush}"
+                                                                                   TextDecorations="Underline"/>
+                                                                    </Button>
+                                                                </StackPanel>
+                                                            </StackPanel>
+                                                            <TextBlock Grid.Column="1"
+                                                                       Text="{Binding FormattedSize}"
+                                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                                       FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                       VerticalAlignment="Center" Margin="8,0"
+                                                                       IsVisible="{Binding EstimatedSizeBytes}"/>
+                                                            <TextBlock Grid.Column="2"
+                                                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                                       FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                                       VerticalAlignment="Center" Margin="8,0">
+                                                                <TextBlock.Text>
+                                                                    <MultiBinding StringFormat="{}{0} rows">
+                                                                        <Binding Path="FormattedRowCount"/>
+                                                                    </MultiBinding>
+                                                                </TextBlock.Text>
+                                                            </TextBlock>
+                                                            <Border Grid.Column="3" Padding="8,4" CornerRadius="4"
+                                                                    Background="{DynamicResource ThemeHoverBrush}" Margin="8,0,0,0">
+                                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                    <PathIcon Data="{Binding BackingModeIcon}"
+                                                                             Width="10" Height="10"
+                                                                             VerticalAlignment="Center"
+                                                                             Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                                                    <TextBlock Text="{Binding BackingMode}"
+                                                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                                               VerticalAlignment="Center"/>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Empty state -->
+                <StackPanel HorizontalAlignment="Center" Spacing="8" Margin="0,20"
+                            IsVisible="{Binding !PluginDataItems.Count}">
+                    <TextBlock Text="No data metrics available"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                               HorizontalAlignment="Center"
+                               IsVisible="{Binding !IsLoading}"/>
+                </StackPanel>
+
+                <!-- Actions -->
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Refresh Metrics"
+                            Command="{Binding LoadDataMetricsCommand}"
+                            Background="{DynamicResource ThemeHoverBrush}"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                            Padding="16,8" CornerRadius="6"
+                            FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                    <Button Command="{Binding RunDatabaseMaintenanceCommand}"
+                            IsEnabled="{Binding !IsRunningMaintenance}"
+                            Background="{DynamicResource ThemeHoverBrush}"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                            Padding="16,8" CornerRadius="6"
+                            FontSize="{DynamicResource ThemeFontSizeSm}"
+                            ToolTip.Tip="Runs WAL checkpoint and vacuum to reclaim disk space">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon Data="M19.36 2.72l1.42 1.42-5.72 5.71c1.07 1.54 1.22 3.26.32 4.57L9.06 8.12c1.31-.9 3.02-.75 4.57.32l5.73-5.72zM5.93 17.57c-2.01-2.01-3.24-4.41-3.58-6.65l4.88-2.09 7.44 7.44-2.09 4.88c-2.24-.34-4.64-1.57-6.65-3.58z"
+                                     Width="14" Height="14" VerticalAlignment="Center"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                            <TextBlock Text="Clean Database" VerticalAlignment="Center"
+                                       IsVisible="{Binding !IsRunningMaintenance}"/>
+                            <TextBlock Text="Cleaning..." VerticalAlignment="Center"
+                                       IsVisible="{Binding IsRunningMaintenance}"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ValidateMetadataCommand}"
+                            IsEnabled="{Binding !IsValidatingMetadata}"
+                            Background="{DynamicResource ThemeHoverBrush}"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                            Padding="16,8" CornerRadius="6"
+                            FontSize="{DynamicResource ThemeFontSizeSm}"
+                            ToolTip.Tip="Scans for orphaned metadata records and removes them">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon Data="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+                                     Width="14" Height="14" VerticalAlignment="Center"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                            <TextBlock Text="Validate Metadata" VerticalAlignment="Center"
+                                       IsVisible="{Binding !IsValidatingMetadata}"/>
+                            <TextBlock Text="Validating..." VerticalAlignment="Center"
+                                       IsVisible="{Binding IsValidatingMetadata}"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- Validation status -->
+                <TextBlock Text="{Binding ValidationStatus}"
+                           IsVisible="{Binding ValidationStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+
+                <!-- Database Diagnostics Header -->
+                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
+                    <TextBlock Text="Database Internals"
+                               FontSize="{DynamicResource ThemeFontSizeMd}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                               VerticalAlignment="Center"/>
+                    <Button Command="{Binding RunDatabaseDiagnosticsCommand}"
+                            IsEnabled="{Binding !IsLoadingDiagnostics}"
+                            Background="{DynamicResource ThemeHoverBrush}"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                            Padding="12,6" CornerRadius="6"
+                            FontSize="{DynamicResource ThemeFontSizeXs}"
+                            ToolTip.Tip="Scan all DuckDB files to see what tables exist and what's consuming space">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="Scan All DBs" VerticalAlignment="Center"
+                                       IsVisible="{Binding !IsLoadingDiagnostics}"/>
+                            <TextBlock Text="Scanning..." VerticalAlignment="Center"
+                                       IsVisible="{Binding IsLoadingDiagnostics}"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- Expandable DB file list -->
+                <ItemsControl ItemsSource="{Binding DiagnosticsFiles}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:DbFileDiagnostic">
+                            <Border Margin="0,0,0,6" CornerRadius="6"
+                                    Background="{DynamicResource ThemeSurfaceElevatedBrush}">
+                                <StackPanel>
+                                    <!-- Clickable DB header -->
+                                    <Button Background="Transparent" Padding="12" HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch" Cursor="Hand"
+                                            Command="{Binding $parent[UserControl].((vm:DashboardViewModel)DataContext).ToggleDiagnosticsExpandedCommand}"
+                                            CommandParameter="{Binding}">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <TextBlock Grid.Column="0" Text="&#x25B8;"
+                                                       FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                       VerticalAlignment="Center" Margin="0,0,8,0"
+                                                       IsVisible="{Binding !IsExpanded}"/>
+                                            <TextBlock Grid.Column="0" Text="&#x25BE;"
+                                                       FontSize="{DynamicResource ThemeFontSizeSmMd}"
+                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                       VerticalAlignment="Center" Margin="0,0,8,0"
+                                                       IsVisible="{Binding IsExpanded}"/>
+                                            <StackPanel Grid.Column="1" Spacing="2">
+                                                <TextBlock Text="{Binding FileName}"
+                                                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                           FontWeight="SemiBold"
+                                                           FontFamily="Cascadia Code,Consolas,monospace"
+                                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                                <TextBlock Text="{Binding Summary}"
+                                                           FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                           Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding FormattedFileSize}"
+                                                       FontSize="{DynamicResource ThemeFontSizeMd}"
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource ThemeAccentBrush}"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+
+                                    <!-- Expanded: table list + block info -->
+                                    <StackPanel Spacing="4" Margin="12,0,12,12"
+                                                IsVisible="{Binding IsExpanded}">
+                                        <!-- Block allocation info -->
+                                        <TextBlock Text="{Binding BlockInfo}"
+                                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   IsVisible="{Binding BlockInfo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                   Margin="0,0,0,4"/>
+
+                                        <!-- Per-table rows -->
+                                        <ItemsControl ItemsSource="{Binding Tables}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="models:DbTableDiagnostic">
+                                                    <Border Padding="8,6" Margin="0,1"
+                                                            Background="{DynamicResource ThemeBackgroundBrush}"
+                                                            CornerRadius="4">
+                                                        <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                                                            <TextBlock Grid.Column="0"
+                                                                       Text="{Binding TableName}"
+                                                                       FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                                       FontFamily="Cascadia Code,Consolas,monospace"
+                                                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                                       VerticalAlignment="Center"/>
+                                                            <TextBlock Grid.Column="1"
+                                                                       Text="{Binding FormattedRowCount}"
+                                                                       FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                                       VerticalAlignment="Center"
+                                                                       Margin="16,0"/>
+                                                            <TextBlock Grid.Column="2"
+                                                                       Text="{Binding ColumnCount, StringFormat='{}{0} cols'}"
+                                                                       FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                                       VerticalAlignment="Center"
+                                                                       Margin="0,0,16,0"/>
+                                                            <TextBlock Grid.Column="3"
+                                                                       Text="{Binding FormattedSize}"
+                                                                       FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource ThemeAccentBrush}"
+                                                                       VerticalAlignment="Center"
+                                                                       MinWidth="70"
+                                                                       TextAlignment="Right"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <!-- Empty state -->
+                                        <TextBlock Text="No tables found in this database"
+                                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   IsVisible="{Binding !Tables.Count}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Loading indicator -->
+                <TextBlock Text="Loading data metrics..."
+                           IsVisible="{Binding IsLoading}"
+                           FontSize="{DynamicResource ThemeFontSizeSm}"
+                           Foreground="{DynamicResource ThemeTextMutedBrush}"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </ScrollViewer>
+    </Border>
+</UserControl>

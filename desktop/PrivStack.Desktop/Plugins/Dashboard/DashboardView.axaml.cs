@@ -1,33 +1,47 @@
+using System.ComponentModel;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
-using Avalonia.VisualTree;
 
 namespace PrivStack.Desktop.Plugins.Dashboard;
 
 public partial class DashboardView : UserControl
 {
-    private const double MinCardWidth = 260;
-    private const double ColumnSpacing = 10;
+    private readonly Dictionary<DashboardTab, Control> _tabCache = new();
 
     public DashboardView()
     {
         InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
     }
 
-    private void OnPluginGridSizeChanged(object? sender, SizeChangedEventArgs e)
+    private void OnDataContextChanged(object? sender, EventArgs e)
     {
-        if (sender is not ItemsControl host) return;
+        if (DataContext is DashboardViewModel vm)
+        {
+            vm.PropertyChanged += OnViewModelPropertyChanged;
+            SwitchTab(vm.ActiveTab);
+        }
+    }
 
-        var available = e.NewSize.Width;
-        if (available <= 0) return;
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(DashboardViewModel.ActiveTab) && sender is DashboardViewModel vm)
+            SwitchTab(vm.ActiveTab);
+    }
 
-        var columns = Math.Max(1, (int)((available + ColumnSpacing) / (MinCardWidth + ColumnSpacing)));
+    private void SwitchTab(DashboardTab tab)
+    {
+        if (!_tabCache.TryGetValue(tab, out var control))
+        {
+            control = tab switch
+            {
+                DashboardTab.Overview => new DashboardOverviewTab(),
+                DashboardTab.Data => new DashboardDataTab(),
+                DashboardTab.Subsystems => new DashboardSubsystemsTab(),
+                _ => new DashboardOverviewTab()
+            };
+            _tabCache[tab] = control;
+        }
 
-        var grid = host.GetVisualDescendants()
-            .OfType<UniformGrid>()
-            .FirstOrDefault();
-
-        if (grid != null && grid.Columns != columns)
-            grid.Columns = columns;
+        TabContent.Content = control;
     }
 }
