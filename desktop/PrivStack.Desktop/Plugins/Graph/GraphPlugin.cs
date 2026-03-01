@@ -6,7 +6,7 @@ using PrivStack.Sdk;
 
 namespace PrivStack.Desktop.Plugins.Graph;
 
-public sealed class GraphPlugin : PluginBase<GraphViewModel>
+public sealed partial class GraphPlugin : PluginBase<GraphViewModel>
 {
     private GraphDataService? _graphService;
     private EmbeddingDataService? _embeddingService;
@@ -16,7 +16,7 @@ public sealed class GraphPlugin : PluginBase<GraphViewModel>
         Id = "privstack.graph",
         Name = "Graph",
         Description = "Knowledge graph visualization with force-directed layout",
-        Version = new Version(1, 1, 0),
+        Version = new Version(1, 1, 1),
         Author = "PrivStack",
         Icon = "Graph",
         NavigationOrder = 105,

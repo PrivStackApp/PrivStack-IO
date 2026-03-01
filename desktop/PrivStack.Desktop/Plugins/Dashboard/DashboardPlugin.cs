@@ -1,8 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Desktop.Plugins.Dashboard.Services;
-using PrivStack.Desktop.Services;
-using PrivStack.Desktop.Services.Abstractions;
-using PrivStack.Desktop.Services.Plugin;
 using PrivStack.Services.Diagnostics;
 using PrivStack.Sdk;
 
@@ -12,14 +9,14 @@ namespace PrivStack.Desktop.Plugins.Dashboard;
 /// Built-in Dashboard plugin — always present, cannot be disabled.
 /// Shows the official plugin catalog, system metrics, and install/update/uninstall capabilities.
 /// </summary>
-public sealed class DashboardPlugin : PluginBase<DashboardViewModel>
+public sealed partial class DashboardPlugin : PluginBase<DashboardViewModel>
 {
     public override PluginMetadata Metadata { get; } = new()
     {
         Id = "privstack.dashboard",
         Name = "Dashboard",
         Description = "System overview, plugin marketplace, and management dashboard",
-        Version = new Version(1, 5, 1),
+        Version = new Version(1, 5, 2),
         Author = "PrivStack",
         Icon = "LayoutDashboard",
         NavigationOrder = 50,
@@ -51,12 +48,13 @@ public sealed class DashboardPlugin : PluginBase<DashboardViewModel>
         var tracker = SubsystemTracker.Instance;
 
         // Register plugin subsystems dynamically
-        if (tracker != null)
+        if (tracker == null)
+            return new DashboardViewModel(installService, pluginRegistry, metricsService, sdk,
+                entityMetadataService, linkProviderCache, workspaceService, runtime, tracker);
+
+        foreach (var plugin in pluginRegistry.ActivePlugins)
         {
-            foreach (var plugin in pluginRegistry.ActivePlugins)
-            {
-                tracker.Register($"plugin.{plugin.Metadata.Id}", plugin.Metadata.Name, "Plugin");
-            }
+            tracker.Register($"plugin.{plugin.Metadata.Id}", plugin.Metadata.Name, "Plugin");
         }
 
         return new DashboardViewModel(installService, pluginRegistry, metricsService, sdk,

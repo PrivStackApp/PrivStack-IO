@@ -8,4 +8,9 @@ public partial class DashboardSubsystemsTab : UserControl
     {
         InitializeComponent();
     }
+
+    private static void InitializeComponent()
+    {
+        throw new NotImplementedException();
+    }
 }

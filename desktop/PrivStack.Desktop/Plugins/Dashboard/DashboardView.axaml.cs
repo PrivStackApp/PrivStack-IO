@@ -15,11 +15,9 @@ public partial class DashboardView : UserControl
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
-        if (DataContext is DashboardViewModel vm)
-        {
-            vm.PropertyChanged += OnViewModelPropertyChanged;
-            SwitchTab(vm.ActiveTab);
-        }
+        if (DataContext is not DashboardViewModel vm) return;
+        vm.PropertyChanged += OnViewModelPropertyChanged;
+        SwitchTab(vm.ActiveTab);
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
