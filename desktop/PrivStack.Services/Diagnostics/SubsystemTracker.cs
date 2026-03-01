@@ -24,11 +24,20 @@ public sealed class SubsystemTracker
     private const int RateSampleCount = 5;
 
     /// <summary>
-    /// Register a subsystem for tracking.
+    /// Register a subsystem for tracking. If the subsystem was already auto-created
+    /// (from a scope or RunTagged call before explicit registration), updates the
+    /// display name and category to the authoritative values.
     /// </summary>
     public void Register(string id, string displayName, string category)
     {
-        _states.TryAdd(id, new SubsystemState(displayName, category));
+        _states.AddOrUpdate(id,
+            new SubsystemState(displayName, category),
+            (_, existing) =>
+            {
+                existing.DisplayName = displayName;
+                existing.Category = category;
+                return existing;
+            });
     }
 
     /// <summary>
@@ -207,13 +216,30 @@ public sealed class SubsystemTracker
 
     private SubsystemState GetOrCreateState(string id)
     {
-        return _states.GetOrAdd(id, static _ => new SubsystemState("Unknown", "Unknown"));
+        return _states.GetOrAdd(id, static key =>
+        {
+            // Infer display name and category from the subsystem ID pattern
+            if (key.StartsWith("plugin.", StringComparison.Ordinal))
+            {
+                // "plugin.privstack.notes" → "Notes", category "Plugin"
+                var pluginId = key["plugin.".Length..];
+                var lastDot = pluginId.LastIndexOf('.');
+                var shortName = lastDot >= 0 ? pluginId[(lastDot + 1)..] : pluginId;
+                // Title-case the short name
+                var display = shortName.Length > 0
+                    ? char.ToUpperInvariant(shortName[0]) + shortName[1..]
+                    : shortName;
+                return new SubsystemState(display, "Plugin");
+            }
+
+            return new SubsystemState(key, "Other");
+        });
     }
 
     private sealed class SubsystemState(string displayName, string category)
     {
-        public readonly string DisplayName = displayName;
-        public readonly string Category = category;
+        public string DisplayName = displayName;
+        public string Category = category;
         public int ActiveTaskCount;
         public long ManagedAllocBytes;
         public long SmoothedAllocRate;

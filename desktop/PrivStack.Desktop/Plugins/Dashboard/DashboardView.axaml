@@ -896,7 +896,7 @@
         <Border Grid.Row="2"
                 IsVisible="{Binding IsSubsystemsTab}"
                 Background="{DynamicResource ThemeSurfaceBrush}">
-            <ScrollViewer Padding="24,24,24,80" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer Padding="24,24,24,120" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Spacing="24" MaxWidth="900" HorizontalAlignment="Center">
 
                     <!-- Summary Cards -->
