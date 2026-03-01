@@ -1,14 +1,14 @@
-//! DuckDB-backed tabular dataset storage for PrivStack.
+//! SQLite-backed tabular dataset storage for PrivStack.
 //!
-//! This crate provides a 5th DuckDB database (`data.datasets.duckdb`) that
-//! stores raw columnar data without encryption, enabling full SQL (WHERE,
-//! GROUP BY, JOIN, aggregations) and DuckDB's native `read_csv_auto()`.
+//! This crate provides a database (`data.datasets.db`) that stores raw
+//! columnar data without encryption, enabling full SQL (WHERE, GROUP BY,
+//! JOIN, aggregations) via SQLite.
 //!
 //! # Architecture
 //!
 //! Unlike the entity system (which encrypts all data), datasets are stored
-//! as plain DuckDB tables for maximum query performance. Each imported CSV
-//! becomes a native DuckDB table named `ds_<uuid>`.
+//! as plain SQLite tables for maximum query performance. Each imported CSV
+//! becomes a native SQLite table named `ds_<uuid>`.
 
 mod error;
 mod schema;
@@ -24,34 +24,3 @@ pub use types::{
     RowPageLink, SavedQuery, SortDirection, SqlExecutionResult, StatementType, ViewConfig,
     ViewFilter, ViewSort,
 };
-
-/// Open a DuckDB connection for the datasets database with WAL recovery.
-///
-/// Mirrors the pattern from `privstack-storage::open_duckdb_with_wal_recovery`.
-pub fn open_datasets_db(path: &std::path::Path) -> DatasetResult<duckdb::Connection> {
-    let conn = match duckdb::Connection::open(path) {
-        Ok(c) => c,
-        Err(first_err) => {
-            let wal_path = path.with_extension(
-                path.extension()
-                    .map(|ext| format!("{}.wal", ext.to_string_lossy()))
-                    .unwrap_or_else(|| "wal".to_string()),
-            );
-            if wal_path.exists() {
-                eprintln!(
-                    "[WARN] DuckDB datasets open failed, removing stale WAL and retrying: {}",
-                    wal_path.display()
-                );
-                if std::fs::remove_file(&wal_path).is_ok() {
-                    let c = duckdb::Connection::open(path)?;
-                    c.execute_batch("PRAGMA memory_limit='64MB'; PRAGMA threads=2;")?;
-                    return Ok(c);
-                }
-            }
-            return Err(first_err.into());
-        }
-    };
-    // Cap memory/threads — DuckDB defaults to ~80% RAM per connection
-    conn.execute_batch("PRAGMA memory_limit='64MB'; PRAGMA threads=2;")?;
-    Ok(conn)
-}

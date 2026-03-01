@@ -4,7 +4,7 @@ use super::helpers::now_millis;
 use super::DatasetStore;
 use crate::error::DatasetResult;
 use crate::types::DatasetId;
-use duckdb::params;
+use privstack_db::rusqlite::params;
 use uuid::Uuid;
 
 impl DatasetStore {
@@ -18,7 +18,7 @@ impl DatasetStore {
         let now = now_millis();
         let conn = self.lock_conn();
         conn.execute(
-            "INSERT OR REPLACE INTO _dataset_row_pages (dataset_id, row_index, row_key, page_id, created_at) VALUES (?, 0, ?, ?, ?)",
+            "INSERT OR REPLACE INTO _dataset_row_pages (dataset_id, row_index, row_key, page_id, created_at) VALUES (?1, 0, ?2, ?3, ?4)",
             params![dataset_id.to_string(), row_key, page_id, now],
         )?;
         Ok(())
@@ -32,13 +32,13 @@ impl DatasetStore {
     ) -> DatasetResult<Option<String>> {
         let conn = self.lock_conn();
         let result = conn.query_row(
-            "SELECT page_id FROM _dataset_row_pages WHERE dataset_id = ? AND row_key = ?",
+            "SELECT page_id FROM _dataset_row_pages WHERE dataset_id = ?1 AND row_key = ?2",
             params![dataset_id.to_string(), row_key],
             |row| row.get::<_, String>(0),
         );
         match result {
             Ok(page_id) => Ok(Some(page_id)),
-            Err(duckdb::Error::QueryReturnedNoRows) => Ok(None),
+            Err(privstack_db::rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
         }
     }
@@ -50,7 +50,7 @@ impl DatasetStore {
     ) -> DatasetResult<Option<(DatasetId, String)>> {
         let conn = self.lock_conn();
         let result = conn.query_row(
-            "SELECT dataset_id, row_key FROM _dataset_row_pages WHERE page_id = ?",
+            "SELECT dataset_id, row_key FROM _dataset_row_pages WHERE page_id = ?1",
             params![page_id],
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
         );
@@ -59,7 +59,7 @@ impl DatasetStore {
                 DatasetId(Uuid::parse_str(&ds_id).unwrap_or_default()),
                 row_key,
             ))),
-            Err(duckdb::Error::QueryReturnedNoRows) => Ok(None),
+            Err(privstack_db::rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
         }
     }
@@ -72,7 +72,7 @@ impl DatasetStore {
     ) -> DatasetResult<()> {
         let conn = self.lock_conn();
         conn.execute(
-            "DELETE FROM _dataset_row_pages WHERE dataset_id = ? AND row_key = ?",
+            "DELETE FROM _dataset_row_pages WHERE dataset_id = ?1 AND row_key = ?2",
             params![dataset_id.to_string(), row_key],
         )?;
         Ok(())

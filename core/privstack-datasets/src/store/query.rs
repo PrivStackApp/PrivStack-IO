@@ -96,8 +96,7 @@ impl DatasetStore {
 
         let conn = self.lock_conn();
 
-        // Use DESCRIBE to get column names and types (avoids DuckDB 1.4.4 panic
-        // where stmt.column_count() crashes on un-executed statements).
+        // Get column names and types by executing a LIMIT 0 query
         let described = Self::describe_query_columns(&conn, sql)?;
         let col_count = described.len();
         let col_names: Vec<String> = described.iter().map(|(n, _)| n.clone()).collect();
@@ -108,24 +107,9 @@ impl DatasetStore {
             .query_row(&count_sql, [], |row| row.get(0))
             .unwrap_or(0);
 
-        // Build a SELECT that casts DATE/TIMESTAMP columns to VARCHAR
-        let select_cols: Vec<String> = described
-            .iter()
-            .map(|(name, col_type)| {
-                let safe = sanitize_identifier(name);
-                match col_type {
-                    DatasetColumnType::Date | DatasetColumnType::Timestamp => {
-                        format!("CAST(\"{safe}\" AS VARCHAR) AS \"{safe}\"")
-                    }
-                    _ => format!("\"{safe}\""),
-                }
-            })
-            .collect();
-        let select_clause = select_cols.join(", ");
-
         let offset = page * page_size;
         let data_sql = format!(
-            "SELECT {select_clause} FROM ({sql}) AS q LIMIT {page_size} OFFSET {offset}"
+            "SELECT * FROM ({sql}) LIMIT {page_size} OFFSET {offset}"
         );
 
         let mut stmt = conn.prepare(&data_sql)?;
@@ -150,26 +134,32 @@ impl DatasetStore {
         })
     }
 
-    /// Get column names and types for an arbitrary SELECT query via DESCRIBE.
+    /// Get column names and types for an arbitrary SELECT query.
+    ///
+    /// SQLite doesn't have DESCRIBE, so we prepare the statement and
+    /// read column metadata from the prepared statement handle.
     fn describe_query_columns(
-        conn: &duckdb::Connection,
+        conn: &privstack_db::rusqlite::Connection,
         sql: &str,
     ) -> DatasetResult<Vec<(String, DatasetColumnType)>> {
-        let desc_sql = format!("DESCRIBE SELECT * FROM ({sql}) AS __subq");
-        let mut desc_stmt = conn.prepare(&desc_sql)?;
-        let cols: Vec<(String, DatasetColumnType)> = desc_stmt
-            .query_map([], |row| {
-                let name: String = row.get(0)?;
-                let type_name: String = row.get(1)?;
-                Ok((name, DatasetColumnType::from_duckdb(&type_name)))
-            })?
-            .filter_map(|r| r.ok())
-            .collect();
-        if cols.is_empty() {
+        let stmt = conn.prepare(sql)?;
+        let columns = stmt.columns();
+        if columns.is_empty() {
             return Err(DatasetError::InvalidQuery(
                 "Query returned no columns".to_string(),
             ));
         }
+
+        let cols: Vec<(String, DatasetColumnType)> = columns
+            .iter()
+            .map(|col| {
+                let name = col.name().to_string();
+                let col_type = col.decl_type()
+                    .map(|t| DatasetColumnType::from_sqlite(t))
+                    .unwrap_or(DatasetColumnType::Text);
+                (name, col_type)
+            })
+            .collect();
         Ok(cols)
     }
 
@@ -191,25 +181,12 @@ impl DatasetStore {
         let x_col = sanitize_identifier(x_column);
         let y_col = sanitize_identifier(y_column);
 
-        // If x or group-by columns are DATE/TIMESTAMP, cast them to VARCHAR for display
-        let x_type = columns.iter().find(|c| c.name == x_column).map(|c| &c.column_type);
-        let x_is_temporal = matches!(x_type, Some(DatasetColumnType::Date) | Some(DatasetColumnType::Timestamp));
-        let x_expr = if x_is_temporal {
-            format!("CAST(\"{x_col}\" AS VARCHAR)")
-        } else {
-            format!("\"{x_col}\"")
-        };
+        let x_expr = format!("\"{x_col}\"");
 
         let sql = match (aggregation, group_by) {
             (Some(agg), Some(grp)) => {
                 let grp_col = sanitize_identifier(grp);
-                let grp_type = columns.iter().find(|c| c.name == grp).map(|c| &c.column_type);
-                let grp_is_temporal = matches!(grp_type, Some(DatasetColumnType::Date) | Some(DatasetColumnType::Timestamp));
-                let grp_expr = if grp_is_temporal {
-                    format!("CAST(\"{grp_col}\" AS VARCHAR)")
-                } else {
-                    format!("\"{grp_col}\"")
-                };
+                let grp_expr = format!("\"{grp_col}\"");
                 format!(
                     "SELECT {grp_expr}, {agg}(\"{y_col}\") FROM {table}{where_clause} GROUP BY \"{grp_col}\" ORDER BY \"{grp_col}\""
                 )
@@ -257,22 +234,8 @@ impl DatasetStore {
         let y_col = sanitize_identifier(y_column);
         let grp_col = sanitize_identifier(group_column);
 
-        // Cast temporal columns to VARCHAR for display
-        let x_type = columns.iter().find(|c| c.name == x_column).map(|c| &c.column_type);
-        let x_is_temporal = matches!(x_type, Some(DatasetColumnType::Date) | Some(DatasetColumnType::Timestamp));
-        let x_expr = if x_is_temporal {
-            format!("CAST(\"{x_col}\" AS VARCHAR)")
-        } else {
-            format!("\"{x_col}\"")
-        };
-
-        let grp_type = columns.iter().find(|c| c.name == group_column).map(|c| &c.column_type);
-        let grp_is_temporal = matches!(grp_type, Some(DatasetColumnType::Date) | Some(DatasetColumnType::Timestamp));
-        let grp_expr = if grp_is_temporal {
-            format!("CAST(\"{grp_col}\" AS VARCHAR)")
-        } else {
-            format!("\"{grp_col}\"")
-        };
+        let x_expr = format!("\"{x_col}\"");
+        let grp_expr = format!("\"{grp_col}\"");
 
         let agg_expr = match aggregation {
             Some(agg) => format!("{agg}(\"{y_col}\")"),
@@ -310,7 +273,7 @@ impl DatasetStore {
         use super::preprocessor::preprocess_sql;
 
         // Strip trailing semicolons — wrapping SQL as a subquery
-        // (for DESCRIBE, COUNT, pagination) requires clean SQL without terminators.
+        // (for COUNT, pagination) requires clean SQL without terminators.
         let cleaned = raw_sql.trim().trim_end_matches(';').trim();
         if cleaned.is_empty() {
             return Err(DatasetError::InvalidQuery("Empty SQL".to_string()));

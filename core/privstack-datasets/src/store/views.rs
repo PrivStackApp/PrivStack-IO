@@ -4,7 +4,7 @@ use super::helpers::now_millis;
 use super::DatasetStore;
 use crate::error::DatasetResult;
 use crate::types::{DatasetId, DatasetView, ViewConfig};
-use duckdb::params;
+use privstack_db::rusqlite::params;
 use uuid::Uuid;
 
 impl DatasetStore {
@@ -20,7 +20,7 @@ impl DatasetStore {
         let config_json = serde_json::to_string(config)?;
         let conn = self.lock_conn();
         conn.execute(
-            "INSERT INTO _dataset_views (id, dataset_id, name, config_json, is_default, sort_order, created_at, modified_at) VALUES (?, ?, ?, ?, FALSE, 0, ?, ?)",
+            "INSERT INTO _dataset_views (id, dataset_id, name, config_json, is_default, sort_order, created_at, modified_at) VALUES (?1, ?2, ?3, ?4, 0, 0, ?5, ?6)",
             params![id, dataset_id.to_string(), name, config_json, now, now],
         )?;
         Ok(DatasetView {
@@ -41,7 +41,7 @@ impl DatasetStore {
         let config_json = serde_json::to_string(config)?;
         let conn = self.lock_conn();
         conn.execute(
-            "UPDATE _dataset_views SET config_json = ?, modified_at = ? WHERE id = ?",
+            "UPDATE _dataset_views SET config_json = ?1, modified_at = ?2 WHERE id = ?3",
             params![config_json, now, view_id],
         )?;
         Ok(())
@@ -51,7 +51,7 @@ impl DatasetStore {
     pub fn delete_view(&self, view_id: &str) -> DatasetResult<()> {
         let conn = self.lock_conn();
         conn.execute(
-            "DELETE FROM _dataset_views WHERE id = ?",
+            "DELETE FROM _dataset_views WHERE id = ?1",
             params![view_id],
         )?;
         Ok(())
@@ -64,7 +64,7 @@ impl DatasetStore {
     ) -> DatasetResult<Vec<DatasetView>> {
         let conn = self.lock_conn();
         let mut stmt = conn.prepare(
-            "SELECT id, name, config_json, is_default, sort_order, created_at, modified_at FROM _dataset_views WHERE dataset_id = ? ORDER BY sort_order, name",
+            "SELECT id, name, config_json, is_default, sort_order, created_at, modified_at FROM _dataset_views WHERE dataset_id = ?1 ORDER BY sort_order, name",
         )?;
         let rows = stmt
             .query_map(params![dataset_id.to_string()], |row| {
@@ -72,7 +72,7 @@ impl DatasetStore {
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
-                    row.get::<_, bool>(3)?,
+                    row.get::<_, i32>(3)?,
                     row.get::<_, i32>(4)?,
                     row.get::<_, i64>(5)?,
                     row.get::<_, i64>(6)?,
@@ -93,7 +93,7 @@ impl DatasetStore {
                         dataset_id: dataset_id.clone(),
                         name,
                         config,
-                        is_default,
+                        is_default: is_default != 0,
                         sort_order,
                         created_at: created,
                         modified_at: modified,

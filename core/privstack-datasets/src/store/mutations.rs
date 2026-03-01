@@ -5,7 +5,7 @@ use super::DatasetStore;
 use crate::error::{DatasetError, DatasetResult};
 use crate::schema::dataset_table_name;
 use crate::types::{ColumnDef, DatasetId, DatasetMeta, DatasetQueryResult, MutationResult};
-use duckdb::params;
+use privstack_db::rusqlite::params;
 use tracing::info;
 
 impl DatasetStore {
@@ -32,7 +32,7 @@ impl DatasetStore {
                 format!(
                     "\"{}\" {}",
                     sanitize_identifier(&c.name),
-                    c.column_type.to_uppercase()
+                    normalize_sql_type(&c.column_type)
                 )
             })
             .collect();
@@ -46,7 +46,7 @@ impl DatasetStore {
 
         conn.execute(
             r#"INSERT INTO _datasets_meta (id, name, source_file_name, row_count, columns_json, category, created_at, modified_at)
-               VALUES (?, ?, NULL, 0, ?, ?, ?, ?)"#,
+               VALUES (?1, ?2, NULL, 0, ?3, ?4, ?5, ?6)"#,
             params![id.to_string(), name, columns_json, category, now, now],
         )?;
 
@@ -80,7 +80,7 @@ impl DatasetStore {
         // Read source category before duplicating
         let source_category: Option<String> = conn
             .query_row(
-                "SELECT category FROM _datasets_meta WHERE id = ?",
+                "SELECT category FROM _datasets_meta WHERE id = ?1",
                 params![source_id.to_string()],
                 |row| row.get(0),
             )
@@ -100,7 +100,7 @@ impl DatasetStore {
 
         conn.execute(
             r#"INSERT INTO _datasets_meta (id, name, source_file_name, row_count, columns_json, category, created_at, modified_at)
-               VALUES (?, ?, NULL, ?, ?, ?, ?, ?)"#,
+               VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, ?7)"#,
             params![new_id.to_string(), new_name, row_count, columns_json, source_category, now, now],
         )?;
 
@@ -125,54 +125,7 @@ impl DatasetStore {
         name: &str,
         category: Option<&str>,
     ) -> DatasetResult<DatasetMeta> {
-        let id = DatasetId::new();
-        let table = dataset_table_name(&id);
-        let now = now_millis();
-
-        // Write to a temp file for DuckDB's read_csv_auto
-        let tmp_dir = std::env::temp_dir();
-        let tmp_path = tmp_dir.join(format!("privstack_import_{}.csv", id.0.simple()));
-        std::fs::write(&tmp_path, csv_content)?;
-
-        let conn = self.lock_conn();
-
-        let escaped_path = tmp_path.to_string_lossy().replace('\'', "''");
-        let create_sql = format!(
-            "CREATE TABLE {table} AS SELECT * FROM read_csv_auto('{escaped_path}', header=true, auto_detect=true)"
-        );
-
-        let result = conn.execute_batch(&create_sql);
-        // Clean up temp file regardless of outcome
-        let _ = std::fs::remove_file(&tmp_path);
-        result.map_err(|e| {
-            DatasetError::ImportFailed(format!("Failed to import content: {e}"))
-        })?;
-
-        let columns = introspect_columns(&conn, &table)?;
-        let row_count: i64 = conn
-            .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                row.get(0)
-            })?;
-        let columns_json = serde_json::to_string(&columns)?;
-
-        conn.execute(
-            r#"INSERT INTO _datasets_meta (id, name, source_file_name, row_count, columns_json, category, created_at, modified_at)
-               VALUES (?, ?, NULL, ?, ?, ?, ?, ?)"#,
-            params![id.to_string(), name, row_count, columns_json, category, now, now],
-        )?;
-
-        info!(dataset_id = %id, name, row_count, "Dataset imported from content");
-
-        Ok(DatasetMeta {
-            id,
-            name: name.to_string(),
-            source_file_name: None,
-            row_count,
-            columns,
-            category: category.map(|s| s.to_string()),
-            created_at: now,
-            modified_at: now,
-        })
+        self.import_csv_content_inner(csv_content, name, category, None)
     }
 
     /// Insert a new row into a dataset.
@@ -188,7 +141,7 @@ impl DatasetStore {
             .iter()
             .map(|(name, _)| format!("\"{}\"", sanitize_identifier(name)))
             .collect();
-        let placeholders: Vec<&str> = values.iter().map(|_| "?").collect();
+        let placeholders: Vec<String> = (1..=values.len()).map(|i| format!("?{i}")).collect();
 
         let sql = format!(
             "INSERT INTO {table} ({}) VALUES ({})",
@@ -203,9 +156,9 @@ impl DatasetStore {
             .iter()
             .map(|(_, v)| json_value_to_sql_string(v))
             .collect();
-        let param_refs: Vec<&dyn duckdb::ToSql> = str_vals
+        let param_refs: Vec<&dyn privstack_db::rusqlite::types::ToSql> = str_vals
             .iter()
-            .map(|s| s as &dyn duckdb::ToSql)
+            .map(|s| s as &dyn privstack_db::rusqlite::types::ToSql)
             .collect();
 
         conn.execute(&sql, param_refs.as_slice())?;
@@ -227,16 +180,16 @@ impl DatasetStore {
         let col = sanitize_identifier(column);
         let val_str = json_value_to_sql_string(&value);
 
-        // Use DuckDB's rowid pseudo-column for stable row addressing
+        // Use SQLite's rowid pseudo-column for stable row addressing
         let sql = format!(
-            "UPDATE {table} SET \"{col}\" = ? WHERE rowid = (SELECT rowid FROM {table} LIMIT 1 OFFSET ?)"
+            "UPDATE {table} SET \"{col}\" = ?1 WHERE rowid = (SELECT rowid FROM {table} LIMIT 1 OFFSET ?2)"
         );
 
         let conn = self.lock_conn();
         conn.execute(&sql, params![val_str, row_index])?;
 
         conn.execute(
-            "UPDATE _datasets_meta SET modified_at = ? WHERE id = ?",
+            "UPDATE _datasets_meta SET modified_at = ?1 WHERE id = ?2",
             params![now, id.to_string()],
         )?;
 
@@ -260,7 +213,7 @@ impl DatasetStore {
         // Delete using rowid-based subqueries for each index
         for &idx in row_indices {
             let sql = format!(
-                "DELETE FROM {table} WHERE rowid = (SELECT rowid FROM {table} LIMIT 1 OFFSET ?)"
+                "DELETE FROM {table} WHERE rowid = (SELECT rowid FROM {table} LIMIT 1 OFFSET ?1)"
             );
             conn.execute(&sql, params![idx])?;
         }
@@ -280,7 +233,7 @@ impl DatasetStore {
         let table = dataset_table_name(id);
         let now = now_millis();
         let col = sanitize_identifier(name);
-        let dtype = col_type.to_uppercase();
+        let dtype = normalize_sql_type(col_type);
 
         let default_clause = match default {
             Some(d) => format!(" DEFAULT '{}'", d.replace('\'', "''")),
@@ -296,7 +249,7 @@ impl DatasetStore {
         let columns = introspect_columns(&conn, &table)?;
         let columns_json = serde_json::to_string(&columns)?;
         conn.execute(
-            "UPDATE _datasets_meta SET columns_json = ?, modified_at = ? WHERE id = ?",
+            "UPDATE _datasets_meta SET columns_json = ?1, modified_at = ?2 WHERE id = ?3",
             params![columns_json, now, id.to_string()],
         )?;
 
@@ -304,6 +257,8 @@ impl DatasetStore {
     }
 
     /// Drop a column from a dataset.
+    ///
+    /// SQLite 3.35.0+ supports `ALTER TABLE DROP COLUMN`.
     pub fn drop_column(&self, id: &DatasetId, name: &str) -> DatasetResult<()> {
         let table = dataset_table_name(id);
         let now = now_millis();
@@ -317,7 +272,7 @@ impl DatasetStore {
         let columns = introspect_columns(&conn, &table)?;
         let columns_json = serde_json::to_string(&columns)?;
         conn.execute(
-            "UPDATE _datasets_meta SET columns_json = ?, modified_at = ? WHERE id = ?",
+            "UPDATE _datasets_meta SET columns_json = ?1, modified_at = ?2 WHERE id = ?3",
             params![columns_json, now, id.to_string()],
         )?;
 
@@ -325,6 +280,10 @@ impl DatasetStore {
     }
 
     /// Change a column's data type.
+    ///
+    /// SQLite doesn't support `ALTER COLUMN SET DATA TYPE` directly, so we
+    /// rebuild the table: create a new table with the modified schema, copy
+    /// data with CAST, drop the old table, and rename.
     pub fn alter_column_type(
         &self,
         id: &DatasetId,
@@ -332,8 +291,8 @@ impl DatasetStore {
         new_type: &str,
     ) -> DatasetResult<()> {
         const VALID_TYPES: &[&str] = &[
-            "VARCHAR", "INTEGER", "BIGINT", "DOUBLE", "FLOAT", "BOOLEAN",
-            "DATE", "TIMESTAMP", "HUGEINT", "SMALLINT", "TINYINT",
+            "TEXT", "INTEGER", "BIGINT", "REAL", "DOUBLE", "FLOAT", "BOOLEAN",
+            "DATE", "TIMESTAMP", "SMALLINT", "TINYINT", "VARCHAR",
         ];
         let dtype = new_type.to_uppercase();
         if !VALID_TYPES.contains(&dtype.as_str()) {
@@ -344,17 +303,56 @@ impl DatasetStore {
 
         let table = dataset_table_name(id);
         let now = now_millis();
-        let col = sanitize_identifier(column);
-
-        let sql = format!("ALTER TABLE {table} ALTER COLUMN \"{col}\" SET DATA TYPE {dtype}");
+        let target_col = sanitize_identifier(column);
+        let sqlite_type = normalize_sql_type(&dtype);
 
         let conn = self.lock_conn();
-        conn.execute_batch(&sql)?;
+
+        // Get current columns
+        let current_columns = introspect_columns(&conn, &table)?;
+
+        // Build new table schema with the modified column type
+        let tmp_table = format!("{table}_rebuild");
+        let col_defs: Vec<String> = current_columns
+            .iter()
+            .map(|c| {
+                let safe_name = sanitize_identifier(&c.name);
+                if safe_name == target_col {
+                    format!("\"{}\" {}", safe_name, sqlite_type)
+                } else {
+                    format!("\"{}\" {}", safe_name, c.column_type.to_sqlite_type())
+                }
+            })
+            .collect();
+
+        // Build SELECT with CAST for the target column
+        let select_cols: Vec<String> = current_columns
+            .iter()
+            .map(|c| {
+                let safe_name = sanitize_identifier(&c.name);
+                if safe_name == target_col {
+                    format!("CAST(\"{safe_name}\" AS {sqlite_type}) AS \"{safe_name}\"")
+                } else {
+                    format!("\"{safe_name}\"")
+                }
+            })
+            .collect();
+
+        let rebuild_sql = format!(
+            "CREATE TABLE {tmp_table} ({});\n\
+             INSERT INTO {tmp_table} SELECT {} FROM {table};\n\
+             DROP TABLE {table};\n\
+             ALTER TABLE {tmp_table} RENAME TO {table};",
+            col_defs.join(", "),
+            select_cols.join(", "),
+        );
+
+        conn.execute_batch(&rebuild_sql)?;
 
         let columns = introspect_columns(&conn, &table)?;
         let columns_json = serde_json::to_string(&columns)?;
         conn.execute(
-            "UPDATE _datasets_meta SET columns_json = ?, modified_at = ? WHERE id = ?",
+            "UPDATE _datasets_meta SET columns_json = ?1, modified_at = ?2 WHERE id = ?3",
             params![columns_json, now, id.to_string()],
         )?;
 
@@ -381,7 +379,7 @@ impl DatasetStore {
         let columns = introspect_columns(&conn, &table)?;
         let columns_json = serde_json::to_string(&columns)?;
         conn.execute(
-            "UPDATE _datasets_meta SET columns_json = ?, modified_at = ? WHERE id = ?",
+            "UPDATE _datasets_meta SET columns_json = ?1, modified_at = ?2 WHERE id = ?3",
             params![columns_json, now, id.to_string()],
         )?;
 
@@ -390,7 +388,7 @@ impl DatasetStore {
 
     /// Execute a SQL mutation (INSERT/UPDATE/DELETE/CREATE/ALTER) with optional dry-run.
     ///
-    /// When `dry_run` is true, the mutation is executed inside a transaction that is
+    /// When `dry_run` is true, the mutation is executed inside a SAVEPOINT that is
     /// rolled back, returning a preview of affected rows without persisting changes.
     pub fn execute_mutation(
         &self,
@@ -401,24 +399,14 @@ impl DatasetStore {
         let conn = self.lock_conn();
 
         if dry_run {
-            // Clear any stale implicit transaction before starting ours.
-            // DuckDB errors with "cannot start a transaction within a transaction"
-            // if an implicit auto-commit transaction is still active.
-            if conn.execute_batch("BEGIN TRANSACTION").is_err() {
-                let _ = conn.execute_batch("ROLLBACK");
-                conn.execute_batch("BEGIN TRANSACTION")?;
-            }
+            conn.execute_batch("SAVEPOINT dry_run")?;
 
             let execute_result = conn.execute(sql, []);
             match execute_result {
                 Ok(affected) => {
                     let preview = self.query_mutation_preview(&conn, sql, &stmt_type);
-                    let _ = conn.execute_batch("ROLLBACK");
-                    // Reset connection state after rollback — DuckDB 1.4.4's Rust
-                    // driver leaves stale statement state after ROLLBACK, causing
-                    // panics on subsequent prepare/query_map calls. A trivial
-                    // execute_batch forces the driver to clear statement caches.
-                    let _ = conn.execute_batch("SELECT 1");
+                    conn.execute_batch("ROLLBACK TO SAVEPOINT dry_run")?;
+                    conn.execute_batch("RELEASE SAVEPOINT dry_run")?;
 
                     Ok(MutationResult {
                         affected_rows: affected as i64,
@@ -428,9 +416,9 @@ impl DatasetStore {
                     })
                 }
                 Err(e) => {
-                    let _ = conn.execute_batch("ROLLBACK");
-                    let _ = conn.execute_batch("SELECT 1");
-                    Err(DatasetError::DuckDb(e))
+                    conn.execute_batch("ROLLBACK TO SAVEPOINT dry_run")?;
+                    conn.execute_batch("RELEASE SAVEPOINT dry_run")?;
+                    Err(DatasetError::Sqlite(e))
                 }
             }
         } else {
@@ -444,24 +432,25 @@ impl DatasetStore {
         }
     }
 
-    /// Query a preview of mutation results (called inside dry-run transaction).
+    /// Query a preview of mutation results (called inside dry-run savepoint).
     fn query_mutation_preview(
         &self,
-        conn: &duckdb::Connection,
+        conn: &privstack_db::rusqlite::Connection,
         sql: &str,
         _stmt_type: &str,
     ) -> DatasetResult<DatasetQueryResult> {
         // Try to extract table name and query it for preview
         let table_name = extract_table_name(sql);
         if let Some(table) = table_name {
-            // Use DESCRIBE to get column info (avoids DuckDB 1.4.4 panic where
-            // column_count()/column_name() crash on un-executed prepared statements).
-            let desc_sql = format!("DESCRIBE SELECT * FROM {table}");
-            let mut desc_stmt = conn.prepare(&desc_sql)?;
-            let col_names: Vec<String> = desc_stmt
-                .query_map([], |row| row.get::<_, String>(0))?
-                .filter_map(|r| r.ok())
-                .collect();
+            // Get column names via PRAGMA
+            let col_names = {
+                let mut pragma_stmt = conn.prepare(&format!("PRAGMA table_info('{table}')"))?;
+                let names: Vec<String> = pragma_stmt
+                    .query_map([], |row| row.get::<_, String>(1))?
+                    .filter_map(|r| r.ok())
+                    .collect();
+                names
+            };
             let col_count = col_names.len();
 
             let preview_sql = format!("SELECT * FROM {table} LIMIT 50");
@@ -504,7 +493,7 @@ impl DatasetStore {
     /// Helper: update row count and column metadata after a mutation.
     fn update_row_count_and_meta(
         &self,
-        conn: &duckdb::Connection,
+        conn: &privstack_db::rusqlite::Connection,
         id: &DatasetId,
         table: &str,
         now: i64,
@@ -515,7 +504,7 @@ impl DatasetStore {
             })?;
 
         conn.execute(
-            "UPDATE _datasets_meta SET row_count = ?, modified_at = ? WHERE id = ?",
+            "UPDATE _datasets_meta SET row_count = ?1, modified_at = ?2 WHERE id = ?3",
             params![row_count, now, id.to_string()],
         )?;
 
@@ -576,5 +565,19 @@ fn json_value_to_sql_string(value: &serde_json::Value) -> String {
         serde_json::Value::Number(n) => n.to_string(),
         serde_json::Value::String(s) => s.clone(),
         other => other.to_string(),
+    }
+}
+
+/// Normalize DuckDB/generic SQL type names to SQLite-compatible types.
+fn normalize_sql_type(type_name: &str) -> String {
+    let upper = type_name.to_uppercase();
+    match upper.as_str() {
+        "VARCHAR" | "TEXT" | "CHAR" | "CLOB" | "STRING" => "TEXT".to_string(),
+        "BIGINT" | "SMALLINT" | "TINYINT" | "HUGEINT" | "INT" | "INTEGER" => "INTEGER".to_string(),
+        "DOUBLE" | "FLOAT" | "REAL" | "DECIMAL" | "NUMERIC" => "REAL".to_string(),
+        "BOOLEAN" | "BOOL" => "INTEGER".to_string(),
+        "DATE" | "TIMESTAMP" | "DATETIME" => "TEXT".to_string(),
+        "BLOB" => "BLOB".to_string(),
+        _ => upper,
     }
 }

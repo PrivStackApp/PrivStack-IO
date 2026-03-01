@@ -4,7 +4,7 @@ use super::helpers::now_millis;
 use super::DatasetStore;
 use crate::error::DatasetResult;
 use crate::types::{DatasetId, DatasetRelation, RelationType};
-use duckdb::params;
+use privstack_db::rusqlite::params;
 use uuid::Uuid;
 
 impl DatasetStore {
@@ -20,7 +20,7 @@ impl DatasetStore {
         let now = now_millis();
         let conn = self.lock_conn();
         conn.execute(
-            "INSERT INTO _dataset_relations (id, source_dataset_id, source_column, target_dataset_id, target_column, relation_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO _dataset_relations (id, source_dataset_id, source_column, target_dataset_id, target_column, relation_type, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![id, source_dataset_id.to_string(), source_column, target_dataset_id.to_string(), target_column, "many_to_one", now],
         )?;
         Ok(DatasetRelation {
@@ -38,7 +38,7 @@ impl DatasetStore {
     pub fn delete_relation(&self, relation_id: &str) -> DatasetResult<()> {
         let conn = self.lock_conn();
         conn.execute(
-            "DELETE FROM _dataset_relations WHERE id = ?",
+            "DELETE FROM _dataset_relations WHERE id = ?1",
             params![relation_id],
         )?;
         Ok(())
@@ -52,7 +52,7 @@ impl DatasetStore {
         let conn = self.lock_conn();
         let id_str = dataset_id.to_string();
         let mut stmt = conn.prepare(
-            "SELECT id, source_dataset_id, source_column, target_dataset_id, target_column, relation_type, created_at FROM _dataset_relations WHERE source_dataset_id = ? OR target_dataset_id = ?",
+            "SELECT id, source_dataset_id, source_column, target_dataset_id, target_column, relation_type, created_at FROM _dataset_relations WHERE source_dataset_id = ?1 OR target_dataset_id = ?2",
         )?;
         let rows = stmt
             .query_map(params![id_str, id_str], |row| {

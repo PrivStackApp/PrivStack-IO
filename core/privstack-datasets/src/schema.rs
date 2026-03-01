@@ -1,31 +1,31 @@
 //! DDL and schema helpers for the datasets database.
 
 use crate::error::DatasetResult;
-use duckdb::Connection;
+use privstack_db::rusqlite::Connection;
 
 /// Metadata table DDL — stores info about each imported dataset.
 const DATASETS_META_DDL: &str = r#"
 CREATE TABLE IF NOT EXISTS _datasets_meta (
-    id VARCHAR PRIMARY KEY,
-    name VARCHAR NOT NULL,
-    source_file_name VARCHAR,
-    row_count BIGINT NOT NULL DEFAULT 0,
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    source_file_name TEXT,
+    row_count INTEGER NOT NULL DEFAULT 0,
     columns_json TEXT NOT NULL DEFAULT '[]',
-    created_at BIGINT NOT NULL,
-    modified_at BIGINT NOT NULL
+    created_at INTEGER NOT NULL,
+    modified_at INTEGER NOT NULL
 );
 "#;
 
 /// Relations table DDL — foreign-key-like links between datasets.
 const DATASET_RELATIONS_DDL: &str = r#"
 CREATE TABLE IF NOT EXISTS _dataset_relations (
-    id VARCHAR PRIMARY KEY,
-    source_dataset_id VARCHAR NOT NULL,
-    source_column VARCHAR NOT NULL,
-    target_dataset_id VARCHAR NOT NULL,
-    target_column VARCHAR NOT NULL,
-    relation_type VARCHAR DEFAULT 'many_to_one',
-    created_at BIGINT NOT NULL,
+    id TEXT PRIMARY KEY,
+    source_dataset_id TEXT NOT NULL,
+    source_column TEXT NOT NULL,
+    target_dataset_id TEXT NOT NULL,
+    target_column TEXT NOT NULL,
+    relation_type TEXT DEFAULT 'many_to_one',
+    created_at INTEGER NOT NULL,
     FOREIGN KEY (source_dataset_id) REFERENCES _datasets_meta(id),
     FOREIGN KEY (target_dataset_id) REFERENCES _datasets_meta(id)
 );
@@ -34,11 +34,11 @@ CREATE TABLE IF NOT EXISTS _dataset_relations (
 /// Row-page linking table DDL — maps dataset rows to Notes pages.
 const DATASET_ROW_PAGES_DDL: &str = r#"
 CREATE TABLE IF NOT EXISTS _dataset_row_pages (
-    dataset_id VARCHAR NOT NULL,
-    row_index BIGINT NOT NULL,
-    row_key VARCHAR NOT NULL,
-    page_id VARCHAR NOT NULL,
-    created_at BIGINT NOT NULL,
+    dataset_id TEXT NOT NULL,
+    row_index INTEGER NOT NULL,
+    row_key TEXT NOT NULL,
+    page_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
     PRIMARY KEY (dataset_id, row_key)
 );
 "#;
@@ -46,14 +46,14 @@ CREATE TABLE IF NOT EXISTS _dataset_row_pages (
 /// Saved views table DDL — named view configs per dataset.
 const DATASET_VIEWS_DDL: &str = r#"
 CREATE TABLE IF NOT EXISTS _dataset_views (
-    id VARCHAR PRIMARY KEY,
-    dataset_id VARCHAR NOT NULL,
-    name VARCHAR NOT NULL,
+    id TEXT PRIMARY KEY,
+    dataset_id TEXT NOT NULL,
+    name TEXT NOT NULL,
     config_json TEXT NOT NULL,
-    is_default BOOLEAN DEFAULT FALSE,
+    is_default INTEGER DEFAULT 0,
     sort_order INTEGER DEFAULT 0,
-    created_at BIGINT NOT NULL,
-    modified_at BIGINT NOT NULL,
+    created_at INTEGER NOT NULL,
+    modified_at INTEGER NOT NULL,
     FOREIGN KEY (dataset_id) REFERENCES _datasets_meta(id)
 );
 "#;
@@ -61,22 +61,14 @@ CREATE TABLE IF NOT EXISTS _dataset_views (
 /// Saved queries table DDL — user-authored SQL queries.
 const DATASET_SAVED_QUERIES_DDL: &str = r#"
 CREATE TABLE IF NOT EXISTS _dataset_saved_queries (
-    id VARCHAR PRIMARY KEY,
-    name VARCHAR NOT NULL,
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
     sql TEXT NOT NULL,
-    description VARCHAR,
-    created_at BIGINT NOT NULL,
-    modified_at BIGINT NOT NULL
+    description TEXT,
+    created_at INTEGER NOT NULL,
+    modified_at INTEGER NOT NULL
 );
 "#;
-
-/// Migration: add is_view flag to saved queries.
-const SAVED_QUERIES_ADD_IS_VIEW: &str =
-    "ALTER TABLE _dataset_saved_queries ADD COLUMN IF NOT EXISTS is_view BOOLEAN DEFAULT FALSE;";
-
-/// Migration: add category column to datasets metadata for AI-generated dataset isolation.
-const DATASETS_META_ADD_CATEGORY: &str =
-    "ALTER TABLE _datasets_meta ADD COLUMN IF NOT EXISTS category VARCHAR;";
 
 /// Initialize all dataset schema tables.
 pub fn initialize_datasets_schema(conn: &Connection) -> DatasetResult<()> {
@@ -85,9 +77,15 @@ pub fn initialize_datasets_schema(conn: &Connection) -> DatasetResult<()> {
     conn.execute_batch(DATASET_ROW_PAGES_DDL)?;
     conn.execute_batch(DATASET_VIEWS_DDL)?;
     conn.execute_batch(DATASET_SAVED_QUERIES_DDL)?;
-    // Migrations
-    conn.execute_batch(SAVED_QUERIES_ADD_IS_VIEW)?;
-    conn.execute_batch(DATASETS_META_ADD_CATEGORY)?;
+
+    // Migrations — use privstack_db helpers for safe ADD COLUMN
+    privstack_db::add_column_if_not_exists(
+        conn,
+        "_dataset_saved_queries",
+        "is_view",
+        "INTEGER DEFAULT 0",
+    )?;
+    privstack_db::add_column_if_not_exists(conn, "_datasets_meta", "category", "TEXT")?;
     Ok(())
 }
 

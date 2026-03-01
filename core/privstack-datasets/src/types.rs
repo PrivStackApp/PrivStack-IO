@@ -24,7 +24,7 @@ impl std::fmt::Display for DatasetId {
     }
 }
 
-/// Column type as detected by DuckDB's `read_csv_auto`.
+/// Column type as detected during CSV import or via `PRAGMA table_info()`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DatasetColumnType {
@@ -39,27 +39,40 @@ pub enum DatasetColumnType {
 }
 
 impl DatasetColumnType {
-    /// Map DuckDB type name to our enum.
-    pub fn from_duckdb(type_name: &str) -> Self {
+    /// Map a SQLite type name (from `PRAGMA table_info()` or column declarations) to our enum.
+    pub fn from_sqlite(type_name: &str) -> Self {
         let upper = type_name.to_uppercase();
         match upper.as_str() {
-            s if s.contains("VARCHAR") || s.contains("TEXT") || s.contains("CHAR") => Self::Text,
-            s if s.contains("BIGINT") || s.contains("INTEGER") || s.contains("SMALLINT")
-                || s.contains("TINYINT") || s.contains("HUGEINT") || s.contains("UBIGINT")
-                || s.contains("UINTEGER") || s.contains("USMALLINT") || s.contains("UTINYINT") =>
+            s if s.contains("TEXT") || s.contains("VARCHAR") || s.contains("CHAR")
+                || s.contains("CLOB") =>
             {
-                Self::Integer
+                Self::Text
             }
-            s if s.contains("DOUBLE") || s.contains("FLOAT") || s.contains("REAL")
+            s if s.contains("INT") => Self::Integer,
+            s if s.contains("REAL") || s.contains("DOUBLE") || s.contains("FLOAT")
                 || s.contains("DECIMAL") || s.contains("NUMERIC") =>
             {
                 Self::Float
             }
-            s if s.contains("BOOLEAN") => Self::Boolean,
+            s if s.contains("BOOLEAN") || s == "BOOL" => Self::Boolean,
             s if s.contains("TIMESTAMP") || s.contains("DATETIME") => Self::Timestamp,
             s if s.contains("DATE") => Self::Date,
             s if s.contains("BLOB") => Self::Blob,
             _ => Self::Unknown,
+        }
+    }
+
+    /// Return the SQLite type name for this column type.
+    pub fn to_sqlite_type(&self) -> &str {
+        match self {
+            Self::Text => "TEXT",
+            Self::Integer => "INTEGER",
+            Self::Float => "REAL",
+            Self::Boolean => "INTEGER",
+            Self::Date => "TEXT",
+            Self::Timestamp => "TEXT",
+            Self::Blob => "BLOB",
+            Self::Unknown => "TEXT",
         }
     }
 }
@@ -96,7 +109,7 @@ pub struct DatasetQueryResult {
     pub page_size: i64,
 }
 
-// ── Phase 5: Relations ──────────────────────────────────────────────────
+// -- Phase 5: Relations --
 
 /// Relation type between datasets.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -134,7 +147,7 @@ pub struct DatasetRelation {
     pub created_at: i64,
 }
 
-// ── Phase 6: Row-Page Linking ───────────────────────────────────────────
+// -- Phase 6: Row-Page Linking --
 
 /// Link between a dataset row and a Notes page.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,7 +159,7 @@ pub struct RowPageLink {
     pub created_at: i64,
 }
 
-// ── Phase 8: Dataset Views ──────────────────────────────────────────────
+// -- Phase 8: Dataset Views --
 
 /// A saved view configuration for a dataset.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -206,7 +219,7 @@ pub struct ViewSort {
     pub direction: SortDirection,
 }
 
-// ── Phase 10: Saved Queries ─────────────────────────────────────────────
+// -- Phase 10: Saved Queries --
 
 /// A user-authored SQL query saved for reuse.
 /// When `is_view` is true, it appears as an immutable dataset in the sidebar.
@@ -222,7 +235,7 @@ pub struct SavedQuery {
     pub modified_at: i64,
 }
 
-// ── Mutations & SQL v2 ──────────────────────────────────────────────────
+// -- Mutations & SQL v2 --
 
 /// Column definition for creating empty datasets.
 #[derive(Debug, Clone, Serialize, Deserialize)]

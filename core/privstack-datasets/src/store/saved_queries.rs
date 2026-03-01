@@ -4,7 +4,7 @@ use super::helpers::now_millis;
 use super::DatasetStore;
 use crate::error::DatasetResult;
 use crate::types::SavedQuery;
-use duckdb::params;
+use privstack_db::rusqlite::params;
 use uuid::Uuid;
 
 impl DatasetStore {
@@ -20,8 +20,8 @@ impl DatasetStore {
         let now = now_millis();
         let conn = self.lock_conn();
         conn.execute(
-            "INSERT INTO _dataset_saved_queries (id, name, sql, description, is_view, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            params![id, name, sql, description, is_view, now, now],
+            "INSERT INTO _dataset_saved_queries (id, name, sql, description, is_view, created_at, modified_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![id, name, sql, description, is_view as i32, now, now],
         )?;
         Ok(SavedQuery {
             id,
@@ -46,8 +46,8 @@ impl DatasetStore {
         let now = now_millis();
         let conn = self.lock_conn();
         conn.execute(
-            "UPDATE _dataset_saved_queries SET name = ?, sql = ?, description = ?, is_view = ?, modified_at = ? WHERE id = ?",
-            params![name, sql, description, is_view, now, query_id],
+            "UPDATE _dataset_saved_queries SET name = ?1, sql = ?2, description = ?3, is_view = ?4, modified_at = ?5 WHERE id = ?6",
+            params![name, sql, description, is_view as i32, now, query_id],
         )?;
         Ok(())
     }
@@ -56,7 +56,7 @@ impl DatasetStore {
     pub fn delete_saved_query(&self, query_id: &str) -> DatasetResult<()> {
         let conn = self.lock_conn();
         conn.execute(
-            "DELETE FROM _dataset_saved_queries WHERE id = ?",
+            "DELETE FROM _dataset_saved_queries WHERE id = ?1",
             params![query_id],
         )?;
         Ok(())
@@ -66,7 +66,7 @@ impl DatasetStore {
     pub fn list_saved_queries(&self) -> DatasetResult<Vec<SavedQuery>> {
         let conn = self.lock_conn();
         let mut stmt = conn.prepare(
-            "SELECT id, name, sql, description, COALESCE(is_view, FALSE), created_at, modified_at FROM _dataset_saved_queries ORDER BY name",
+            "SELECT id, name, sql, description, COALESCE(is_view, 0), created_at, modified_at FROM _dataset_saved_queries ORDER BY name",
         )?;
         let rows = stmt
             .query_map([], |row| {
@@ -75,7 +75,7 @@ impl DatasetStore {
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
                     row.get::<_, Option<String>>(3)?,
-                    row.get::<_, bool>(4)?,
+                    row.get::<_, i32>(4)?,
                     row.get::<_, i64>(5)?,
                     row.get::<_, i64>(6)?,
                 ))
@@ -86,7 +86,7 @@ impl DatasetStore {
                 name,
                 sql,
                 description: desc,
-                is_view,
+                is_view: is_view != 0,
                 created_at: created,
                 modified_at: modified,
             })

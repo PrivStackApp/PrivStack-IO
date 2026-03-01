@@ -1,4 +1,4 @@
-//! Core dataset store — thread-safe DuckDB wrapper with modular operations.
+//! Core dataset store — thread-safe SQLite wrapper with modular operations.
 
 mod crud;
 pub(crate) mod helpers;
@@ -10,13 +10,13 @@ mod row_pages;
 mod saved_queries;
 mod views;
 
-use crate::error::{DatasetError, DatasetResult};
+use crate::error::DatasetResult;
 use crate::schema::initialize_datasets_schema;
-use duckdb::Connection;
+use privstack_db::rusqlite::Connection;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-/// Thread-safe store for tabular datasets backed by DuckDB.
+/// Thread-safe store for tabular datasets backed by SQLite.
 #[derive(Clone)]
 pub struct DatasetStore {
     conn: Arc<Mutex<Connection>>,
@@ -25,7 +25,7 @@ pub struct DatasetStore {
 impl DatasetStore {
     /// Open (or create) the datasets database at the given path.
     pub fn open(path: &Path) -> DatasetResult<Self> {
-        let conn = crate::open_datasets_db(path)?;
+        let conn = privstack_db::open_db_unencrypted(path)?;
         initialize_datasets_schema(&conn)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
@@ -34,7 +34,15 @@ impl DatasetStore {
 
     /// Open an in-memory datasets database (for testing).
     pub fn open_in_memory() -> DatasetResult<Self> {
-        let conn = Connection::open_in_memory().map_err(DatasetError::DuckDb)?;
+        let conn = privstack_db::open_in_memory()?;
+        initialize_datasets_schema(&conn)?;
+        Ok(Self {
+            conn: Arc::new(Mutex::new(conn)),
+        })
+    }
+
+    /// Open from an existing connection (for integration with external connection management).
+    pub fn open_with_conn(conn: Connection) -> DatasetResult<Self> {
         initialize_datasets_schema(&conn)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
@@ -42,7 +50,7 @@ impl DatasetStore {
     }
 
     /// Acquire the connection lock, recovering from poison if a prior
-    /// `catch_unwind` caught a DuckDB panic while the lock was held.
+    /// `catch_unwind` caught a panic while the lock was held.
     pub(crate) fn lock_conn(&self) -> MutexGuard<'_, Connection> {
         self.conn.lock().unwrap_or_else(|poisoned| {
             eprintln!("[DatasetStore] recovering from poisoned mutex");
@@ -53,7 +61,7 @@ impl DatasetStore {
     /// Flushes the WAL to the main database file.
     pub fn checkpoint(&self) -> DatasetResult<()> {
         let conn = self.lock_conn();
-        conn.execute_batch("CHECKPOINT")?;
+        privstack_db::checkpoint(&conn)?;
         Ok(())
     }
 

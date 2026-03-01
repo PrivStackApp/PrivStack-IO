@@ -5,7 +5,7 @@ use pretty_assertions::assert_eq;
 use privstack_datasets::*;
 use serde_json::json;
 
-// ── Helpers ─────────────────────────────────────────────────────────────
+// -- Helpers --
 
 fn store() -> DatasetStore {
     DatasetStore::open_in_memory().expect("in-memory store must open")
@@ -16,9 +16,9 @@ fn create_test_dataset(store: &DatasetStore) -> DatasetMeta {
         .create_empty(
             "test_ds",
             &[
-                ColumnDef { name: "name".into(), column_type: "VARCHAR".into() },
+                ColumnDef { name: "name".into(), column_type: "TEXT".into() },
                 ColumnDef { name: "age".into(), column_type: "INTEGER".into() },
-                ColumnDef { name: "score".into(), column_type: "DOUBLE".into() },
+                ColumnDef { name: "score".into(), column_type: "REAL".into() },
             ],
             None,
         )
@@ -34,7 +34,7 @@ fn create_and_populate(store: &DatasetStore) -> DatasetMeta {
     store.get(&meta.id).unwrap()
 }
 
-// ── DatasetStore basics ─────────────────────────────────────────────────
+// -- DatasetStore basics --
 
 #[test]
 fn open_in_memory_succeeds() {
@@ -53,7 +53,7 @@ fn maintenance_succeeds() {
     s.maintenance().unwrap();
 }
 
-// ── CRUD: create_empty ──────────────────────────────────────────────────
+// -- CRUD: create_empty --
 
 #[test]
 fn create_empty_dataset() {
@@ -88,7 +88,7 @@ fn create_empty_no_columns_errors() {
     assert!(msg.contains("At least one column"), "Expected column error, got: {msg}");
 }
 
-// ── CRUD: list & get ────────────────────────────────────────────────────
+// -- CRUD: list & get --
 
 #[test]
 fn list_empty_returns_empty() {
@@ -101,7 +101,7 @@ fn list_empty_returns_empty() {
 fn list_returns_created_datasets() {
     let s = store();
     create_test_dataset(&s);
-    s.create_empty("second", &[ColumnDef { name: "a".into(), column_type: "VARCHAR".into() }], None).unwrap();
+    s.create_empty("second", &[ColumnDef { name: "a".into(), column_type: "TEXT".into() }], None).unwrap();
     let list = s.list().unwrap();
     assert_eq!(list.len(), 2);
 }
@@ -123,7 +123,7 @@ fn get_nonexistent_returns_not_found() {
     assert!(err.is_err());
 }
 
-// ── CRUD: delete ────────────────────────────────────────────────────────
+// -- CRUD: delete --
 
 #[test]
 fn delete_existing_dataset() {
@@ -158,7 +158,7 @@ fn delete_cascades_relations_and_views() {
     assert!(s.get_page_for_row(&ds1.id, "row-1").unwrap().is_none());
 }
 
-// ── CRUD: rename & set_category ─────────────────────────────────────────
+// -- CRUD: rename & set_category --
 
 #[test]
 fn rename_dataset() {
@@ -196,7 +196,7 @@ fn set_category_nonexistent_returns_not_found() {
     assert!(err.is_err());
 }
 
-// ── Mutations: insert_row ───────────────────────────────────────────────
+// -- Mutations: insert_row --
 
 #[test]
 fn insert_row_increments_count() {
@@ -214,7 +214,7 @@ fn insert_multiple_rows() {
     assert_eq!(meta.row_count, 3);
 }
 
-// ── Mutations: update_cell ──────────────────────────────────────────────
+// -- Mutations: update_cell --
 
 #[test]
 fn update_cell_value() {
@@ -226,7 +226,7 @@ fn update_cell_value() {
     assert_eq!(first_row_name, &json!("Alicia"));
 }
 
-// ── Mutations: delete_rows ──────────────────────────────────────────────
+// -- Mutations: delete_rows --
 
 #[test]
 fn delete_rows_removes_rows() {
@@ -246,13 +246,13 @@ fn delete_rows_empty_indices_is_noop() {
     assert_eq!(fetched.row_count, 3);
 }
 
-// ── Mutations: add_column, drop_column, rename_column, alter_column_type
+// -- Mutations: add_column, drop_column, rename_column, alter_column_type
 
 #[test]
 fn add_column_updates_metadata() {
     let s = store();
     let meta = create_test_dataset(&s);
-    s.add_column(&meta.id, "email", "VARCHAR", None).unwrap();
+    s.add_column(&meta.id, "email", "TEXT", None).unwrap();
     let fetched = s.get(&meta.id).unwrap();
     assert_eq!(fetched.columns.len(), 4);
     assert!(fetched.columns.iter().any(|c| c.name == "email"));
@@ -262,7 +262,7 @@ fn add_column_updates_metadata() {
 fn add_column_with_default() {
     let s = store();
     let meta = create_and_populate(&s);
-    s.add_column(&meta.id, "active", "BOOLEAN", Some("true")).unwrap();
+    s.add_column(&meta.id, "active", "INTEGER", Some("1")).unwrap();
     let result = s.query_dataset(&meta.id, 0, 10, None, None, false).unwrap();
     assert!(result.columns.contains(&"active".to_string()));
 }
@@ -308,7 +308,7 @@ fn alter_column_type_invalid_rejected() {
     assert!(msg.contains("Unsupported column type"));
 }
 
-// ── Mutations: duplicate ────────────────────────────────────────────────
+// -- Mutations: duplicate --
 
 #[test]
 fn duplicate_copies_data_and_schema() {
@@ -330,7 +330,7 @@ fn duplicate_preserves_category() {
     assert_eq!(dup.category.as_deref(), Some("reports"));
 }
 
-// ── Mutations: import_csv_content ───────────────────────────────────────
+// -- Mutations: import_csv_content --
 
 #[test]
 fn import_csv_content_creates_dataset() {
@@ -350,7 +350,7 @@ fn import_csv_content_with_category() {
     assert_eq!(meta.category.as_deref(), Some("ai_generated"));
 }
 
-// ── Mutations: execute_mutation ─────────────────────────────────────────
+// -- Mutations: execute_mutation --
 
 #[test]
 fn execute_mutation_committed() {
@@ -378,7 +378,7 @@ fn execute_mutation_dry_run_does_not_persist() {
     assert_eq!(qr.total_count, 3);
 }
 
-// ── Queries: query_dataset ──────────────────────────────────────────────
+// -- Queries: query_dataset --
 
 #[test]
 fn query_dataset_basic() {
@@ -430,7 +430,7 @@ fn query_dataset_filter_text() {
     assert_eq!(result.rows[0][0], json!("Alice"));
 }
 
-// ── Queries: get_columns ────────────────────────────────────────────────
+// -- Queries: get_columns --
 
 #[test]
 fn get_columns_returns_schema() {
@@ -441,7 +441,7 @@ fn get_columns_returns_schema() {
     assert_eq!(cols[0].name, "name");
 }
 
-// ── Queries: execute_raw_query ──────────────────────────────────────────
+// -- Queries: execute_raw_query --
 
 #[test]
 fn execute_raw_query_select() {
@@ -470,7 +470,7 @@ fn execute_raw_query_with_semicolons() {
     assert_eq!(result.total_count, 3);
 }
 
-// ── Queries: aggregate_query ────────────────────────────────────────────
+// -- Queries: aggregate_query --
 
 #[test]
 fn aggregate_query_no_aggregation() {
@@ -488,7 +488,7 @@ fn aggregate_query_with_sum() {
     assert_eq!(result.len(), 3); // 3 unique names, each with their sum
 }
 
-// ── Queries: aggregate_query_grouped ────────────────────────────────────
+// -- Queries: aggregate_query_grouped --
 
 #[test]
 fn aggregate_query_grouped_basic() {
@@ -498,7 +498,7 @@ fn aggregate_query_grouped_basic() {
     assert_eq!(result.len(), 3); // Each name+age combo is unique
 }
 
-// ── Queries: execute_sql_v2 ─────────────────────────────────────────────
+// -- Queries: execute_sql_v2 --
 
 #[test]
 fn execute_sql_v2_select() {
@@ -572,13 +572,13 @@ fn execute_sql_v2_source_alias_not_found() {
     assert!(msg.contains("not found"));
 }
 
-// ── Relations ───────────────────────────────────────────────────────────
+// -- Relations --
 
 #[test]
 fn create_and_list_relation() {
     let s = store();
     let ds1 = create_test_dataset(&s);
-    let ds2 = s.create_empty("ds2", &[ColumnDef { name: "name_ref".into(), column_type: "VARCHAR".into() }], None).unwrap();
+    let ds2 = s.create_empty("ds2", &[ColumnDef { name: "name_ref".into(), column_type: "TEXT".into() }], None).unwrap();
 
     let rel = s.create_relation(&ds1.id, "name", &ds2.id, "name_ref").unwrap();
     assert_eq!(rel.source_column, "name");
@@ -604,7 +604,7 @@ fn delete_relation() {
     assert!(rels.is_empty());
 }
 
-// ── Row-Page Linking ────────────────────────────────────────────────────
+// -- Row-Page Linking --
 
 #[test]
 fn link_row_to_page_and_retrieve() {
@@ -645,7 +645,7 @@ fn unlink_row_page() {
     assert!(page.is_none());
 }
 
-// ── Saved Queries ───────────────────────────────────────────────────────
+// -- Saved Queries --
 
 #[test]
 fn create_and_list_saved_queries() {
@@ -690,7 +690,7 @@ fn delete_saved_query() {
     assert!(list.is_empty());
 }
 
-// ── Views ───────────────────────────────────────────────────────────────
+// -- Views --
 
 #[test]
 fn create_and_list_views() {
@@ -758,7 +758,7 @@ fn list_views_empty_for_no_views() {
     assert!(views.is_empty());
 }
 
-// ── Types ───────────────────────────────────────────────────────────────
+// -- Types --
 
 #[test]
 fn dataset_id_table_name_format() {
@@ -776,23 +776,24 @@ fn dataset_id_display() {
 }
 
 #[test]
-fn dataset_column_type_from_duckdb() {
-    assert_eq!(DatasetColumnType::from_duckdb("VARCHAR"), DatasetColumnType::Text);
-    assert_eq!(DatasetColumnType::from_duckdb("TEXT"), DatasetColumnType::Text);
-    assert_eq!(DatasetColumnType::from_duckdb("INTEGER"), DatasetColumnType::Integer);
-    assert_eq!(DatasetColumnType::from_duckdb("BIGINT"), DatasetColumnType::Integer);
-    assert_eq!(DatasetColumnType::from_duckdb("SMALLINT"), DatasetColumnType::Integer);
-    assert_eq!(DatasetColumnType::from_duckdb("TINYINT"), DatasetColumnType::Integer);
-    assert_eq!(DatasetColumnType::from_duckdb("HUGEINT"), DatasetColumnType::Integer);
-    assert_eq!(DatasetColumnType::from_duckdb("DOUBLE"), DatasetColumnType::Float);
-    assert_eq!(DatasetColumnType::from_duckdb("FLOAT"), DatasetColumnType::Float);
-    assert_eq!(DatasetColumnType::from_duckdb("DECIMAL(10,2)"), DatasetColumnType::Float);
-    assert_eq!(DatasetColumnType::from_duckdb("BOOLEAN"), DatasetColumnType::Boolean);
-    assert_eq!(DatasetColumnType::from_duckdb("DATE"), DatasetColumnType::Date);
-    assert_eq!(DatasetColumnType::from_duckdb("TIMESTAMP"), DatasetColumnType::Timestamp);
-    assert_eq!(DatasetColumnType::from_duckdb("DATETIME"), DatasetColumnType::Timestamp);
-    assert_eq!(DatasetColumnType::from_duckdb("BLOB"), DatasetColumnType::Blob);
-    assert_eq!(DatasetColumnType::from_duckdb("GEOMETRY"), DatasetColumnType::Unknown);
+fn dataset_column_type_from_sqlite() {
+    assert_eq!(DatasetColumnType::from_sqlite("TEXT"), DatasetColumnType::Text);
+    assert_eq!(DatasetColumnType::from_sqlite("VARCHAR"), DatasetColumnType::Text);
+    assert_eq!(DatasetColumnType::from_sqlite("INTEGER"), DatasetColumnType::Integer);
+    assert_eq!(DatasetColumnType::from_sqlite("BIGINT"), DatasetColumnType::Integer);
+    assert_eq!(DatasetColumnType::from_sqlite("SMALLINT"), DatasetColumnType::Integer);
+    assert_eq!(DatasetColumnType::from_sqlite("TINYINT"), DatasetColumnType::Integer);
+    assert_eq!(DatasetColumnType::from_sqlite("INT"), DatasetColumnType::Integer);
+    assert_eq!(DatasetColumnType::from_sqlite("REAL"), DatasetColumnType::Float);
+    assert_eq!(DatasetColumnType::from_sqlite("DOUBLE"), DatasetColumnType::Float);
+    assert_eq!(DatasetColumnType::from_sqlite("FLOAT"), DatasetColumnType::Float);
+    assert_eq!(DatasetColumnType::from_sqlite("DECIMAL(10,2)"), DatasetColumnType::Float);
+    assert_eq!(DatasetColumnType::from_sqlite("BOOLEAN"), DatasetColumnType::Boolean);
+    assert_eq!(DatasetColumnType::from_sqlite("DATE"), DatasetColumnType::Date);
+    assert_eq!(DatasetColumnType::from_sqlite("TIMESTAMP"), DatasetColumnType::Timestamp);
+    assert_eq!(DatasetColumnType::from_sqlite("DATETIME"), DatasetColumnType::Timestamp);
+    assert_eq!(DatasetColumnType::from_sqlite("BLOB"), DatasetColumnType::Blob);
+    assert_eq!(DatasetColumnType::from_sqlite("GEOMETRY"), DatasetColumnType::Unknown);
 }
 
 #[test]
