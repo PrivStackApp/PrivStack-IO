@@ -1115,7 +1115,7 @@ public partial class SetupWizardViewModel : ViewModelBase
 
             // 5. Initialize runtime directly at workspace DB path — derived from
             //    the workspace we just created, not from GetActiveDataPath()
-            var dbPath = Path.Combine(resolvedDir, "data.duckdb");
+            var dbPath = Path.Combine(resolvedDir, "data");
             var dbDir = Path.GetDirectoryName(dbPath)!;
             Directory.CreateDirectory(dbDir);
 

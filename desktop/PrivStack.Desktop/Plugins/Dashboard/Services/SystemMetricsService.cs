@@ -351,18 +351,17 @@ internal sealed class SystemMetricsService
             var dir = Path.GetDirectoryName(dbPath);
             if (dir == null || !Directory.Exists(dir)) return (0, 0, 0);
 
-            var entityPath = Path.Combine(dir, "data.entities.duckdb");
-            var datasetPath = Path.Combine(dir, "data.datasets.duckdb");
-            var blobPath = Path.Combine(dir, "data.blobs.duckdb");
+            var mainPath = Path.Combine(dir, "data.privstack.db");
+            var datasetPath = Path.Combine(dir, "data.datasets.db");
 
             return (
-                GetFileAndWalSize(entityPath),
+                GetFileAndWalSize(mainPath),
                 GetFileAndWalSize(datasetPath),
-                GetFileAndWalSize(blobPath));
+                0);  // Blobs now in main DB
         }
         catch (Exception ex)
         {
-            _log.Warning(ex, "Failed to measure DuckDB file sizes");
+            _log.Warning(ex, "Failed to measure database file sizes");
             return (0, 0, 0);
         }
     }
@@ -372,7 +371,8 @@ internal sealed class SystemMetricsService
         long size = 0;
         if (File.Exists(path))
             size += new FileInfo(path).Length;
-        var walPath = path + ".wal";
+        // SQLite WAL files use "-wal" suffix (e.g., "data.privstack.db-wal")
+        var walPath = path + "-wal";
         if (File.Exists(walPath))
             size += new FileInfo(walPath).Length;
         return size;

@@ -580,25 +580,34 @@ pub fn init_core(path: &str) -> PrivStackError {
     let is_encrypted = path != ":memory:" && salt_path.exists();
 
     // Open the initial connection:
-    //   :memory: path   → in-memory (testing)
-    //   encrypted       → in-memory placeholder (real DB opened on auth)
-    //   unencrypted     → open on-disk unencrypted (legacy / first run)
+    //   :memory: path      → in-memory (testing)
+    //   encrypted (salt)   → in-memory placeholder (real DB opened on auth_unlock)
+    //   fresh install      → in-memory placeholder (real DB created on auth_initialize)
+    //   legacy unencrypted → open on-disk unencrypted (existing DB without salt file)
     let main_db_path = if path == ":memory:" {
         Path::new(":memory:").to_path_buf()
     } else {
         Path::new(path).with_extension("privstack.db")
     };
 
-    let open_result = if path == ":memory:" || is_encrypted {
+    let legacy_unencrypted = !is_encrypted
+        && path != ":memory:"
+        && main_db_path.exists();
+
+    let open_result = if legacy_unencrypted {
+        ffi_debug!("[FFI] Opening legacy unencrypted database: {}", main_db_path.display());
+        privstack_db::open_db_unencrypted(&main_db_path)
+    } else {
         if is_encrypted {
             ffi_info!(
                 "[FFI] Salt file found — opening in-memory placeholder until auth_unlock"
             );
+        } else if path != ":memory:" {
+            ffi_info!(
+                "[FFI] Fresh install — opening in-memory placeholder until auth_initialize"
+            );
         }
         privstack_db::open_in_memory()
-    } else {
-        ffi_debug!("[FFI] Opening main database (unencrypted): {}", main_db_path.display());
-        privstack_db::open_db_unencrypted(&main_db_path)
     };
 
     let main_conn = match open_result {
@@ -762,16 +771,24 @@ where
         Path::new(path).with_extension("privstack.db")
     };
 
-    let open_result = if path == ":memory:" || is_encrypted {
+    let legacy_unencrypted = !is_encrypted
+        && path != ":memory:"
+        && main_db_path.exists();
+
+    let open_result = if legacy_unencrypted {
+        ffi_debug!("[FFI] Opening legacy unencrypted database: {}", main_db_path.display());
+        privstack_db::open_db_unencrypted(&main_db_path)
+    } else {
         if is_encrypted {
             ffi_info!(
                 "[FFI] Salt file found — opening in-memory placeholder until auth_unlock"
             );
+        } else if path != ":memory:" {
+            ffi_info!(
+                "[FFI] Fresh install — opening in-memory placeholder until auth_initialize"
+            );
         }
         privstack_db::open_in_memory()
-    } else {
-        ffi_debug!("[FFI] Opening main database (unencrypted): {}", main_db_path.display());
-        privstack_db::open_db_unencrypted(&main_db_path)
     };
 
     let main_conn = match open_result {
@@ -1066,47 +1083,56 @@ pub unsafe extern "C" fn privstack_auth_initialize(
         None => return PrivStackError::NotInitialized,
     };
 
-    // For on-disk databases: generate salt, create encrypted DB, swap connection
+    // For on-disk databases: generate salt, create encrypted DB, swap connection.
+    // Skip if a legacy unencrypted DB is already open (no salt file, but DB exists).
     if handle.db_path != ":memory:" {
         if handle.has_salt_file() {
             ffi_warn!("[FFI] auth_initialize called but salt file already exists");
             return PrivStackError::VaultAlreadyInitialized;
         }
 
-        // 1. Generate salt
-        let salt = privstack_crypto::Salt::random();
-
-        // 2. Derive SQLCipher key
-        let db_key = match derive_db_key(password, &salt) {
-            Ok(k) => k,
-            Err(e) => return e,
-        };
-
-        // 3. Create encrypted database
         let db_path = handle.main_db_path();
-        ffi_info!("[FFI] Creating encrypted database: {}", db_path.display());
+        let is_legacy = db_path.exists();
 
-        let new_conn = match privstack_db::open_db(&db_path, &db_key) {
-            Ok(c) => c,
-            Err(e) => {
-                ffi_error!("[FFI] Failed to create encrypted database: {e:?}");
+        if is_legacy {
+            // Legacy unencrypted DB already open from init_core — just initialize vault.
+            ffi_info!("[FFI] Legacy unencrypted database detected, skipping encryption setup");
+        } else {
+            // Fresh install: create encrypted database with SQLCipher.
+            // 1. Generate salt
+            let salt = privstack_crypto::Salt::random();
+
+            // 2. Derive SQLCipher key
+            let db_key = match derive_db_key(password, &salt) {
+                Ok(k) => k,
+                Err(e) => return e,
+            };
+
+            // 3. Create encrypted database
+            ffi_info!("[FFI] Creating encrypted database: {}", db_path.display());
+
+            let new_conn = match privstack_db::open_db(&db_path, &db_key) {
+                Ok(c) => c,
+                Err(e) => {
+                    ffi_error!("[FFI] Failed to create encrypted database: {e:?}");
+                    return PrivStackError::StorageError;
+                }
+            };
+
+            // 4. Swap connection — all stores now point at the encrypted DB
+            if let Err(e) = handle.swap_connection(new_conn) {
+                ffi_error!("[FFI] Failed to swap connection: {e:?}");
+                return e;
+            }
+
+            // 5. Write salt file AFTER successful DB creation (crash-safe ordering)
+            if let Err(e) = std::fs::write(handle.salt_path(), salt.as_bytes()) {
+                ffi_error!("[FFI] Failed to write salt file: {e:?}");
                 return PrivStackError::StorageError;
             }
-        };
 
-        // 4. Swap connection — all stores now point at the encrypted DB
-        if let Err(e) = handle.swap_connection(new_conn) {
-            ffi_error!("[FFI] Failed to swap connection: {e:?}");
-            return e;
+            ffi_info!("[FFI] Encrypted database created and salt file written");
         }
-
-        // 5. Write salt file AFTER successful DB creation (crash-safe ordering)
-        if let Err(e) = std::fs::write(handle.salt_path(), salt.as_bytes()) {
-            ffi_error!("[FFI] Failed to write salt file: {e:?}");
-            return PrivStackError::StorageError;
-        }
-
-        ffi_info!("[FFI] Encrypted database created and salt file written");
     }
 
     // Initialize the vault on the (now real) database

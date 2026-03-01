@@ -94,10 +94,9 @@ public sealed class PrivStackService : IPrivStackNative
     {
         try
         {
-            // The Rust side uses Path::with_extension, so "data.duckdb" becomes "data.vault.duckdb" etc.
-            var basePath = dbPath.EndsWith(".duckdb", StringComparison.OrdinalIgnoreCase)
-                ? dbPath[..^".duckdb".Length]
-                : dbPath;
+            // The Rust side uses Path::with_extension on the base path (e.g., "data")
+            // to derive "data.privstack.db", "data.datasets.db", "data.privstack.salt"
+            var basePath = dbPath;
             var dbDir = Path.GetDirectoryName(dbPath) ?? ".";
 
             _log.Information("[StorageDiag] === Pre-flight check ===");
@@ -105,8 +104,8 @@ public sealed class PrivStackService : IPrivStackNative
             _log.Information("[StorageDiag] Directory: {Dir} (exists={Exists})",
                 dbDir, Directory.Exists(dbDir));
 
-            // Check each database file
-            string[] suffixes = ["vault.duckdb", "blobs.duckdb", "entities.duckdb", "events.duckdb"];
+            // Check main database and datasets files
+            string[] suffixes = ["privstack.db", "datasets.db", "privstack.salt"];
             foreach (var suffix in suffixes)
             {
                 var filePath = $"{basePath}.{suffix}";
@@ -160,21 +159,17 @@ public sealed class PrivStackService : IPrivStackNative
         _log.Information("[StorageDiag] {File}: size={Size} bytes, modified={Modified}, readonly={ReadOnly}",
             name, info.Length, info.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm:ss"), info.IsReadOnly);
 
-        // Check DuckDB header magic
+        // Check SQLite header magic
         try
         {
             using var fs = File.OpenRead(filePath);
-            var header = new byte[64];
-            var bytesRead = fs.Read(header, 0, 64);
+            var header = new byte[16];
+            var bytesRead = fs.Read(header, 0, 16);
             if (bytesRead >= 16)
             {
-                // Bytes 8-11 should be "DUCK"
-                var magic = System.Text.Encoding.ASCII.GetString(header, 8, 4);
-                // Version string is at offset 0x34
-                var versionBytes = header[0x34..Math.Min(0x40, bytesRead)];
-                var version = System.Text.Encoding.ASCII.GetString(versionBytes).TrimEnd('\0');
-                _log.Information("[StorageDiag] {File}: magic={Magic}, version={Version}",
-                    name, magic, version);
+                var magic = System.Text.Encoding.ASCII.GetString(header, 0, 15);
+                _log.Information("[StorageDiag] {File}: header={Magic}",
+                    name, magic.Contains("SQLite") ? "SQLite" : (magic.Contains('\0') ? "encrypted/binary" : magic));
             }
         }
         catch (Exception ex)
@@ -182,7 +177,8 @@ public sealed class PrivStackService : IPrivStackNative
             _log.Error("[StorageDiag] {File}: failed to read header — {Error}", name, ex.Message);
         }
 
-        // Check for WAL file
+        // Check for WAL file (SQLite uses -wal suffix)
+        walPath = filePath + "-wal";
         if (File.Exists(walPath))
         {
             var walInfo = new FileInfo(walPath);
@@ -209,18 +205,16 @@ public sealed class PrivStackService : IPrivStackNative
     {
         try
         {
-            var basePath = dbPath.EndsWith(".duckdb", StringComparison.OrdinalIgnoreCase)
-                ? dbPath[..^".duckdb".Length]
-                : dbPath;
+            var basePath = dbPath;
             var dbDir = Path.GetDirectoryName(dbPath) ?? ".";
 
             _log.Error("[StorageDiag] === Post-mortem after init failure ===");
 
             // Check for WAL files that appeared during the failed init
-            string[] suffixes = ["vault.duckdb", "blobs.duckdb", "entities.duckdb", "events.duckdb"];
+            string[] suffixes = ["privstack.db", "datasets.db"];
             foreach (var suffix in suffixes)
             {
-                var walPath = $"{basePath}.{suffix}.wal";
+                var walPath = $"{basePath}.{suffix}-wal";
                 if (File.Exists(walPath))
                 {
                     var walInfo = new FileInfo(walPath);

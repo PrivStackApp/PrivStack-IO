@@ -89,7 +89,7 @@ public sealed partial class WorkspaceService : IWorkspaceService
     {
         var workspace = _registry.Workspaces.FirstOrDefault(w => w.Id == workspaceId);
         var wsDir = ResolveWorkspaceDir(workspaceId, workspace?.StorageLocation);
-        return Path.Combine(wsDir, "data.duckdb");
+        return Path.Combine(wsDir, "data");
     }
 
     /// <summary>
@@ -514,10 +514,11 @@ public sealed partial class WorkspaceService : IWorkspaceService
                     continue;
 
                 var localDir = Path.Combine(_basePath, "workspaces", workspace.Id);
-                var localDb = Path.Combine(localDir, "data.duckdb");
+                var localDbNew = Path.Combine(localDir, "data.privstack.db");
+                var localDbLegacy = Path.Combine(localDir, "data.duckdb");
 
-                // Already migrated — local DB exists
-                if (File.Exists(localDb)) continue;
+                // Already migrated — local DB exists (check both new and legacy paths)
+                if (File.Exists(localDbNew) || File.Exists(localDbLegacy)) continue;
 
                 // Resolve the old cloud path where DB files used to live
                 var oldDir = ResolveOldCloudWorkspaceDir(workspace.Id, workspace.StorageLocation);

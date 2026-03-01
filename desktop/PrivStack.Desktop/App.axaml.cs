@@ -278,7 +278,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Removes orphaned data.*.duckdb and data.peer_id files from the root BaseDir
+    /// Removes orphaned database and peer_id files from the root BaseDir
     /// that were created by the old setup wizard initializing at root level.
     /// </summary>
     private static void CleanupOrphanedRootFiles()
@@ -286,7 +286,7 @@ public partial class App : Application
         try
         {
             var baseDir = DataPaths.BaseDir;
-            var orphanPatterns = new[] { "data.*.duckdb", "data.*.duckdb.wal", "data.peer_id" };
+            var orphanPatterns = new[] { "data.*.duckdb", "data.*.duckdb.wal", "data.*.db", "data.*.db-wal", "data.*.salt", "data.peer_id" };
 
             foreach (var pattern in orphanPatterns)
             {
@@ -311,16 +311,16 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Logs detailed diagnostics about DuckDB file state before initialization.
+    /// Logs detailed diagnostics about database file state before initialization.
     /// </summary>
     private static void LogStorageDiagnostics(string dbPath)
     {
         try
         {
-            var basePath = Path.ChangeExtension(dbPath, null); // strip .duckdb
+            var basePath = dbPath;
             var dbDir = Path.GetDirectoryName(dbPath)!;
 
-            string[] suffixes = ["vault.duckdb", "blobs.duckdb", "entities.duckdb", "events.duckdb"];
+            string[] suffixes = ["privstack.db", "datasets.db", "privstack.salt"];
 
             Log.Information("[StorageDiag] Base path: {BasePath}", basePath);
             Log.Information("[StorageDiag] Directory exists: {Exists}, writable: {Writable}",
@@ -330,7 +330,7 @@ public partial class App : Application
             foreach (var suffix in suffixes)
             {
                 var filePath = $"{basePath}.{suffix}";
-                var walPath = $"{filePath}.wal";
+                var walPath = $"{filePath}-wal";
 
                 if (File.Exists(filePath))
                 {

@@ -627,8 +627,8 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
             StatusMessage = null;
 
             var dbDir = Path.GetDirectoryName(_workspaceService.GetActiveDataPath());
-            var entityDb = dbDir != null ? Path.Combine(dbDir, "data.entities.duckdb") : null;
-            var sizeBefore = entityDb != null && File.Exists(entityDb) ? new FileInfo(entityDb).Length : 0;
+            var mainDb = dbDir != null ? Path.Combine(dbDir, "data.privstack.db") : null;
+            var sizeBefore = mainDb != null && File.Exists(mainDb) ? new FileInfo(mainDb).Length : 0;
 
             // 1. Clean orphaned auxiliary rows + transient data + CHECKPOINT
             StatusMessage = "Cleaning orphaned data...";
@@ -661,7 +661,7 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
             _log.Information("Compact results: {Json}", compactJson);
 
             // 4. Report results
-            var sizeAfter = entityDb != null && File.Exists(entityDb) ? new FileInfo(entityDb).Length : 0;
+            var sizeAfter = mainDb != null && File.Exists(mainDb) ? new FileInfo(mainDb).Length : 0;
             var parts = new List<string>();
             if (orphansDeleted > 0)
                 parts.Add($"removed {orphansDeleted} orphan entit{(orphansDeleted == 1 ? "y" : "ies")}");
@@ -766,7 +766,7 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
 
                 // Get actual file size from disk
                 long fileSize = 0;
-                var fileName = $"data.{dbLabel}.duckdb";
+                var fileName = dbLabel == "main" ? "data.privstack.db" : $"data.{dbLabel}.db";
                 if (dbVal.TryGetProperty("file_size", out var fs))
                     fileSize = fs.GetInt64();
                 else if (dbDir != null)
