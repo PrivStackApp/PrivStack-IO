@@ -1319,7 +1319,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         ExperimentalPluginsEnabled = _settingsService.Settings.ExperimentalPluginsEnabled;
 
-        // Sort plugins alphabetically by name
+        // Sort loaded plugins alphabetically by name
         var sortedPlugins = _pluginRegistry.Plugins
             .OrderBy(p => p.Metadata.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -1349,6 +1349,40 @@ public partial class SettingsViewModel : ViewModelBase
 
             PluginItems.Add(item);
         }
+
+        // Include deferred (disabled-at-startup) plugins so they can be re-enabled.
+        // These plugins had their assemblies skipped during discovery to save memory.
+        // Toggling them on will dynamically load the assembly via EnablePlugin().
+        foreach (var (pluginId, dirPath) in _pluginRegistry.DeferredPluginDirs)
+        {
+            // Skip if already in the list (shouldn't happen, but be safe)
+            if (PluginItems.Any(p => string.Equals(p.Id, pluginId, StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            // Derive a display name from the directory name
+            var dirName = Path.GetFileName(dirPath);
+            var displayName = dirName.StartsWith("PrivStack.Plugin.", StringComparison.OrdinalIgnoreCase)
+                ? dirName["PrivStack.Plugin.".Length..]
+                : dirName;
+
+            var item = new PluginSettingsItem
+            {
+                Id = pluginId,
+                Name = displayName,
+                Description = "Disabled — toggle to load",
+                Category = PluginCategory.Productivity,
+                IsEnabled = false,
+                CanDisable = true,
+            };
+
+            PluginItems.Add(item);
+        }
+
+        // Re-sort the combined list
+        var sorted = PluginItems.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        PluginItems.Clear();
+        foreach (var item in sorted)
+            PluginItems.Add(item);
     }
 
     [RelayCommand]

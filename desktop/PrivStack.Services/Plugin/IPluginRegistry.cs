@@ -119,6 +119,13 @@ public interface IPluginRegistry
     bool IsPluginEnabled(string pluginId);
 
     /// <summary>
+    /// Plugin IDs and directory paths for plugins that were discovered but not
+    /// loaded because they were disabled at startup. Used by Settings to show
+    /// disabled plugins so they can be re-enabled (which triggers on-demand load).
+    /// </summary>
+    IReadOnlyDictionary<string, string> DeferredPluginDirs { get; }
+
+    /// <summary>
     /// Enables a plugin in the current workspace. Returns true if successful.
     /// </summary>
     bool EnablePlugin(string pluginId);

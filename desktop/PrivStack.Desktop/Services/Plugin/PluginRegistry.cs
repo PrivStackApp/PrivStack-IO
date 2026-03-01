@@ -81,6 +81,14 @@ public sealed partial class PluginRegistry : ObservableObject, IPluginRegistry, 
     public IReadOnlyList<IAppPlugin> ActivePlugins =>
         _plugins.Where(p => p.State == PluginState.Active).ToList().AsReadOnly();
 
+    /// <summary>
+    /// Returns IDs and directory names of plugins that were discovered but not
+    /// loaded because they were disabled at startup.  The Settings UI uses this
+    /// to show disabled plugins so the user can re-enable them.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> DeferredPluginDirs =>
+        _deferredPluginDirs;
+
     public IReadOnlyList<NavigationItem> NavigationItems => _navigationItems;
 
     public ObservableCollection<NavigationItem> NavigationItemsObservable => _navigationItems;

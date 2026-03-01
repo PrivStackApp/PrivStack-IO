@@ -34,6 +34,8 @@ internal sealed class HeadlessPluginRegistry : IPluginRegistry
     public IReadOnlyList<IAppPlugin> ActivePlugins => _activePlugins;
     public IReadOnlyList<NavigationItem> NavigationItems => _navItems;
     public ObservableCollection<NavigationItem> NavigationItemsObservable => _navItemsObservable;
+    public IReadOnlyDictionary<string, string> DeferredPluginDirs { get; } =
+        new Dictionary<string, string>();
 
 #pragma warning disable CS0067 // Required by IPluginRegistry interface; headless never fires UI state events
     public event EventHandler<PluginStateChangedEventArgs>? PluginStateChanged;
