@@ -209,23 +209,35 @@ public sealed class SubsystemTracker
         var gcHeap = GC.GetTotalMemory(false);
         Interlocked.Exchange(ref gcState.ManagedAllocBytes, gcHeap);
 
-        // Thread pool
+        // Thread pool — actual pool thread count + pending work items
         var tpState = GetOrCreateState("runtime.threadpool");
-        ThreadPool.GetAvailableThreads(out var workerAvail, out var ioAvail);
-        ThreadPool.GetMaxThreads(out var workerMax, out var ioMax);
-        var activeWorkers = workerMax - workerAvail;
-        var activeIo = ioMax - ioAvail;
-        Volatile.Write(ref tpState.ActiveTaskCount, activeWorkers + activeIo);
+        Volatile.Write(ref tpState.ActiveTaskCount, ThreadPool.ThreadCount);
+        Interlocked.Exchange(ref tpState.ManagedAllocBytes, ThreadPool.PendingWorkItemCount * 64L);
 
-        // Shell (process working set minus GC heap = approximate shell overhead)
+        // Native (Rust) — total Rust-side memory across all subsystems
+        // Individual Core subsystems (storage, sync, crypto, cloud) have their
+        // own per-subsystem breakdown from MergeNativeCounters. This entry shows
+        // the aggregate so it's never "—" when Rust is active.
         try
         {
-            var proc = System.Diagnostics.Process.GetCurrentProcess();
-            var shellState = GetOrCreateState("shell");
-            Interlocked.Exchange(ref shellState.NativeBytes, Math.Max(0, proc.WorkingSet64 - gcHeap));
-            Volatile.Write(ref shellState.ActiveTaskCount, proc.Threads.Count);
+            long totalRustBytes = 0;
+            foreach (var (id, state) in _states)
+            {
+                if (id.StartsWith("core.", StringComparison.Ordinal) || id == "runtime.native")
+                    totalRustBytes += Interlocked.Read(ref state.NativeBytes);
+            }
+            var nativeState = GetOrCreateState("runtime.native");
+            Interlocked.Exchange(ref nativeState.NativeBytes, totalRustBytes);
         }
-        catch { /* process metrics may fail in sandboxed environments */ }
+        catch { /* snapshot iteration may race with registration */ }
+
+        // Shell — mark active (UI thread is always running)
+        var shellState = GetOrCreateState("shell");
+        Volatile.Write(ref shellState.ActiveTaskCount, 1);
+
+        // Rendering — mark active while UI is running
+        var renderState = GetOrCreateState("rendering");
+        Volatile.Write(ref renderState.ActiveTaskCount, 1);
     }
 
     /// <summary>
