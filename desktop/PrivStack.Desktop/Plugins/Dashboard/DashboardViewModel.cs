@@ -490,22 +490,26 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
         _liveMetricsTimer = null;
     }
 
+    private int _dataMetricsTickCounter;
+
     private async void OnLiveMetricsTick(object? sender, EventArgs e)
     {
         try
         {
+            // Memory metrics are cheap (process-level, no SDK calls) — refresh every tick
             var diag = _metricsService.GetDetailedMemoryDiagnostic(_pluginRegistry);
             MemoryUsage = SystemMetricsHelper.FormatBytes(diag.WorkingSet);
             MemoryGcHeap = SystemMetricsHelper.FormatBytes(diag.GcHeap);
             MemoryNative = SystemMetricsHelper.FormatBytes(diag.NativeEstimate);
             MemoryDetail = diag.FormatDetail();
 
-            var dataResult = await _metricsService.GetDataMetricsAsync(_pluginRegistry, _workspaceService);
-            DataStorageTotal = SystemMetricsHelper.FormatBytes(dataResult.TotalStorageBytes);
-
-            // If we're on the Data tab, also refresh the detailed breakdown
-            if (ActiveTab == DashboardTab.Data)
+            // Data metrics are expensive (~33 SDK ReadList/Count calls across all plugins).
+            // Only refresh on the Data tab, and throttle to every 10 seconds.
+            if (ActiveTab == DashboardTab.Data && ++_dataMetricsTickCounter >= 10)
             {
+                _dataMetricsTickCounter = 0;
+                var dataResult = await _metricsService.GetDataMetricsAsync(_pluginRegistry, _workspaceService);
+                DataStorageTotal = SystemMetricsHelper.FormatBytes(dataResult.TotalStorageBytes);
                 TotalDatabaseSize = SystemMetricsHelper.FormatBytes(dataResult.TotalDatabaseBytes);
                 TotalFilesSize = SystemMetricsHelper.FormatBytes(dataResult.TotalFilesBytes);
                 TotalVaultSize = SystemMetricsHelper.FormatBytes(dataResult.TotalVaultBytes);
