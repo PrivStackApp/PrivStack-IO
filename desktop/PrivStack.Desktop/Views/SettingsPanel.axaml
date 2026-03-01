@@ -2145,6 +2145,23 @@
                             </Grid>
                         </Border>
 
+                        <Border Classes="card" Padding="16,14">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="Auto-Check for Updates"
+                                               FontSize="{DynamicResource ThemeFontSizeSm}" FontWeight="Medium"/>
+                                    <TextBlock Text="Periodically check for new versions on startup"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding AutoCheckForUpdates}"
+                                              OnContent="" OffContent=""
+                                              VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
                         <StackPanel Spacing="8">
                             <Button Command="{Binding OpenUrlCommand}"
                                     CommandParameter="https://privstack.io"
