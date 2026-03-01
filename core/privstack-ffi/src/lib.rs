@@ -1620,6 +1620,119 @@ pub unsafe extern "C" fn privstack_vault_create(vault_id: *const c_char) -> Priv
     }
 }}
 
+// ── Legacy DuckDB Migration Detection ────────────────────────────────
+
+/// Checks if legacy DuckDB database files exist at the given data path.
+/// Returns true if any `.duckdb` files are found, indicating the C# side
+/// should run its migration tool before the first SQLCipher-encrypted open.
+///
+/// The Rust core no longer includes the DuckDB library, so migration must
+/// be orchestrated from the managed side (C#) or a standalone CLI tool.
+///
+/// # Safety
+/// - `data_path` must be a valid null-terminated UTF-8 string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn privstack_has_legacy_databases(
+    data_path: *const c_char,
+) -> bool { unsafe {
+    if data_path.is_null() {
+        return false;
+    }
+    let path = match CStr::from_ptr(data_path).to_str() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    let base = Path::new(path);
+    let legacy_files = [
+        base.with_extension("entities.duckdb"),
+        base.with_extension("events.duckdb"),
+        base.with_extension("blobs.duckdb"),
+        base.with_extension("vault.duckdb"),
+        base.with_extension("datasets.duckdb"),
+    ];
+    legacy_files.iter().any(|f| f.exists())
+}}
+
+/// Returns a JSON array of legacy DuckDB file paths that exist at the data path.
+/// Caller must free with `privstack_free_string`.
+///
+/// # Safety
+/// - `data_path` must be a valid null-terminated UTF-8 string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn privstack_list_legacy_databases(
+    data_path: *const c_char,
+) -> *mut c_char { unsafe {
+    if data_path.is_null() {
+        return to_c_string("[]");
+    }
+    let path = match CStr::from_ptr(data_path).to_str() {
+        Ok(s) => s,
+        Err(_) => return to_c_string("[]"),
+    };
+    let base = Path::new(path);
+    let legacy_files = [
+        ("entities", base.with_extension("entities.duckdb")),
+        ("events", base.with_extension("events.duckdb")),
+        ("blobs", base.with_extension("blobs.duckdb")),
+        ("vault", base.with_extension("vault.duckdb")),
+        ("datasets", base.with_extension("datasets.duckdb")),
+    ];
+    let found: Vec<serde_json::Value> = legacy_files
+        .iter()
+        .filter(|(_, p)| p.exists())
+        .map(|(name, p)| {
+            serde_json::json!({
+                "name": name,
+                "path": p.to_string_lossy(),
+                "size": std::fs::metadata(p).map(|m| m.len()).unwrap_or(0),
+            })
+        })
+        .collect();
+    to_c_string(&serde_json::to_string(&found).unwrap_or_else(|_| "[]".to_string()))
+}}
+
+/// Renames legacy DuckDB files to `.duckdb.bak` after successful migration.
+/// Call this from the C# side after migration is verified.
+///
+/// # Safety
+/// - `data_path` must be a valid null-terminated UTF-8 string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn privstack_archive_legacy_databases(
+    data_path: *const c_char,
+) -> PrivStackError { unsafe {
+    if data_path.is_null() {
+        return PrivStackError::NullPointer;
+    }
+    let path = match CStr::from_ptr(data_path).to_str() {
+        Ok(s) => s,
+        Err(_) => return PrivStackError::InvalidUtf8,
+    };
+    let base = Path::new(path);
+    let legacy_files = [
+        base.with_extension("entities.duckdb"),
+        base.with_extension("events.duckdb"),
+        base.with_extension("blobs.duckdb"),
+        base.with_extension("vault.duckdb"),
+        base.with_extension("datasets.duckdb"),
+    ];
+    for file in &legacy_files {
+        if file.exists() {
+            let backup = file.with_extension("duckdb.bak");
+            if let Err(e) = std::fs::rename(file, &backup) {
+                ffi_warn!("[migration] Failed to archive {}: {e}", file.display());
+            }
+        }
+    }
+    // Also archive any WAL files
+    for file in &legacy_files {
+        let wal = file.with_extension("duckdb.wal");
+        if wal.exists() {
+            let _ = std::fs::remove_file(&wal);
+        }
+    }
+    PrivStackError::Ok
+}}
+
 /// Initializes a vault with a password.
 ///
 /// # Safety
