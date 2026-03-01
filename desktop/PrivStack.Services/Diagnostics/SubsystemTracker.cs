@@ -199,6 +199,36 @@ public sealed class SubsystemTracker
     }
 
     /// <summary>
+    /// Populate runtime subsystems from .NET system APIs.
+    /// Call once per timer tick alongside RefreshNativeCounters/UpdateRateSamples.
+    /// </summary>
+    public void RefreshRuntimeMetrics()
+    {
+        // .NET GC heap
+        var gcState = GetOrCreateState("runtime.gc");
+        var gcHeap = GC.GetTotalMemory(false);
+        Interlocked.Exchange(ref gcState.ManagedAllocBytes, gcHeap);
+
+        // Thread pool
+        var tpState = GetOrCreateState("runtime.threadpool");
+        ThreadPool.GetAvailableThreads(out var workerAvail, out var ioAvail);
+        ThreadPool.GetMaxThreads(out var workerMax, out var ioMax);
+        var activeWorkers = workerMax - workerAvail;
+        var activeIo = ioMax - ioAvail;
+        Volatile.Write(ref tpState.ActiveTaskCount, activeWorkers + activeIo);
+
+        // Shell (process working set minus GC heap = approximate shell overhead)
+        try
+        {
+            var proc = System.Diagnostics.Process.GetCurrentProcess();
+            var shellState = GetOrCreateState("shell");
+            Interlocked.Exchange(ref shellState.NativeBytes, Math.Max(0, proc.WorkingSet64 - gcHeap));
+            Volatile.Write(ref shellState.ActiveTaskCount, proc.Threads.Count);
+        }
+        catch { /* process metrics may fail in sandboxed environments */ }
+    }
+
+    /// <summary>
     /// Static convenience: run tagged if tracker is available, otherwise plain Task.Run.
     /// </summary>
     public static Task RunTaggedStatic(string subsystemId, Func<Task> action)

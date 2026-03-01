@@ -46,6 +46,7 @@ internal sealed class SnapshotSyncService : ISnapshotSyncService
 
     public async Task StartAsync()
     {
+        using var _ = Diagnostics.SubsystemTracker.Instance?.EnterScope("core.sync");
         if (_disposed) return;
 
         var workspace = _workspaceService.GetActiveWorkspace();

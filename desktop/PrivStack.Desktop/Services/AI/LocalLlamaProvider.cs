@@ -64,6 +64,7 @@ internal sealed class LocalLlamaProvider : IAiProvider
 
     public async Task<AiResponse> CompleteAsync(AiRequest request, string? modelOverride, CancellationToken ct)
     {
+        using var _ = PrivStack.Services.Diagnostics.SubsystemTracker.Instance?.EnterScope("ai.llm");
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         await _inferLock.WaitAsync(ct);
@@ -147,6 +148,7 @@ internal sealed class LocalLlamaProvider : IAiProvider
     public async Task<AiResponse> StreamCompleteAsync(
         AiRequest request, string? modelOverride, Action<string> onToken, CancellationToken ct)
     {
+        using var _ = PrivStack.Services.Diagnostics.SubsystemTracker.Instance?.EnterScope("ai.llm");
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         await _inferLock.WaitAsync(ct);

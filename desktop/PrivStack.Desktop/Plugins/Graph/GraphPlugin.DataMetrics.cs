@@ -19,29 +19,24 @@ public sealed partial class GraphPlugin : IDataMetricsProvider
             edgeCount = graph.EdgeCount;
         }
 
-        if (nodeCount > 0)
+        // Always report — even with 0 counts the graph plugin is loaded and allocated
+        tables.Add(new DataTableInfo
         {
-            tables.Add(new DataTableInfo
-            {
-                Name = "Graph Nodes",
-                EntityType = "graph_node",
-                RowCount = nodeCount,
-                BackingMode = "runtime",
-                PluginId = Metadata.Id,
-            });
-        }
+            Name = "Graph Nodes",
+            EntityType = "graph_node",
+            RowCount = nodeCount,
+            BackingMode = "runtime",
+            PluginId = Metadata.Id,
+        });
 
-        if (edgeCount > 0)
+        tables.Add(new DataTableInfo
         {
-            tables.Add(new DataTableInfo
-            {
-                Name = "Graph Edges",
-                EntityType = "graph_edge",
-                RowCount = edgeCount,
-                BackingMode = "runtime",
-                PluginId = Metadata.Id,
-            });
-        }
+            Name = "Graph Edges",
+            EntityType = "graph_edge",
+            RowCount = edgeCount,
+            BackingMode = "runtime",
+            PluginId = Metadata.Id,
+        });
 
         return Task.FromResult(new PluginDataMetrics
         {

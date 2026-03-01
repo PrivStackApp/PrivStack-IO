@@ -72,6 +72,7 @@ public sealed class RegistryUpdateService : IUpdateService
 
     public async Task<LatestReleaseInfo?> CheckForUpdatesAsync(CancellationToken ct = default)
     {
+        using var _ = Diagnostics.SubsystemTracker.Instance?.EnterScope("updates");
         if (_consecutiveNetworkFailures >= MaxConsecutiveFailuresBeforeBackoff)
         {
             Logger.Debug("Skipping update check — API unreachable after {Failures} consecutive failures",

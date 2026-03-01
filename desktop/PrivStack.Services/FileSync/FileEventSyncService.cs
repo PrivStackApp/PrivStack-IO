@@ -37,6 +37,7 @@ internal sealed class FileEventSyncService : IFileEventSyncService
 
     public void Start()
     {
+        using var _ = Diagnostics.SubsystemTracker.Instance?.EnterScope("core.sync");
         if (_disposed) return;
 
         var workspace = _workspaceService.GetActiveWorkspace();

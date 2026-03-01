@@ -255,6 +255,7 @@ public sealed class BacklinkService
 
     private async Task BuildIndexAsync(CancellationToken ct)
     {
+        using var _ = Diagnostics.SubsystemTracker.Instance?.EnterScope("ai.rag");
         _log.Information("BacklinkService: building index...");
 
         var entityMap = new Dictionary<string, (string Title, string LinkType, DateTimeOffset? ModifiedAt, string? Icon)>();

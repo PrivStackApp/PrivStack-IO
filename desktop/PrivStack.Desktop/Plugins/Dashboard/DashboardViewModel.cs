@@ -539,6 +539,7 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
         try
         {
             _subsystemTracker.RefreshNativeCounters();
+            _subsystemTracker.RefreshRuntimeMetrics();
             _subsystemTracker.UpdateRateSamples();
 
             var snapshots = _subsystemTracker.GetSnapshots();
