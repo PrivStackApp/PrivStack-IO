@@ -655,10 +655,8 @@ public partial class App : Application
                     Services.GetRequiredService<IDatasetService>());
 
                 // IPC server — only if the local API is enabled or the browser extension
-                // has been paired (BridgeAuthToken exists). The bridge binary may exist in
-                // dev builds without the extension actually being installed.
-                var bridgePaired = !string.IsNullOrEmpty(appSettings.Settings.BridgeAuthToken);
-                if (appSettings.Settings.ApiEnabled || bridgePaired)
+                // bridge is explicitly enabled in settings.
+                if (appSettings.Settings.ApiEnabled || appSettings.Settings.BridgeEnabled)
                 {
                     Services.GetRequiredService<IIpcServer>().Start();
                 }

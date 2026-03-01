@@ -19,9 +19,15 @@ public static class NativeMessagingRegistrar
     /// Writes native messaging host manifests to browser-specific directories.
     /// Also generates a bridge auth token if one doesn't exist.
     /// </summary>
-    public static void Register(string bridgePath, IAppSettingsService settings)
+    public static void Register(string bridgePath, IAppSettingsService settings, bool enableBridge = false)
     {
         EnsureAuthToken(settings);
+
+        if (enableBridge && !settings.Settings.BridgeEnabled)
+        {
+            settings.Settings.BridgeEnabled = true;
+            settings.Save();
+        }
 
         var manifest = new
         {

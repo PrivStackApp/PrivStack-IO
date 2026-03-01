@@ -295,6 +295,13 @@ public class AppSettings
     [JsonPropertyName("bridge_auth_token")]
     public string? BridgeAuthToken { get; set; }
 
+    /// <summary>
+    /// Whether the browser extension bridge (IPC pipe) is enabled.
+    /// Toggled on when the user installs the web clipper extension.
+    /// </summary>
+    [JsonPropertyName("bridge_enabled")]
+    public bool BridgeEnabled { get; set; }
+
     // Local HTTP API settings
     [JsonPropertyName("api_enabled")]
     public bool ApiEnabled { get; set; }
