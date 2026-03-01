@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace PrivStack.Desktop.Plugins.Dashboard.Models;
@@ -29,4 +30,14 @@ public partial class SubsystemItemViewModel : ObservableObject
     public bool IsActive => ActiveTaskCount > 0;
     public bool IsIdle => ActiveTaskCount == 0 && (NativeBytes > 0 || ManagedAllocBytes > 0);
     public bool IsStopped => ActiveTaskCount == 0 && NativeBytes == 0 && ManagedAllocBytes == 0;
+}
+
+public partial class SubsystemGroupViewModel : ObservableObject
+{
+    public string Category { get; init; } = "";
+
+    [ObservableProperty]
+    private string _summary = "";
+
+    public ObservableCollection<SubsystemItemViewModel> Items { get; } = [];
 }

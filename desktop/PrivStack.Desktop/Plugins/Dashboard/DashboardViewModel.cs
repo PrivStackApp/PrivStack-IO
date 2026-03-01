@@ -185,7 +185,7 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
     [ObservableProperty]
     private int _activeSubsystemCount;
 
-    public ObservableCollection<SubsystemItemViewModel> SubsystemItems { get; } = [];
+    public ObservableCollection<SubsystemGroupViewModel> SubsystemGroups { get; } = [];
 
     // --- Computed ---
 
@@ -538,13 +538,12 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
 
         try
         {
-            // Refresh native (Rust) counters from FFI
             _subsystemTracker.RefreshNativeCounters();
             _subsystemTracker.UpdateRateSamples();
 
             var snapshots = _subsystemTracker.GetSnapshots();
 
-            // Summary cards — use process-level metrics for accuracy
+            // Summary cards — process-level metrics
             var totalThreads = snapshots.Sum(s => s.ActiveTaskCount);
             var gcHeap = GC.GetTotalMemory(false);
             var workingSet = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64;
@@ -556,52 +555,69 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
             SubsystemNativeTotal = SystemMetricsHelper.FormatBytes(Math.Max(0, nativeEstimate));
             ActiveSubsystemCount = activeCount;
 
-            // Sort: by category order, then by name within category
-            var sorted = snapshots.OrderBy(s => CategorySortOrder(s.Category))
-                                  .ThenBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
-                                  .ToArray();
+            // Group by category, sorted
+            var grouped = snapshots
+                .OrderBy(s => CategorySortOrder(s.Category))
+                .ThenBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(s => s.Category);
 
-            // Rebuild collection on first populate; update in-place on subsequent ticks
-            var needsRebuild = SubsystemItems.Count != sorted.Length;
+            // Rebuild groups on first populate or if categories changed
+            var needsRebuild = SubsystemGroups.Count == 0 ||
+                SubsystemGroups.Count != grouped.Count() ||
+                !SubsystemGroups.Select(g => g.Category).SequenceEqual(grouped.Select(g => g.Key));
 
             if (needsRebuild)
             {
-                SubsystemItems.Clear();
-                foreach (var snap in sorted)
+                SubsystemGroups.Clear();
+                foreach (var group in grouped)
                 {
-                    SubsystemItems.Add(new SubsystemItemViewModel
+                    var vm = new SubsystemGroupViewModel { Category = group.Key };
+                    foreach (var snap in group)
                     {
-                        Id = snap.Id,
-                        DisplayName = snap.DisplayName,
-                        Category = snap.Category,
-                    });
+                        vm.Items.Add(new SubsystemItemViewModel
+                        {
+                            Id = snap.Id,
+                            DisplayName = snap.DisplayName,
+                            Category = snap.Category,
+                        });
+                    }
+                    SubsystemGroups.Add(vm);
                 }
             }
 
-            for (var i = 0; i < sorted.Length; i++)
+            // Update values in-place
+            foreach (var groupVm in SubsystemGroups)
             {
-                var snap = sorted[i];
-                var item = SubsystemItems[i];
+                var groupActive = 0;
+                foreach (var item in groupVm.Items)
+                {
+                    var snap = snapshots.FirstOrDefault(s => s.Id == item.Id);
+                    if (snap.Id == null) continue;
 
-                item.ActiveTaskCount = snap.ActiveTaskCount;
-                item.NativeBytes = snap.NativeBytes;
-                item.ManagedAllocBytes = snap.ManagedAllocBytes;
+                    item.ActiveTaskCount = snap.ActiveTaskCount;
+                    item.NativeBytes = snap.NativeBytes;
+                    item.ManagedAllocBytes = snap.ManagedAllocBytes;
+                    groupActive += snap.ActiveTaskCount;
 
-                // Format memory display
-                var rustBytes = Math.Max(0, snap.NativeBytes);
-                var managedBytes = snap.ManagedAllocBytes;
-                if (rustBytes > 0 && managedBytes > 0)
-                    item.MemoryDisplay = $"{SystemMetricsHelper.FormatBytes(rustBytes)} native + {SystemMetricsHelper.FormatBytes(managedBytes)} managed";
-                else if (rustBytes > 0)
-                    item.MemoryDisplay = $"{SystemMetricsHelper.FormatBytes(rustBytes)} native";
-                else if (managedBytes > 0)
-                    item.MemoryDisplay = SystemMetricsHelper.FormatBytes(managedBytes);
-                else
-                    item.MemoryDisplay = "—";
+                    var rustBytes = Math.Max(0, snap.NativeBytes);
+                    var managedBytes = snap.ManagedAllocBytes;
+                    if (rustBytes > 0 && managedBytes > 0)
+                        item.MemoryDisplay = $"{SystemMetricsHelper.FormatBytes(rustBytes)} native + {SystemMetricsHelper.FormatBytes(managedBytes)} managed";
+                    else if (rustBytes > 0)
+                        item.MemoryDisplay = $"{SystemMetricsHelper.FormatBytes(rustBytes)} native";
+                    else if (managedBytes > 0)
+                        item.MemoryDisplay = SystemMetricsHelper.FormatBytes(managedBytes);
+                    else
+                        item.MemoryDisplay = "—";
 
-                item.AllocRateDisplay = snap.ManagedAllocRate > 0
-                    ? $"{SystemMetricsHelper.FormatBytes(snap.ManagedAllocRate)}/s"
-                    : "—";
+                    item.AllocRateDisplay = snap.ManagedAllocRate > 0
+                        ? $"{SystemMetricsHelper.FormatBytes(snap.ManagedAllocRate)}/s"
+                        : "—";
+                }
+
+                groupVm.Summary = groupActive > 0
+                    ? $"{groupVm.Items.Count} subsystems · {groupActive} active"
+                    : $"{groupVm.Items.Count} subsystems";
             }
         }
         catch (Exception ex)

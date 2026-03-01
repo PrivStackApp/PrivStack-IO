@@ -942,84 +942,92 @@
                         </WrapPanel>
                     </StackPanel>
 
-                    <!-- Subsystem List -->
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Per-Subsystem Breakdown" Classes="section-heading"/>
+                    <!-- Subsystem Groups -->
+                    <ItemsControl ItemsSource="{Binding SubsystemGroups}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:SubsystemGroupViewModel">
+                                <StackPanel Spacing="6" Margin="0,0,0,16">
+                                    <!-- Category header -->
+                                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,4">
+                                        <TextBlock Text="{Binding Category}"
+                                                   FontSize="{DynamicResource ThemeFontSizeSm}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                        <TextBlock Text="{Binding Summary}"
+                                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
 
-                        <!-- Header row -->
-                        <Grid ColumnDefinitions="24,*,80,60,180,100" Margin="0,0,0,4">
-                            <TextBlock Grid.Column="1" Text="Subsystem"
-                                       FontSize="{DynamicResource ThemeFontSizeXs}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}" FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="2" Text="Category"
-                                       FontSize="{DynamicResource ThemeFontSizeXs}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}" FontWeight="SemiBold"
-                                       HorizontalAlignment="Center"/>
-                            <TextBlock Grid.Column="3" Text="Tasks"
-                                       FontSize="{DynamicResource ThemeFontSizeXs}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}" FontWeight="SemiBold"
-                                       HorizontalAlignment="Center"/>
-                            <TextBlock Grid.Column="4" Text="Tracked Memory"
-                                       FontSize="{DynamicResource ThemeFontSizeXs}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}" FontWeight="SemiBold"
-                                       HorizontalAlignment="Right"/>
-                            <TextBlock Grid.Column="5" Text="Alloc Rate"
-                                       FontSize="{DynamicResource ThemeFontSizeXs}"
-                                       Foreground="{DynamicResource ThemeTextMutedBrush}" FontWeight="SemiBold"
-                                       HorizontalAlignment="Right"/>
-                        </Grid>
+                                    <!-- Column headers (per group) -->
+                                    <Grid ColumnDefinitions="24,*,50,180,90" Margin="0,0,0,2">
+                                        <TextBlock Grid.Column="1" Text="Name"
+                                                   FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"/>
+                                        <TextBlock Grid.Column="2" Text="Tasks"
+                                                   FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   HorizontalAlignment="Center"/>
+                                        <TextBlock Grid.Column="3" Text="Memory"
+                                                   FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   HorizontalAlignment="Right"/>
+                                        <TextBlock Grid.Column="4" Text="Alloc Rate"
+                                                   FontSize="{DynamicResource ThemeFontSize2Xs}"
+                                                   Foreground="{DynamicResource ThemeTextMutedBrush}"
+                                                   HorizontalAlignment="Right"/>
+                                    </Grid>
 
-                        <ItemsControl ItemsSource="{Binding SubsystemItems}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="models:SubsystemItemViewModel">
-                                    <Border Padding="8,10" CornerRadius="6" Margin="0,0,0,2"
-                                            Background="{DynamicResource ThemeSurfaceElevatedBrush}">
-                                        <Grid ColumnDefinitions="24,*,80,60,180,100">
-                                            <!-- Status dot (green=active, gray=idle/stopped) -->
-                                            <Panel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                                <Ellipse Width="8" Height="8"
-                                                         Fill="{DynamicResource ThemeSuccessBrush}"
-                                                         IsVisible="{Binding IsActive}"/>
-                                                <Ellipse Width="8" Height="8"
-                                                         Fill="{DynamicResource ThemeTextMutedBrush}"
-                                                         IsVisible="{Binding !IsActive}"/>
-                                            </Panel>
+                                    <!-- Items -->
+                                    <ItemsControl ItemsSource="{Binding Items}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="models:SubsystemItemViewModel">
+                                                <Border Padding="6,8" CornerRadius="6" Margin="0,0,0,1"
+                                                        Background="{DynamicResource ThemeSurfaceElevatedBrush}">
+                                                    <Grid ColumnDefinitions="24,*,50,180,90">
+                                                        <!-- Status dot -->
+                                                        <Panel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                            <Ellipse Width="7" Height="7"
+                                                                     Fill="{DynamicResource ThemeSuccessBrush}"
+                                                                     IsVisible="{Binding IsActive}"/>
+                                                            <Ellipse Width="7" Height="7"
+                                                                     Fill="{DynamicResource ThemeTextMutedBrush}"
+                                                                     IsVisible="{Binding !IsActive}"
+                                                                     Opacity="0.4"/>
+                                                        </Panel>
 
-                                            <!-- Name -->
-                                            <TextBlock Grid.Column="1" Text="{Binding DisplayName}"
-                                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                                       VerticalAlignment="Center"/>
+                                                        <!-- Name -->
+                                                        <TextBlock Grid.Column="1" Text="{Binding DisplayName}"
+                                                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                                                   VerticalAlignment="Center"/>
 
-                                            <!-- Category -->
-                                            <TextBlock Grid.Column="2" Text="{Binding Category}"
-                                                       FontSize="{DynamicResource ThemeFontSizeXs}"
-                                                       Foreground="{DynamicResource ThemeTextMutedBrush}"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        <!-- Task Count -->
+                                                        <TextBlock Grid.Column="2" Text="{Binding ActiveTaskCount}"
+                                                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
-                                            <!-- Task Count -->
-                                            <TextBlock Grid.Column="3" Text="{Binding ActiveTaskCount}"
-                                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        <!-- Memory -->
+                                                        <TextBlock Grid.Column="3" Text="{Binding MemoryDisplay}"
+                                                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                                   HorizontalAlignment="Right" VerticalAlignment="Center"/>
 
-                                            <!-- Memory -->
-                                            <TextBlock Grid.Column="4" Text="{Binding MemoryDisplay}"
-                                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                                                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
-
-                                            <!-- Alloc Rate -->
-                                            <TextBlock Grid.Column="5" Text="{Binding AllocRateDisplay}"
-                                                       FontSize="{DynamicResource ThemeFontSizeSm}"
-                                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                                                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
+                                                        <!-- Alloc Rate -->
+                                                        <TextBlock Grid.Column="4" Text="{Binding AllocRateDisplay}"
+                                                                   FontSize="{DynamicResource ThemeFontSizeXs}"
+                                                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                                                   HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
                 </StackPanel>
             </ScrollViewer>
