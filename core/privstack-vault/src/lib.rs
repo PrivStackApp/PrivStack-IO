@@ -1,18 +1,18 @@
 //! Generic encrypted vault with blob storage.
 //!
-//! Provides password-protected vault instances backed by DuckDB.
+//! Provides password-protected vault instances backed by SQLite.
 //! Encryption keys never leave the vault — all encrypt/decrypt happens internally.
 //!
 //! Each vault has its own salt + verification token (Argon2id-derived).
 //! Blobs are encrypted with ChaCha20-Poly1305 using the vault's derived key.
 
 use chrono::Utc;
-use duckdb::{params, Connection};
 use privstack_crypto::{
     decrypt, decrypt_document, derive_key, encrypt, encrypt_document, reencrypt_document_key,
     DataEncryptor, DerivedKey, EncryptedData, EncryptedDocument, EncryptorError, EncryptorResult,
     KdfParams, Salt, KEY_SIZE,
 };
+use privstack_db::rusqlite::{params, Connection};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -98,16 +98,16 @@ impl Vault {
 
         conn.execute_batch(&format!(
             "CREATE TABLE IF NOT EXISTS {meta_table} (
-                key VARCHAR PRIMARY KEY,
+                key TEXT PRIMARY KEY,
                 value BLOB NOT NULL
             );
             CREATE TABLE IF NOT EXISTS {blobs_table} (
-                blob_id VARCHAR PRIMARY KEY,
+                blob_id TEXT PRIMARY KEY,
                 encrypted_data BLOB NOT NULL,
-                size BIGINT NOT NULL DEFAULT 0,
-                content_hash VARCHAR,
-                created_at BIGINT NOT NULL,
-                modified_at BIGINT NOT NULL
+                size INTEGER NOT NULL DEFAULT 0,
+                content_hash TEXT,
+                created_at INTEGER NOT NULL,
+                modified_at INTEGER NOT NULL
             );"
         ))
         .map_err(|e| VaultError::Storage(e.to_string()))?;
@@ -153,13 +153,13 @@ impl Vault {
         let meta_table = format!("vault_{}_meta", self.table_prefix);
 
         conn.execute(
-            &format!("INSERT INTO {meta_table} (key, value) VALUES ('salt', ?)"),
+            &format!("INSERT INTO {meta_table} (key, value) VALUES ('salt', ?1)"),
             params![salt.as_bytes().to_vec()],
         )
         .map_err(|e| VaultError::Storage(e.to_string()))?;
 
         conn.execute(
-            &format!("INSERT INTO {meta_table} (key, value) VALUES ('verification', ?)"),
+            &format!("INSERT INTO {meta_table} (key, value) VALUES ('verification', ?1)"),
             params![verification_bytes],
         )
         .map_err(|e| VaultError::Storage(e.to_string()))?;
@@ -305,6 +305,8 @@ impl Vault {
             .filter_map(|r| r.ok())
             .collect();
 
+        drop(stmt);
+
         for (blob_id, enc_bytes) in &blobs {
             let enc: EncryptedData = serde_json::from_slice(enc_bytes)
                 .map_err(|e| VaultError::Storage(e.to_string()))?;
@@ -316,7 +318,7 @@ impl Vault {
                 serde_json::to_vec(&new_enc).map_err(|e| VaultError::Storage(e.to_string()))?;
 
             conn.execute(
-                &format!("UPDATE {blobs_table} SET encrypted_data = ? WHERE blob_id = ?"),
+                &format!("UPDATE {blobs_table} SET encrypted_data = ?1 WHERE blob_id = ?2"),
                 params![new_enc_bytes, blob_id],
             )
             .map_err(|e| VaultError::Storage(e.to_string()))?;
@@ -329,13 +331,13 @@ impl Vault {
             .map_err(|e| VaultError::Storage(e.to_string()))?;
 
         conn.execute(
-            &format!("UPDATE {meta_table} SET value = ? WHERE key = 'salt'"),
+            &format!("UPDATE {meta_table} SET value = ?1 WHERE key = 'salt'"),
             params![new_salt.as_bytes().to_vec()],
         )
         .map_err(|e| VaultError::Storage(e.to_string()))?;
 
         conn.execute(
-            &format!("UPDATE {meta_table} SET value = ? WHERE key = 'verification'"),
+            &format!("UPDATE {meta_table} SET value = ?1 WHERE key = 'verification'"),
             params![new_verification_bytes],
         )
         .map_err(|e| VaultError::Storage(e.to_string()))?;
@@ -368,9 +370,9 @@ impl Vault {
         conn.execute(
             &format!(
                 "INSERT OR REPLACE INTO {blobs_table} (blob_id, encrypted_data, size, content_hash, created_at, modified_at)
-                 VALUES (?, ?, ?, ?, COALESCE((SELECT created_at FROM {blobs_table} WHERE blob_id = ?), ?), ?)"
+                 VALUES (?1, ?2, ?3, ?4, COALESCE((SELECT created_at FROM {blobs_table} WHERE blob_id = ?1), ?5), ?5)"
             ),
-            params![blob_id, enc_bytes, data.len() as i64, content_hash, blob_id, now, now],
+            params![blob_id, enc_bytes, data.len() as i64, content_hash, now],
         )
         .map_err(|e| VaultError::Storage(e.to_string()))?;
 
@@ -387,7 +389,7 @@ impl Vault {
 
         let enc_bytes: Vec<u8> = conn
             .query_row(
-                &format!("SELECT encrypted_data FROM {blobs_table} WHERE blob_id = ?"),
+                &format!("SELECT encrypted_data FROM {blobs_table} WHERE blob_id = ?1"),
                 params![blob_id],
                 |row| row.get(0),
             )
@@ -406,7 +408,7 @@ impl Vault {
 
         let affected = conn
             .execute(
-                &format!("DELETE FROM {blobs_table} WHERE blob_id = ?"),
+                &format!("DELETE FROM {blobs_table} WHERE blob_id = ?1"),
                 params![blob_id],
             )
             .map_err(|e| VaultError::Storage(e.to_string()))?;
@@ -445,7 +447,7 @@ impl Vault {
 // VaultManager — manages multiple vaults sharing a connection
 // ============================================================================
 
-/// Manages multiple named vaults, all sharing a single DuckDB connection.
+/// Manages multiple named vaults, all sharing a single SQLite connection.
 pub struct VaultManager {
     vaults: RwLock<HashMap<String, Vault>>,
     conn: Arc<Mutex<Connection>>,
@@ -462,20 +464,10 @@ pub struct BlobInfo {
 }
 
 impl VaultManager {
-    /// Open a vault manager backed by a DuckDB file.
+    /// Open a vault manager backed by a SQLite file.
     pub fn open(db_path: &Path) -> VaultResult<Self> {
-        let conn = if db_path.to_str() == Some(":memory:") {
-            Connection::open_in_memory()
-        } else {
-            Connection::open(db_path)
-        }
-        .map_err(|e| VaultError::Storage(e.to_string()))?;
-
-        // Cap memory/threads — DuckDB defaults to ~80% RAM per connection
-        if db_path.to_str() != Some(":memory:") {
-            conn.execute_batch("PRAGMA memory_limit='16MB'; PRAGMA threads=1;")
-                .map_err(|e| VaultError::Storage(e.to_string()))?;
-        }
+        let conn = privstack_db::open_db_unencrypted(db_path)
+            .map_err(|e| VaultError::Storage(e.to_string()))?;
 
         Ok(Self {
             vaults: RwLock::new(HashMap::new()),
@@ -483,18 +475,25 @@ impl VaultManager {
         })
     }
 
+    /// Open a vault manager with a shared connection.
+    pub fn open_with_conn(conn: Arc<Mutex<Connection>>) -> VaultResult<Self> {
+        Ok(Self {
+            vaults: RwLock::new(HashMap::new()),
+            conn,
+        })
+    }
+
     /// Flushes the WAL to the main database file.
     pub fn checkpoint(&self) -> VaultResult<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute_batch("CHECKPOINT;")
-            .map_err(|e| VaultError::Storage(e.to_string()))?;
+        privstack_db::checkpoint(&conn).map_err(|e| VaultError::Storage(e.to_string()))?;
         Ok(())
     }
 
     /// Open a vault manager with an in-memory database.
     pub fn open_in_memory() -> VaultResult<Self> {
         let conn =
-            Connection::open_in_memory().map_err(|e| VaultError::Storage(e.to_string()))?;
+            privstack_db::open_in_memory().map_err(|e| VaultError::Storage(e.to_string()))?;
         Ok(Self {
             vaults: RwLock::new(HashMap::new()),
             conn: Arc::new(Mutex::new(conn)),

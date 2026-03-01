@@ -7,14 +7,12 @@ license.workspace = true
 
 [dependencies]
 privstack-crypto.workspace = true
+privstack-db.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-uuid.workspace = true
 chrono = "0.4"
-duckdb.workspace = true
 sha2 = "0.10"
 
 [dev-dependencies]
 tempfile.workspace = true
-duckdb.workspace = true

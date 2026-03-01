@@ -8,7 +8,7 @@ use tempfile::TempDir;
 #[test]
 fn open_file_backed_vault() {
     let temp = TempDir::new().unwrap();
-    let db_path = temp.path().join("vault.duckdb");
+    let db_path = temp.path().join("vault.db");
     let mgr = VaultManager::open(&db_path).unwrap();
     mgr.create_vault("test").unwrap();
     mgr.initialize("test", "password123").unwrap();
@@ -179,7 +179,7 @@ fn unlock_all_skips_uninitialized() {
 #[test]
 fn file_backed_persistence() {
     let temp = TempDir::new().unwrap();
-    let db_path = temp.path().join("persist.duckdb");
+    let db_path = temp.path().join("persist.db");
 
     // Create and populate
     {
@@ -383,7 +383,7 @@ fn vault_direct_id() {
     use privstack_vault::Vault;
     use std::sync::{Arc, Mutex};
 
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("test_vault", conn).unwrap();
 
@@ -395,7 +395,7 @@ fn vault_direct_list_blobs_empty() {
     use privstack_vault::Vault;
     use std::sync::{Arc, Mutex};
 
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("v", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -409,7 +409,7 @@ fn vault_direct_list_blobs_with_data() {
     use privstack_vault::Vault;
     use std::sync::{Arc, Mutex};
 
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("v", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -426,7 +426,7 @@ fn vault_direct_list_blobs_with_data() {
 
 #[test]
 fn vault_direct_initialize_lock_unlock() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("direct", conn).unwrap();
 
@@ -446,7 +446,7 @@ fn vault_direct_initialize_lock_unlock() {
 
 #[test]
 fn vault_direct_store_read_delete_blob() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("blobs", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -461,7 +461,7 @@ fn vault_direct_store_read_delete_blob() {
 
 #[test]
 fn vault_direct_locked_operations_fail() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("locked", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -473,7 +473,7 @@ fn vault_direct_locked_operations_fail() {
 
 #[test]
 fn vault_direct_change_password() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("chpw", conn).unwrap();
     vault.initialize("oldpass12").unwrap();
@@ -489,7 +489,7 @@ fn vault_direct_change_password() {
 
 #[test]
 fn vault_direct_wrong_password() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("wrongpw", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -500,7 +500,7 @@ fn vault_direct_wrong_password() {
 
 #[test]
 fn vault_direct_double_init() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("dbl", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -509,7 +509,7 @@ fn vault_direct_double_init() {
 
 #[test]
 fn vault_direct_unlock_not_initialized() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("uninit", conn).unwrap();
     assert!(matches!(vault.unlock("password123"), Err(VaultError::NotInitialized)));
@@ -517,7 +517,7 @@ fn vault_direct_unlock_not_initialized() {
 
 #[test]
 fn vault_direct_delete_nonexistent() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("del", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -526,7 +526,7 @@ fn vault_direct_delete_nonexistent() {
 
 #[test]
 fn vault_direct_password_too_short() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("short", conn).unwrap();
     assert!(matches!(vault.initialize("short"), Err(VaultError::PasswordTooShort)));
@@ -534,7 +534,7 @@ fn vault_direct_password_too_short() {
 
 #[test]
 fn vault_direct_change_password_short() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("chps", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -543,7 +543,7 @@ fn vault_direct_change_password_short() {
 
 #[test]
 fn vault_direct_change_password_wrong_old() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("chpwo", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -702,7 +702,7 @@ fn vault_manager_default_key_bytes() {
 
 #[test]
 fn vault_is_unlocked_reflects_key_state() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("gk", conn).unwrap();
     assert!(!vault.is_unlocked());
@@ -807,7 +807,7 @@ fn change_password_all_no_initialized_vaults() {
 
 #[test]
 fn vault_direct_read_blob_not_found() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("rnf", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -899,7 +899,7 @@ fn blob_info_serialize_with_none_hash() {
 #[test]
 fn vault_direct_change_password_no_blobs() {
     // Change password when vault has no blobs (empty re-encryption loop)
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("noblobs", conn).unwrap();
     vault.initialize("oldpass12").unwrap();
@@ -911,7 +911,7 @@ fn vault_direct_change_password_no_blobs() {
 
 #[test]
 fn vault_direct_store_read_multiple_blobs() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("multi", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -934,7 +934,7 @@ fn vault_direct_store_read_multiple_blobs() {
 
 #[test]
 fn vault_direct_delete_then_list() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("dellist", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -1053,7 +1053,7 @@ fn vault_manager_change_password_all_with_blobs() {
 
 #[test]
 fn vault_direct_overwrite_blob_preserves_single_entry() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("ow", conn).unwrap();
     vault.initialize("password123").unwrap();

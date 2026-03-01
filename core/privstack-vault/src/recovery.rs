@@ -5,7 +5,7 @@
 //! is stored as a JSON value in the vault's meta table under the key
 //! `"recovery_blob"`.
 
-use duckdb::params;
+use privstack_db::rusqlite::params;
 use privstack_crypto::recovery::{create_recovery_blob, create_recovery_blob_with_mnemonic, open_recovery_blob, reencrypt_recovery_blob, RecoveryBlob};
 use privstack_crypto::{decrypt, derive_key, encrypt, EncryptedData, KdfParams, Salt};
 

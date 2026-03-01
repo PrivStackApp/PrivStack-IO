@@ -25,7 +25,7 @@ fn generate_mnemonic() -> String {
 
 #[test]
 fn setup_recovery_with_mnemonic_stores_blob() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("v", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -38,7 +38,7 @@ fn setup_recovery_with_mnemonic_stores_blob() {
 
 #[test]
 fn setup_recovery_with_mnemonic_on_locked_vault_fails() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("v", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -51,7 +51,7 @@ fn setup_recovery_with_mnemonic_on_locked_vault_fails() {
 
 #[test]
 fn setup_recovery_with_mnemonic_allows_password_reset() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("v", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -74,7 +74,7 @@ fn setup_recovery_with_mnemonic_allows_password_reset() {
 
 #[test]
 fn setup_recovery_with_mnemonic_overwrites_previous_recovery() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("v", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -341,7 +341,7 @@ fn checkpoint_succeeds_on_in_memory_db() {
 #[test]
 fn checkpoint_succeeds_on_file_backed_db() {
     let temp = tempfile::TempDir::new().unwrap();
-    let db_path = temp.path().join("checkpoint_test.duckdb");
+    let db_path = temp.path().join("checkpoint_test.db");
     let mgr = VaultManager::open(&db_path).unwrap();
     mgr.create_vault("v").unwrap();
     mgr.initialize("v", "password123").unwrap();
@@ -486,7 +486,7 @@ fn recovery_with_mnemonic_on_vault_with_special_id() {
 
 #[test]
 fn vault_direct_reset_password_no_blobs() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("v", conn).unwrap();
     vault.initialize("password123").unwrap();
@@ -508,7 +508,7 @@ fn vault_direct_reset_password_no_blobs() {
 
 #[test]
 fn vault_direct_has_recovery_false_initially() {
-    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let conn = privstack_db::open_in_memory().unwrap();
     let conn = Arc::new(Mutex::new(conn));
     let vault = Vault::open("v", conn).unwrap();
     vault.initialize("password123").unwrap();
