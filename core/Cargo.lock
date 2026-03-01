@@ -4194,6 +4194,7 @@ dependencies = [
  "privstack-cloud",
  "privstack-crypto",
  "privstack-datasets",
+ "privstack-db",
  "privstack-license",
  "privstack-model",
  "privstack-plugin-host",

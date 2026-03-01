@@ -22,6 +22,7 @@ privstack-license.workspace = true
 # Generic vault + blob storage
 privstack-vault.workspace = true
 privstack-blobstore.workspace = true
+privstack-db.workspace = true
 # Core entity model
 privstack-model.workspace = true
 privstack-plugin-host = { workspace = true, optional = true }

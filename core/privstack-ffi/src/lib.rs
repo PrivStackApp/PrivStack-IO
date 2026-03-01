@@ -499,74 +499,71 @@ fn load_or_create_keypair(db_path: &str) -> Keypair {
 pub fn init_core(path: &str) -> PrivStackError {
     let peer_id = load_or_create_peer_id(path);
 
-    // Create vault manager (encrypted blob storage)
-    let vault_db_path = if path == ":memory:" {
+    // Open single shared database for entities, events, blobs, and vault
+    let main_db_path = if path == ":memory:" {
         Path::new(":memory:").to_path_buf()
     } else {
-        Path::new(path).with_extension("vault.db")
+        Path::new(path).with_extension("privstack.db")
     };
-    ffi_debug!("[FFI] Opening vault DB: {}", vault_db_path.display());
-    let vault_manager = match VaultManager::open(&vault_db_path) {
+    ffi_debug!("[FFI] Opening main database: {}", main_db_path.display());
+
+    let main_conn = if path == ":memory:" {
+        privstack_db::open_in_memory()
+    } else {
+        privstack_db::open_db_unencrypted(&main_db_path)
+    };
+    let main_conn = match main_conn {
+        Ok(conn) => {
+            privstack_db::register_custom_functions(&conn).ok();
+            Arc::new(std::sync::Mutex::new(conn))
+        }
+        Err(e) => {
+            ffi_error!("[FFI] FAILED to open main database: {e:?}");
+            return PrivStackError::StorageError;
+        }
+    };
+
+    // All stores share the same connection
+    let vault_manager = match VaultManager::open_with_conn(main_conn.clone()) {
         Ok(vm) => {
-            ffi_debug!("[FFI] Vault DB opened OK");
+            ffi_debug!("[FFI] Vault manager initialized OK");
             Arc::new(vm)
         }
         Err(e) => {
-            ffi_error!("[FFI] FAILED to open vault DB: {e:?}");
+            ffi_error!("[FFI] FAILED to init vault manager: {e:?}");
             return PrivStackError::StorageError;
         }
     };
 
-    // Create blob store with vault-backed encryption
-    let blob_db_path = if path == ":memory:" {
-        Path::new(":memory:").to_path_buf()
-    } else {
-        Path::new(path).with_extension("blobs.db")
-    };
-    ffi_debug!("[FFI] Opening blob store: {}", blob_db_path.display());
-    let blob_store = match BlobStore::open(&blob_db_path) {
+    let blob_store = match BlobStore::open_with_conn(main_conn.clone()) {
         Ok(bs) => {
-            ffi_debug!("[FFI] Blob store opened OK");
+            ffi_debug!("[FFI] Blob store initialized OK");
             bs
         }
         Err(e) => {
-            ffi_error!("[FFI] FAILED to open blob store: {e:?}");
+            ffi_error!("[FFI] FAILED to init blob store: {e:?}");
             return PrivStackError::StorageError;
         }
     };
 
-    // Create generic entity store with vault-backed encryption
-    let entity_path = if path == ":memory:" {
-        Path::new(":memory:").to_path_buf()
-    } else {
-        Path::new(path).with_extension("entities.db")
-    };
-    ffi_debug!("[FFI] Opening entity store: {}", entity_path.display());
-    let entity_store = match EntityStore::open(&entity_path) {
+    let entity_store = match EntityStore::open_with_conn(main_conn.clone()) {
         Ok(s) => {
-            ffi_debug!("[FFI] Entity store opened OK");
+            ffi_debug!("[FFI] Entity store initialized OK");
             s
         }
         Err(e) => {
-            ffi_error!("[FFI] FAILED to open entity store: {e:?}");
+            ffi_error!("[FFI] FAILED to init entity store: {e:?}");
             return PrivStackError::StorageError;
         }
     };
 
-    // Event store for sync replication
-    let events_path = if path == ":memory:" {
-        Path::new(":memory:").to_path_buf()
-    } else {
-        Path::new(path).with_extension("events.db")
-    };
-    ffi_debug!("[FFI] Opening event store: {}", events_path.display());
-    let event_store = match EventStore::open(&events_path) {
+    let event_store = match EventStore::open_with_conn(main_conn.clone()) {
         Ok(s) => {
-            ffi_debug!("[FFI] Event store opened OK");
+            ffi_debug!("[FFI] Event store initialized OK");
             s
         }
         Err(e) => {
-            ffi_error!("[FFI] FAILED to open event store: {e:?}");
+            ffi_error!("[FFI] FAILED to init event store: {e:?}");
             return PrivStackError::StorageError;
         }
     };
@@ -663,74 +660,71 @@ where
 {
     let peer_id = load_or_create_peer_id(path);
 
-    // Create vault manager (encrypted blob storage)
-    let vault_db_path = if path == ":memory:" {
+    // Open single shared database for entities, events, blobs, and vault
+    let main_db_path = if path == ":memory:" {
         Path::new(":memory:").to_path_buf()
     } else {
-        Path::new(path).with_extension("vault.db")
+        Path::new(path).with_extension("privstack.db")
     };
-    ffi_debug!("[FFI] Opening vault DB: {}", vault_db_path.display());
-    let vault_manager = match VaultManager::open(&vault_db_path) {
+    ffi_debug!("[FFI] Opening main database: {}", main_db_path.display());
+
+    let main_conn = if path == ":memory:" {
+        privstack_db::open_in_memory()
+    } else {
+        privstack_db::open_db_unencrypted(&main_db_path)
+    };
+    let main_conn = match main_conn {
+        Ok(conn) => {
+            privstack_db::register_custom_functions(&conn).ok();
+            Arc::new(std::sync::Mutex::new(conn))
+        }
+        Err(e) => {
+            ffi_error!("[FFI] FAILED to open main database: {e:?}");
+            return PrivStackError::StorageError;
+        }
+    };
+
+    // All stores share the same connection
+    let vault_manager = match VaultManager::open_with_conn(main_conn.clone()) {
         Ok(vm) => {
-            ffi_debug!("[FFI] Vault DB opened OK");
+            ffi_debug!("[FFI] Vault manager initialized OK");
             Arc::new(vm)
         }
         Err(e) => {
-            ffi_error!("[FFI] FAILED to open vault DB: {e:?}");
+            ffi_error!("[FFI] FAILED to init vault manager: {e:?}");
             return PrivStackError::StorageError;
         }
     };
 
-    // Create blob store with vault-backed encryption
-    let blob_db_path = if path == ":memory:" {
-        Path::new(":memory:").to_path_buf()
-    } else {
-        Path::new(path).with_extension("blobs.db")
-    };
-    ffi_debug!("[FFI] Opening blob store: {}", blob_db_path.display());
-    let blob_store = match BlobStore::open(&blob_db_path) {
+    let blob_store = match BlobStore::open_with_conn(main_conn.clone()) {
         Ok(bs) => {
-            ffi_debug!("[FFI] Blob store opened OK");
+            ffi_debug!("[FFI] Blob store initialized OK");
             bs
         }
         Err(e) => {
-            ffi_error!("[FFI] FAILED to open blob store: {e:?}");
+            ffi_error!("[FFI] FAILED to init blob store: {e:?}");
             return PrivStackError::StorageError;
         }
     };
 
-    // Create generic entity store with vault-backed encryption
-    let entity_path = if path == ":memory:" {
-        Path::new(":memory:").to_path_buf()
-    } else {
-        Path::new(path).with_extension("entities.db")
-    };
-    ffi_debug!("[FFI] Opening entity store: {}", entity_path.display());
-    let entity_store = match EntityStore::open(&entity_path) {
+    let entity_store = match EntityStore::open_with_conn(main_conn.clone()) {
         Ok(s) => {
-            ffi_debug!("[FFI] Entity store opened OK");
+            ffi_debug!("[FFI] Entity store initialized OK");
             s
         }
         Err(e) => {
-            ffi_error!("[FFI] FAILED to open entity store: {e:?}");
+            ffi_error!("[FFI] FAILED to init entity store: {e:?}");
             return PrivStackError::StorageError;
         }
     };
 
-    // Event store for sync replication
-    let events_path = if path == ":memory:" {
-        Path::new(":memory:").to_path_buf()
-    } else {
-        Path::new(path).with_extension("events.db")
-    };
-    ffi_debug!("[FFI] Opening event store: {}", events_path.display());
-    let event_store = match EventStore::open(&events_path) {
+    let event_store = match EventStore::open_with_conn(main_conn.clone()) {
         Ok(s) => {
-            ffi_debug!("[FFI] Event store opened OK");
+            ffi_debug!("[FFI] Event store initialized OK");
             s
         }
         Err(e) => {
-            ffi_error!("[FFI] FAILED to open event store: {e:?}");
+            ffi_error!("[FFI] FAILED to init event store: {e:?}");
             return PrivStackError::StorageError;
         }
     };
@@ -5676,27 +5670,24 @@ pub extern "C" fn privstack_db_diagnostics() -> *mut c_char {
         Some(h) => {
             let mut all_dbs = serde_json::Map::new();
 
-            // 1. Entity store (uses existing open connection)
+            // 1. Main database (shared connection for entities, events, blobs, vault)
             if let Ok(diag) = h.entity_store.db_diagnostics() {
                 // Add file_size from disk
-                let entity_path = Path::new(&h.db_path).with_extension("entities.db");
-                let file_size = std::fs::metadata(&entity_path)
+                let main_path = Path::new(&h.db_path).with_extension("privstack.db");
+                let file_size = std::fs::metadata(&main_path)
                     .map(|m| m.len() as i64)
                     .unwrap_or(0);
                 let mut val = diag;
                 if let Some(obj) = val.as_object_mut() {
                     obj.insert("file_size".to_string(), serde_json::json!(file_size));
                 }
-                all_dbs.insert("entities".to_string(), val);
+                all_dbs.insert("main".to_string(), val);
             }
 
             // 2. Scan sibling SQLite files (opens read-only connections)
             let base = Path::new(&h.db_path);
             let siblings = [
                 ("datasets", base.with_extension("datasets.db")),
-                ("blobs", base.with_extension("blobs.db")),
-                ("events", base.with_extension("events.db")),
-                ("vault", base.with_extension("vault.db")),
             ];
 
             for (label, path) in &siblings {
@@ -5723,17 +5714,17 @@ pub extern "C" fn privstack_compact_databases() -> *mut c_char {
             let mut results = serde_json::Map::new();
             let base = Path::new(&h.db_path);
 
-            // 1. Entity store — uses the managed connection swap approach
-            let entity_path = base.with_extension("entities.db");
-            match h.entity_store.compact(&entity_path) {
+            // 1. Main database (shared connection) — compact covers entities, events, blobs, vault
+            let main_path = base.with_extension("privstack.db");
+            match h.entity_store.compact(&main_path) {
                 Ok((before, after)) => {
-                    results.insert("entities".into(), serde_json::json!({
+                    results.insert("main".into(), serde_json::json!({
                         "before": before, "after": after,
                     }));
                 }
                 Err(e) => {
-                    ffi_error!("[compact] entities failed: {}", e);
-                    results.insert("entities".into(), serde_json::json!({
+                    ffi_error!("[compact] main database failed: {}", e);
+                    results.insert("main".into(), serde_json::json!({
                         "error": format!("{}", e),
                     }));
                 }
@@ -5742,8 +5733,6 @@ pub extern "C" fn privstack_compact_databases() -> *mut c_char {
             // 2. Sibling databases — standalone compact (open, copy, close, swap)
             let siblings = [
                 ("datasets", base.with_extension("datasets.db")),
-                ("blobs", base.with_extension("blobs.db")),
-                ("events", base.with_extension("events.db")),
             ];
 
             for (label, path) in &siblings {
@@ -5764,8 +5753,8 @@ pub extern "C" fn privstack_compact_databases() -> *mut c_char {
                 }
             }
 
-            // Note: vault is intentionally excluded — it has an active VaultManager connection
-            // and its data is typically small.
+            // Note: vault, blobs, events, and entities all share the main database connection,
+            // so the single compact above covers all of them.
 
             to_c_string(&serde_json::Value::Object(results).to_string())
         }
