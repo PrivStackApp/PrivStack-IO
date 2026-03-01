@@ -198,32 +198,42 @@ public sealed class SubsystemTracker
         }
     }
 
+    // Track UI thread allocations between ticks for rendering/shell metrics
+    private long _lastUiThreadBytes;
+
     /// <summary>
     /// Populate runtime subsystems from .NET system APIs.
-    /// Call once per timer tick alongside RefreshNativeCounters/UpdateRateSamples.
+    /// MUST be called from the UI thread (DispatcherTimer) so that
+    /// GC.GetAllocatedBytesForCurrentThread() captures UI/render allocations.
     /// </summary>
     public void RefreshRuntimeMetrics()
     {
-        // .NET GC heap
+        // ── .NET GC ──
+        var gcInfo = GC.GetGCMemoryInfo();
         var gcState = GetOrCreateState("runtime.gc");
         var gcHeap = GC.GetTotalMemory(false);
         Interlocked.Exchange(ref gcState.ManagedAllocBytes, gcHeap);
+        // GC generation breakdown as "native" to show LOH/POH (render targets, bitmaps)
+        var genInfo = gcInfo.GenerationInfo;
+        long loh = genInfo.Length > 3 ? genInfo[3].SizeAfterBytes : 0;
+        long poh = genInfo.Length > 4 ? genInfo[4].SizeAfterBytes : 0;
+        Interlocked.Exchange(ref gcState.NativeBytes, loh + poh);
 
-        // Thread pool — actual pool thread count + pending work items
+        // ── Thread Pool ──
         var tpState = GetOrCreateState("runtime.threadpool");
         Volatile.Write(ref tpState.ActiveTaskCount, ThreadPool.ThreadCount);
-        Interlocked.Exchange(ref tpState.ManagedAllocBytes, ThreadPool.PendingWorkItemCount * 64L);
+        var pending = ThreadPool.PendingWorkItemCount;
+        var completed = ThreadPool.CompletedWorkItemCount;
+        Interlocked.Exchange(ref tpState.ManagedAllocBytes, pending * 64L);
+        Interlocked.Exchange(ref tpState.NativeAllocs, completed);
 
-        // Native (Rust) — total Rust-side memory across all subsystems
-        // Individual Core subsystems (storage, sync, crypto, cloud) have their
-        // own per-subsystem breakdown from MergeNativeCounters. This entry shows
-        // the aggregate so it's never "—" when Rust is active.
+        // ── Native (Rust) — aggregate from all core.* subsystems ──
         try
         {
             long totalRustBytes = 0;
             foreach (var (id, state) in _states)
             {
-                if (id.StartsWith("core.", StringComparison.Ordinal) || id == "runtime.native")
+                if (id.StartsWith("core.", StringComparison.Ordinal))
                     totalRustBytes += Interlocked.Read(ref state.NativeBytes);
             }
             var nativeState = GetOrCreateState("runtime.native");
@@ -231,13 +241,27 @@ public sealed class SubsystemTracker
         }
         catch { /* snapshot iteration may race with registration */ }
 
-        // Shell — mark active (UI thread is always running)
-        var shellState = GetOrCreateState("shell");
-        Volatile.Write(ref shellState.ActiveTaskCount, 1);
-
-        // Rendering — mark active while UI is running
+        // ── Rendering — UI thread allocation tracking ──
+        // This method runs on the UI thread, so GetAllocatedBytesForCurrentThread
+        // captures all UI work: layout, binding updates, render composition, input.
         var renderState = GetOrCreateState("rendering");
+        var uiBytes = GC.GetAllocatedBytesForCurrentThread();
+        var uiDelta = uiBytes - _lastUiThreadBytes;
+        _lastUiThreadBytes = uiBytes;
+        if (uiDelta > 0)
+            Interlocked.Add(ref renderState.ManagedAllocBytes, uiDelta);
         Volatile.Write(ref renderState.ActiveTaskCount, 1);
+
+        // ── Shell — process-level thread count ──
+        try
+        {
+            var proc = System.Diagnostics.Process.GetCurrentProcess();
+            var shellState = GetOrCreateState("shell");
+            Volatile.Write(ref shellState.ActiveTaskCount, proc.Threads.Count);
+            // Loaded assemblies as a proxy for shell complexity
+            Interlocked.Exchange(ref shellState.NativeAllocs, AppDomain.CurrentDomain.GetAssemblies().Length);
+        }
+        catch { /* process metrics may fail in sandboxed environments */ }
     }
 
     /// <summary>
