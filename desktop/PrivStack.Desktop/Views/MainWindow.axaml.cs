@@ -562,44 +562,42 @@ public partial class MainWindow : Window
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     var balloon = this.FindControl<Border>("AiBalloon");
-                    // AiStarIcon is inside NavigationSidebar (separate name scope) — search visual tree
-                    var starIcon = this.GetVisualDescendants()
-                        .OfType<PathIcon>()
-                        .FirstOrDefault(p => p.Name == "AiStarIcon");
-                    if (balloon != null && starIcon != null)
-                        PositionBalloonOverStar(balloon, starIcon);
+                    var fab = this.FindControl<Border>("DuncanFab");
+                    if (balloon != null && fab != null)
+                        PositionBalloonOverFab(balloon, fab);
                 }, Avalonia.Threading.DispatcherPriority.Render);
             }
         };
     }
 
-    private void PositionBalloonOverStar(Border balloon, PathIcon starIcon)
+    private void PositionBalloonOverFab(Border balloon, Border fab)
     {
         if (DataContext is not MainWindowViewModel vm || !vm.AiTrayVM.HasBalloonMessage)
             return;
 
         try
         {
-            // Get star icon center position relative to this window
-            var starBounds = starIcon.Bounds;
-            var starCenter = starIcon.TranslatePoint(
-                new Point(starBounds.Width / 2, 0), this);
+            // Get FAB center X position relative to this window
+            var fabBounds = fab.Bounds;
+            var fabTopCenter = fab.TranslatePoint(
+                new Point(fabBounds.Width / 2, 0), this);
 
-            if (starCenter == null) return;
+            if (fabTopCenter == null) return;
 
-            // The arrow tip is 32px from the balloon's left edge (24px arrow margin + 8px half-width)
-            const double arrowOffsetFromLeft = 32;
+            // The arrow tip is 32px from the balloon's right edge (24px arrow margin + 8px half-width)
+            const double arrowOffsetFromRight = 32;
 
-            // Calculate left margin so arrow tip aligns with star center
-            var leftMargin = starCenter.Value.X - arrowOffsetFromLeft;
-            leftMargin = Math.Max(8, leftMargin); // floor at 8px
+            // Calculate right margin so arrow tip aligns with FAB center
+            var rightMargin = Bounds.Width - fabTopCenter.Value.X - arrowOffsetFromRight;
+            rightMargin = Math.Max(8, rightMargin); // floor at 8px
 
-            balloon.Margin = new Thickness(leftMargin, 0, 0, 48);
+            // Bottom margin: 8px gap above FAB (FAB is 48px tall at 24px bottom margin = 72px from bottom + 8px gap)
+            balloon.Margin = new Thickness(0, 0, rightMargin, 80);
         }
         catch
         {
             // Fallback to default position if measurement fails
-            balloon.Margin = new Thickness(260, 0, 0, 48);
+            balloon.Margin = new Thickness(0, 0, 24, 80);
         }
     }
 }
