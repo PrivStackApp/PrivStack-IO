@@ -376,7 +376,7 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
             });
         }
 
-        // Set workspace activation state
+        // Set workspace activation state (set callback AFTER initial value to avoid re-entrant calls)
         foreach (var item in AllPlugins)
         {
             var plugin = _pluginRegistry.GetPlugin(item.Id);
@@ -384,6 +384,7 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
             {
                 item.CanToggle = true;
                 item.IsActivated = _pluginRegistry.IsPluginEnabled(item.Id);
+                item.OnActivationChanged = OnPluginActivationChanged;
             }
             else if (plugin != null)
             {
@@ -613,6 +614,20 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
             _pluginRegistry.EnablePlugin(item.Id);
             item.IsActivated = true;
         }
+    }
+
+    /// <summary>
+    /// Called when a plugin item's IsActivated property changes from the ToggleSwitch
+    /// two-way binding. Syncs the change to the plugin registry.
+    /// </summary>
+    internal void OnPluginActivationChanged(DashboardPluginItem item)
+    {
+        if (!item.CanToggle) return;
+
+        if (item.IsActivated)
+            _pluginRegistry.EnablePlugin(item.Id);
+        else
+            _pluginRegistry.DisablePlugin(item.Id);
     }
 
     [RelayCommand]

@@ -377,12 +377,10 @@
                                                 <!-- Workspace toggle (only for toggleable plugins) -->
                                                 <ToggleSwitch Grid.Column="2"
                                                               IsVisible="{Binding CanToggle}"
-                                                              IsChecked="{Binding IsActivated, Mode=OneWay}"
+                                                              IsChecked="{Binding IsActivated}"
                                                               VerticalAlignment="Center"
                                                               Margin="4,0,0,0"
-                                                              OnContent="" OffContent=""
-                                                              Command="{Binding $parent[UserControl].((vm:DashboardViewModel)DataContext).TogglePluginActivationCommand}"
-                                                              CommandParameter="{Binding}"/>
+                                                              OnContent="" OffContent=""/>
                                             </Grid>
                                         </StackPanel>
 

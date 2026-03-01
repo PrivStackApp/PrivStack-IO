@@ -65,6 +65,17 @@ public partial class DashboardPluginItem : ObservableObject
     [ObservableProperty]
     private bool _canToggle;
 
+    /// <summary>
+    /// Callback invoked when IsActivated changes (e.g. from ToggleSwitch two-way binding).
+    /// Set by the ViewModel to sync changes to the plugin registry.
+    /// </summary>
+    internal Action<DashboardPluginItem>? OnActivationChanged { get; set; }
+
+    partial void OnIsActivatedChanged(bool value)
+    {
+        OnActivationChanged?.Invoke(this);
+    }
+
     public bool IsAlpha => string.Equals(ReleaseStage, "alpha", StringComparison.OrdinalIgnoreCase);
     public bool IsBeta => string.Equals(ReleaseStage, "beta", StringComparison.OrdinalIgnoreCase);
 
