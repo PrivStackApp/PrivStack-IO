@@ -654,14 +654,17 @@ public partial class App : Application
                     Services.GetRequiredService<IWorkspaceService>(),
                     Services.GetRequiredService<IDatasetService>());
 
-                // IPC server + native messaging registration — only if the bridge binary
-                // exists (web clipper extension installed) or the local API is enabled.
-                var bridgePath = FindBridgePath();
-                if (bridgePath != null || appSettings.Settings.ApiEnabled)
+                // IPC server — only if the local API is enabled or the browser extension
+                // has been paired (BridgeAuthToken exists). The bridge binary may exist in
+                // dev builds without the extension actually being installed.
+                var bridgePaired = !string.IsNullOrEmpty(appSettings.Settings.BridgeAuthToken);
+                if (appSettings.Settings.ApiEnabled || bridgePaired)
                 {
                     Services.GetRequiredService<IIpcServer>().Start();
                 }
 
+                // Native messaging host registration — only if bridge binary exists on disk
+                var bridgePath = FindBridgePath();
                 if (bridgePath != null)
                     NativeMessagingRegistrar.Register(bridgePath, appSettings);
 
