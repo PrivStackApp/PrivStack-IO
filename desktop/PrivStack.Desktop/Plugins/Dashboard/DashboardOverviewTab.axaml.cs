@@ -14,11 +14,6 @@ public partial class DashboardOverviewTab : UserControl
         InitializeComponent();
     }
 
-    private static void InitializeComponent()
-    {
-        throw new NotImplementedException();
-    }
-
     private void OnPluginGridSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         if (sender is not ItemsControl host) return;
