@@ -136,7 +136,7 @@
 
         <!-- ==================== OVERVIEW TAB ==================== -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                      Padding="24,0,24,32"
+                      Padding="24,0,24,80"
                       IsVisible="{Binding IsOverviewTab}">
             <StackPanel Spacing="20">
 
@@ -894,7 +894,7 @@
 
         <!-- ==================== SUBSYSTEMS TAB ==================== -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                      Padding="24,0,24,32"
+                      Padding="24,0,24,80"
                       IsVisible="{Binding IsSubsystemsTab}">
             <StackPanel Spacing="24" MaxWidth="900" HorizontalAlignment="Center">
 
