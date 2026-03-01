@@ -103,16 +103,16 @@
     </Design.DataContext>
 
     <Panel>
-        <!-- Main layout: DockPanel ensures status bar is docked to bottom first, remaining space fills content -->
-        <DockPanel>
+        <!-- Main layout: Grid with explicit row definitions for deterministic height constraints.
+             Row 0 = title bar spacer (fixed 28px), Row 1 = license banner (Auto), Row 2 = content (star). -->
+        <Grid RowDefinitions="28,Auto,*">
             <!-- Title bar drag region / spacer for macOS traffic lights -->
-            <Border DockPanel.Dock="Top" x:Name="TitleBarSpacer"
+            <Border Grid.Row="0" x:Name="TitleBarSpacer"
                     Background="{DynamicResource ThemeBackgroundBrush}"
-                    Height="28"
                     IsHitTestVisible="False"/>
 
             <!-- License expiration banner -->
-            <Border DockPanel.Dock="Top"
+            <Border Grid.Row="1"
                     IsVisible="{Binding IsLicenseExpiredBannerVisible}"
                     Background="{DynamicResource ThemeDangerBrush}" Padding="8,6"
                     HorizontalAlignment="Stretch">
@@ -127,8 +127,8 @@
                 </Grid>
             </Border>
 
-            <!-- Sidebar + Content area (fill child — takes all remaining space after docked items) -->
-            <Grid ColumnDefinitions="Auto,*">
+            <!-- Sidebar + Content area (star row — takes all remaining space after fixed rows) -->
+            <Grid Grid.Row="2" ColumnDefinitions="Auto,*">
                 <!-- Navigation Sidebar -->
                 <views:NavigationSidebar Grid.Column="0"
                                          Classes.collapsed="{Binding IsSidebarCollapsed}"
@@ -427,7 +427,7 @@
                         </StackPanel>
                 </Panel>
             </Grid>
-        </DockPanel>
+        </Grid>
 
         <!-- AI Persona Speech Balloon (dynamically positioned above sidebar AI star icon) -->
         <Border x:Name="AiBalloon"
