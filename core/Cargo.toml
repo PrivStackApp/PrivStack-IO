@@ -4,6 +4,7 @@ members = [
     "privstack-types",
     "privstack-crdt",
     "privstack-crypto",
+    "privstack-db",
     "privstack-storage",
     "privstack-vault",
     "privstack-blobstore",
@@ -66,10 +67,15 @@ privstack-plugin-sdk = { path = "privstack-plugin-sdk" }
 privstack-ppk = { path = "privstack-ppk" }
 privstack-datasets = { path = "privstack-datasets" }
 privstack-cloud = { path = "privstack-cloud" }
+privstack-db = { path = "privstack-db" }
 
 [workspace.dependencies.duckdb]
 version = "1.1"
 features = ["bundled"]
+
+[workspace.dependencies.rusqlite]
+version = "0.31"
+features = ["bundled-sqlcipher", "column_decltype", "blob", "functions"]
 
 [profile.release]
 opt-level = "s"

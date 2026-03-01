@@ -4492,14 +4492,12 @@ name = "privstack-blobstore"
 version = "1.15.3"
 dependencies = [
  "chrono",
- "duckdb",
- "privstack-crypto",
+ "privstack-db",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
  "thiserror 2.0.18",
- "uuid",
 ]
 
 [[package]]
@@ -4582,6 +4580,17 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "privstack-db"
+version = "1.15.3"
+dependencies = [
+ "rusqlite",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]

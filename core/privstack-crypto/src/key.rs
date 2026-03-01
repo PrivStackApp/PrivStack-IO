@@ -139,3 +139,14 @@ pub fn generate_random_key() -> DerivedKey {
     rand::rngs::OsRng.fill_bytes(&mut bytes);
     DerivedKey::from_bytes(bytes)
 }
+
+/// Derive a SQLCipher raw hex key string from a `DerivedKey`.
+///
+/// Returns a string in the format `x'<64 hex chars>'` suitable for
+/// passing to SQLCipher's `PRAGMA key`. Using raw key mode bypasses
+/// SQLCipher's internal PBKDF2 derivation since we already derived
+/// the key via Argon2id.
+pub fn derive_sqlcipher_key(key: &DerivedKey) -> String {
+    let hex: String = key.as_bytes().iter().map(|b| format!("{b:02x}")).collect();
+    format!("x'{hex}'")
+}

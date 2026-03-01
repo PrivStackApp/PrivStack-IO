@@ -1,12 +1,11 @@
-//! Generic namespace-scoped blob storage with optional encryption.
+//! Namespace-scoped blob storage backed by SQLite.
 //!
-//! When a `DataEncryptor` is provided, blob `data` is encrypted at rest.
-//! Content hashes are computed on the *plaintext* before encryption so
-//! dedup checks remain valid across password changes.
+//! Data is stored as plaintext in the database — at-rest encryption is
+//! handled by SQLCipher at the database file level. Content hashes are
+//! SHA-256 of the plaintext for dedup checks.
 
 use chrono::Utc;
-use duckdb::{params, Connection};
-use privstack_crypto::DataEncryptor;
+use privstack_db::rusqlite::{self, params, Connection};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::path::Path;
@@ -22,8 +21,6 @@ pub enum BlobStoreError {
     NotFound(String, String),
     #[error("storage error: {0}")]
     Storage(String),
-    #[error("encryption error: {0}")]
-    Encryption(String),
 }
 
 pub type BlobStoreResult<T> = Result<T, BlobStoreError>;
@@ -49,101 +46,58 @@ pub struct BlobMetadata {
 
 pub struct BlobStore {
     conn: Arc<Mutex<Connection>>,
-    encryptor: Arc<dyn DataEncryptor>,
 }
 
 impl BlobStore {
-    /// Open a blob store backed by a DuckDB file (no encryption).
+    /// Open a blob store backed by a SQLite file (no encryption).
     pub fn open(db_path: &Path) -> BlobStoreResult<Self> {
-        let conn = if db_path.to_str() == Some(":memory:") {
-            Connection::open_in_memory()
-        } else {
-            Connection::open(db_path)
-        }
-        .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
-
-        // Cap memory/threads — DuckDB defaults to ~80% RAM per connection
-        if db_path.to_str() != Some(":memory:") {
-            conn.execute_batch("PRAGMA memory_limit='32MB'; PRAGMA threads=1;")
-                .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
-        }
+        let conn = privstack_db::open_db_unencrypted(db_path)
+            .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
 
         let store = Self {
             conn: Arc::new(Mutex::new(conn)),
-            encryptor: Arc::new(privstack_crypto::PassthroughEncryptor),
         };
         store.ensure_tables()?;
         Ok(store)
     }
 
-    /// Flushes the WAL to the main database file.
-    pub fn checkpoint(&self) -> BlobStoreResult<()> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute_batch("CHECKPOINT;")
-            .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
-        Ok(())
-    }
-
-    /// Open with an existing shared connection (no encryption).
+    /// Open with an existing shared connection.
     pub fn open_with_conn(conn: Arc<Mutex<Connection>>) -> BlobStoreResult<Self> {
-        let store = Self {
-            conn,
-            encryptor: Arc::new(privstack_crypto::PassthroughEncryptor),
-        };
+        let store = Self { conn };
         store.ensure_tables()?;
         Ok(store)
     }
 
-    /// Open in-memory (no encryption).
+    /// Open in-memory (for testing).
     pub fn open_in_memory() -> BlobStoreResult<Self> {
         let conn =
-            Connection::open_in_memory().map_err(|e| BlobStoreError::Storage(e.to_string()))?;
+            privstack_db::open_in_memory().map_err(|e| BlobStoreError::Storage(e.to_string()))?;
         let store = Self {
             conn: Arc::new(Mutex::new(conn)),
-            encryptor: Arc::new(privstack_crypto::PassthroughEncryptor),
         };
         store.ensure_tables()?;
         Ok(store)
     }
 
-    /// Open a blob store with an encryptor for at-rest encryption.
-    pub fn open_with_encryptor(
-        db_path: &Path,
-        encryptor: Arc<dyn DataEncryptor>,
-    ) -> BlobStoreResult<Self> {
-        let conn = if db_path.to_str() == Some(":memory:") {
-            Connection::open_in_memory()
-        } else {
-            Connection::open(db_path)
-        }
-        .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
-
-        // Cap memory/threads — DuckDB defaults to ~80% RAM per connection
-        if db_path.to_str() != Some(":memory:") {
-            conn.execute_batch("PRAGMA memory_limit='32MB'; PRAGMA threads=1;")
-                .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
-        }
-
-        let store = Self {
-            conn: Arc::new(Mutex::new(conn)),
-            encryptor,
-        };
-        store.ensure_tables()?;
-        Ok(store)
+    /// Flush the WAL to the main database file.
+    pub fn checkpoint(&self) -> BlobStoreResult<()> {
+        let conn = self.conn.lock().map_err(|e| BlobStoreError::Storage(e.to_string()))?;
+        privstack_db::checkpoint(&conn).map_err(|e| BlobStoreError::Storage(e.to_string()))?;
+        Ok(())
     }
 
     fn ensure_tables(&self) -> BlobStoreResult<()> {
         let conn = self.conn.lock().map_err(|e| BlobStoreError::Storage(e.to_string()))?;
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS blobs (
-                namespace VARCHAR NOT NULL,
-                blob_id VARCHAR NOT NULL,
+                namespace TEXT NOT NULL,
+                blob_id TEXT NOT NULL,
                 data BLOB NOT NULL,
-                size BIGINT NOT NULL DEFAULT 0,
-                content_hash VARCHAR,
-                metadata_json VARCHAR,
-                created_at BIGINT NOT NULL,
-                modified_at BIGINT NOT NULL,
+                size INTEGER NOT NULL DEFAULT 0,
+                content_hash TEXT,
+                metadata_json TEXT,
+                created_at INTEGER NOT NULL,
+                modified_at INTEGER NOT NULL,
                 PRIMARY KEY (namespace, blob_id)
             );",
         )
@@ -151,12 +105,7 @@ impl BlobStore {
         Ok(())
     }
 
-    /// Entity ID for per-blob encryption keys.
-    fn blob_entity_id(namespace: &str, id: &str) -> String {
-        format!("{namespace}/{id}")
-    }
-
-    /// Store a blob (encrypts data if encryptor is available).
+    /// Store a blob. Data is stored as-is (plaintext).
     pub fn store(
         &self,
         namespace: &str,
@@ -164,52 +113,34 @@ impl BlobStore {
         data: &[u8],
         metadata_json: Option<&str>,
     ) -> BlobStoreResult<()> {
-        // Hash plaintext before encryption for dedup
         let content_hash = hex_encode(Sha256::digest(data));
         let now = Utc::now().timestamp_millis();
-
-        let stored_data = if self.encryptor.is_available() {
-            let entity_id = Self::blob_entity_id(namespace, id);
-            self.encryptor
-                .encrypt_bytes(&entity_id, data)
-                .map_err(|e| BlobStoreError::Encryption(e.to_string()))?
-        } else {
-            data.to_vec()
-        };
 
         let conn = self.conn.lock().map_err(|e| BlobStoreError::Storage(e.to_string()))?;
         conn.execute(
             "INSERT OR REPLACE INTO blobs (namespace, blob_id, data, size, content_hash, metadata_json, created_at, modified_at)
-             VALUES (?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM blobs WHERE namespace = ? AND blob_id = ?), ?), ?)",
-            params![namespace, id, stored_data, data.len() as i64, content_hash, metadata_json, namespace, id, now, now],
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, COALESCE((SELECT created_at FROM blobs WHERE namespace = ?1 AND blob_id = ?2), ?7), ?7)",
+            params![namespace, id, data, data.len() as i64, content_hash, metadata_json, now],
         )
         .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
 
         Ok(())
     }
 
-    /// Read a blob (decrypts if encrypted).
+    /// Read a blob's data.
     pub fn read(&self, namespace: &str, id: &str) -> BlobStoreResult<Vec<u8>> {
         let conn = self.conn.lock().map_err(|e| BlobStoreError::Storage(e.to_string()))?;
-        let raw: Vec<u8> = conn
-            .query_row(
-                "SELECT data FROM blobs WHERE namespace = ? AND blob_id = ?",
-                params![namespace, id],
-                |row| row.get(0),
-            )
-            .map_err(|_| BlobStoreError::NotFound(namespace.to_string(), id.to_string()))?;
-
-        drop(conn);
-
-        // Try decryption; if it fails (passthrough data), return raw
-        if self.encryptor.is_available() {
-            match self.encryptor.decrypt_bytes(&raw) {
-                Ok(plaintext) => Ok(plaintext),
-                Err(_) => Ok(raw), // Legacy unencrypted blob
+        conn.query_row(
+            "SELECT data FROM blobs WHERE namespace = ?1 AND blob_id = ?2",
+            params![namespace, id],
+            |row| row.get(0),
+        )
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => {
+                BlobStoreError::NotFound(namespace.to_string(), id.to_string())
             }
-        } else {
-            Ok(raw)
-        }
+            _ => BlobStoreError::Storage(e.to_string()),
+        })
     }
 
     /// Delete a blob.
@@ -217,7 +148,7 @@ impl BlobStore {
         let conn = self.conn.lock().map_err(|e| BlobStoreError::Storage(e.to_string()))?;
         let affected = conn
             .execute(
-                "DELETE FROM blobs WHERE namespace = ? AND blob_id = ?",
+                "DELETE FROM blobs WHERE namespace = ?1 AND blob_id = ?2",
                 params![namespace, id],
             )
             .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
@@ -237,7 +168,7 @@ impl BlobStore {
         let mut stmt = conn
             .prepare(
                 "SELECT namespace, blob_id, size, content_hash, metadata_json, created_at, modified_at
-                 FROM blobs WHERE namespace = ? ORDER BY modified_at DESC",
+                 FROM blobs WHERE namespace = ?1 ORDER BY modified_at DESC",
             )
             .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
 
@@ -271,7 +202,7 @@ impl BlobStore {
         let conn = self.conn.lock().map_err(|e| BlobStoreError::Storage(e.to_string()))?;
         let affected = conn
             .execute(
-                "UPDATE blobs SET metadata_json = ?, modified_at = ? WHERE namespace = ? AND blob_id = ?",
+                "UPDATE blobs SET metadata_json = ?1, modified_at = ?2 WHERE namespace = ?3 AND blob_id = ?4",
                 params![metadata_json, now, namespace, id],
             )
             .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
@@ -283,87 +214,6 @@ impl BlobStore {
             ));
         }
         Ok(())
-    }
-
-    /// Re-encrypt all blobs after a password change.
-    pub fn re_encrypt_all(
-        &self,
-        old_key_bytes: &[u8],
-        new_key_bytes: &[u8],
-    ) -> BlobStoreResult<usize> {
-        let conn = self.conn.lock().map_err(|e| BlobStoreError::Storage(e.to_string()))?;
-        let mut stmt = conn
-            .prepare("SELECT namespace, blob_id, data FROM blobs")
-            .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
-
-        let rows: Vec<(String, String, Vec<u8>)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
-            .map_err(|e| BlobStoreError::Storage(e.to_string()))?
-            .filter_map(|r| r.ok())
-            .collect();
-        drop(stmt);
-
-        let mut count = 0usize;
-        for (namespace, blob_id, raw) in &rows {
-            // Try to re-encrypt; skip if it fails (likely unencrypted legacy data)
-            match self
-                .encryptor
-                .reencrypt_bytes(raw, old_key_bytes, new_key_bytes)
-            {
-                Ok(re) => {
-                    conn.execute(
-                        "UPDATE blobs SET data = ? WHERE namespace = ? AND blob_id = ?",
-                        params![re, namespace, blob_id],
-                    )
-                    .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
-                    count += 1;
-                }
-                Err(_) => continue, // Unencrypted blob, skip
-            }
-        }
-        Ok(count)
-    }
-
-    /// Migrate unencrypted blobs: encrypts any blob whose data isn't already encrypted.
-    pub fn migrate_unencrypted(&self) -> BlobStoreResult<usize> {
-        if !self.encryptor.is_available() {
-            return Err(BlobStoreError::Encryption(
-                "encryptor unavailable — vault must be unlocked before migration".into(),
-            ));
-        }
-
-        let conn = self.conn.lock().map_err(|e| BlobStoreError::Storage(e.to_string()))?;
-        let mut stmt = conn
-            .prepare("SELECT namespace, blob_id, data FROM blobs")
-            .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
-
-        let rows: Vec<(String, String, Vec<u8>)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
-            .map_err(|e| BlobStoreError::Storage(e.to_string()))?
-            .filter_map(|r| r.ok())
-            .collect();
-        drop(stmt);
-
-        let mut migrated = 0usize;
-        for (namespace, blob_id, raw) in &rows {
-            // If decryption succeeds, it's already encrypted — skip
-            if self.encryptor.decrypt_bytes(raw).is_ok() {
-                continue;
-            }
-            // Raw unencrypted data — encrypt it
-            let entity_id = Self::blob_entity_id(namespace, blob_id);
-            let encrypted = self
-                .encryptor
-                .encrypt_bytes(&entity_id, raw)
-                .map_err(|e| BlobStoreError::Encryption(e.to_string()))?;
-            conn.execute(
-                "UPDATE blobs SET data = ? WHERE namespace = ? AND blob_id = ?",
-                params![encrypted, namespace, blob_id],
-            )
-            .map_err(|e| BlobStoreError::Storage(e.to_string()))?;
-            migrated += 1;
-        }
-        Ok(migrated)
     }
 }
 
