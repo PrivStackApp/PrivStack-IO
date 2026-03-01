@@ -214,6 +214,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAiTrayDrawerOpen))]
+    [NotifyPropertyChangedFor(nameof(ShowDuncanFab))]
     private bool _isAiTrayOpen;
 
     [ObservableProperty]
@@ -226,6 +227,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsAiTrayDetached))]
     [NotifyPropertyChangedFor(nameof(IsAiTrayAttached))]
     [NotifyPropertyChangedFor(nameof(IsAiTrayDrawerOpen))]
+    [NotifyPropertyChangedFor(nameof(ShowDuncanFab))]
     private AiTrayDisplayMode _aiTrayDisplayMode = AiTrayDisplayMode.AttachedFull;
 
     public bool IsAiTrayAttachedFull => AiTrayDisplayMode == AiTrayDisplayMode.AttachedFull;
@@ -237,6 +239,11 @@ public partial class MainWindowViewModel : ViewModelBase
     /// True when the inline drawer should be open (attached mode + tray open).
     /// </summary>
     public bool IsAiTrayDrawerOpen => IsAiTrayOpen && IsAiTrayAttached;
+
+    /// <summary>
+    /// Show the FAB when AI is enabled but the inline drawer is not covering it.
+    /// </summary>
+    public bool ShowDuncanFab => !IsAiTrayDrawerOpen;
 
     /// <summary>
     /// Max height for the AI tray drawer. Infinity for full, half window height for half mode.

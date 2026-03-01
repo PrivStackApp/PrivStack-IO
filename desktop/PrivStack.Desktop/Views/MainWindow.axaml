@@ -154,7 +154,8 @@
                                               Margin="0,8,0,0"
                                               IsHitTestVisible="True"/>
 
-                        <!-- Duncan FAB: floating AI entry point in lower-right corner -->
+                        <!-- Duncan FAB: floating AI entry point in lower-right corner.
+                             Hidden when the inline AI tray drawer is open to avoid overlap. -->
                         <Border x:Name="DuncanFab"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Bottom"
@@ -163,7 +164,7 @@
                                 Width="48" Height="48"
                                 CornerRadius="24"
                                 BoxShadow="0 2 8 0 #40000000, 0 4 16 0 #20000000"
-                                IsVisible="{Binding AiTrayVM.IsEnabled}">
+                                IsVisible="{Binding ShowDuncanFab}">
                             <Button Command="{Binding ToggleAiTrayCommand}"
                                     ToolTip.Tip="{x:Static app:AiPersona.Name}"
                                     Width="48" Height="48"
