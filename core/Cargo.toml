@@ -69,10 +69,6 @@ privstack-datasets = { path = "privstack-datasets" }
 privstack-cloud = { path = "privstack-cloud" }
 privstack-db = { path = "privstack-db" }
 
-[workspace.dependencies.duckdb]
-version = "1.1"
-features = ["bundled"]
-
 [workspace.dependencies.rusqlite]
 version = "0.31"
 features = ["bundled-sqlcipher", "column_decltype", "blob", "functions"]

@@ -231,7 +231,7 @@ pub struct PrivStackHandle {
     // Generic capabilities — no domain logic
     vault_manager: Arc<VaultManager>,
     blob_store: BlobStore,
-    // Tabular datasets (unencrypted DuckDB for SQL queries)
+    // Tabular datasets (unencrypted SQLite for SQL queries)
     dataset_store: Option<privstack_datasets::DatasetStore>,
     // Wasm plugin host manager
     #[cfg(feature = "wasm-plugins")]
@@ -372,7 +372,7 @@ pub enum CloudProvider {
 pub static HANDLE: Mutex<Option<PrivStackHandle>> = Mutex::new(None);
 
 /// Acquire the HANDLE lock, recovering from poison if a prior
-/// `catch_unwind` caught a DuckDB panic while the lock was held.
+/// `catch_unwind` caught a SQLite panic while the lock was held.
 pub(crate) fn lock_handle() -> std::sync::MutexGuard<'static, Option<PrivStackHandle>> {
     HANDLE.lock().unwrap_or_else(|poisoned| {
         ffi_warn!("[FFI] recovering from poisoned HANDLE mutex");
@@ -503,7 +503,7 @@ pub fn init_core(path: &str) -> PrivStackError {
     let vault_db_path = if path == ":memory:" {
         Path::new(":memory:").to_path_buf()
     } else {
-        Path::new(path).with_extension("vault.duckdb")
+        Path::new(path).with_extension("vault.db")
     };
     ffi_debug!("[FFI] Opening vault DB: {}", vault_db_path.display());
     let vault_manager = match VaultManager::open(&vault_db_path) {
@@ -521,7 +521,7 @@ pub fn init_core(path: &str) -> PrivStackError {
     let blob_db_path = if path == ":memory:" {
         Path::new(":memory:").to_path_buf()
     } else {
-        Path::new(path).with_extension("blobs.duckdb")
+        Path::new(path).with_extension("blobs.db")
     };
     ffi_debug!("[FFI] Opening blob store: {}", blob_db_path.display());
     let blob_store = match BlobStore::open(&blob_db_path) {
@@ -539,7 +539,7 @@ pub fn init_core(path: &str) -> PrivStackError {
     let entity_path = if path == ":memory:" {
         Path::new(":memory:").to_path_buf()
     } else {
-        Path::new(path).with_extension("entities.duckdb")
+        Path::new(path).with_extension("entities.db")
     };
     ffi_debug!("[FFI] Opening entity store: {}", entity_path.display());
     let entity_store = match EntityStore::open(&entity_path) {
@@ -557,7 +557,7 @@ pub fn init_core(path: &str) -> PrivStackError {
     let events_path = if path == ":memory:" {
         Path::new(":memory:").to_path_buf()
     } else {
-        Path::new(path).with_extension("events.duckdb")
+        Path::new(path).with_extension("events.db")
     };
     ffi_debug!("[FFI] Opening event store: {}", events_path.display());
     let event_store = match EventStore::open(&events_path) {
@@ -590,12 +590,12 @@ pub fn init_core(path: &str) -> PrivStackError {
         .map(|h| h.to_string_lossy().to_string())
         .unwrap_or_else(|_| "PrivStack Device".to_string());
 
-    // Dataset store (unencrypted DuckDB for tabular data)
+    // Dataset store (unencrypted SQLite for tabular data)
     let dataset_store = {
         let ds_path = if path == ":memory:" {
             None
         } else {
-            Some(Path::new(path).with_extension("datasets.duckdb"))
+            Some(Path::new(path).with_extension("datasets.db"))
         };
         match ds_path {
             Some(p) => {
@@ -667,7 +667,7 @@ where
     let vault_db_path = if path == ":memory:" {
         Path::new(":memory:").to_path_buf()
     } else {
-        Path::new(path).with_extension("vault.duckdb")
+        Path::new(path).with_extension("vault.db")
     };
     ffi_debug!("[FFI] Opening vault DB: {}", vault_db_path.display());
     let vault_manager = match VaultManager::open(&vault_db_path) {
@@ -685,7 +685,7 @@ where
     let blob_db_path = if path == ":memory:" {
         Path::new(":memory:").to_path_buf()
     } else {
-        Path::new(path).with_extension("blobs.duckdb")
+        Path::new(path).with_extension("blobs.db")
     };
     ffi_debug!("[FFI] Opening blob store: {}", blob_db_path.display());
     let blob_store = match BlobStore::open(&blob_db_path) {
@@ -703,7 +703,7 @@ where
     let entity_path = if path == ":memory:" {
         Path::new(":memory:").to_path_buf()
     } else {
-        Path::new(path).with_extension("entities.duckdb")
+        Path::new(path).with_extension("entities.db")
     };
     ffi_debug!("[FFI] Opening entity store: {}", entity_path.display());
     let entity_store = match EntityStore::open(&entity_path) {
@@ -721,7 +721,7 @@ where
     let events_path = if path == ":memory:" {
         Path::new(":memory:").to_path_buf()
     } else {
-        Path::new(path).with_extension("events.duckdb")
+        Path::new(path).with_extension("events.db")
     };
     ffi_debug!("[FFI] Opening event store: {}", events_path.display());
     let event_store = match EventStore::open(&events_path) {
@@ -759,12 +759,12 @@ where
         .map(|h| h.to_string_lossy().to_string())
         .unwrap_or_else(|_| "PrivStack Device".to_string());
 
-    // Dataset store (unencrypted DuckDB for tabular data)
+    // Dataset store (unencrypted SQLite for tabular data)
     let dataset_store = {
         let ds_path = if path == ":memory:" {
             None
         } else {
-            Some(Path::new(path).with_extension("datasets.duckdb"))
+            Some(Path::new(path).with_extension("datasets.db"))
         };
         match ds_path {
             Some(p) => {
@@ -825,7 +825,7 @@ where
 }
 
 /// Shuts down the PrivStack runtime and frees resources.
-/// Checkpoints all DuckDB databases to flush WAL files before dropping connections.
+/// Checkpoints all SQLite databases to flush WAL files before dropping connections.
 #[unsafe(no_mangle)]
 pub extern "C" fn privstack_shutdown() {
     let mut handle = HANDLE.lock().unwrap();
@@ -5588,7 +5588,7 @@ pub unsafe extern "C" fn privstack_ppk_content_hash(
 // ========================================================================
 
 /// Runs database maintenance (orphan cleanup + checkpoint) to reclaim space.
-/// Note: DuckDB VACUUM does NOT reclaim space — CHECKPOINT is the correct approach.
+/// Note: SQLite VACUUM does NOT reclaim space — CHECKPOINT is the correct approach.
 #[unsafe(no_mangle)]
 pub extern "C" fn privstack_db_maintenance() -> PrivStackError {
     let handle = HANDLE.lock().unwrap();
@@ -5666,7 +5666,7 @@ pub unsafe extern "C" fn privstack_delete_orphan_entities(
     }
 }}
 
-/// Returns diagnostics for ALL DuckDB files as JSON. Caller must free with `privstack_free_string`.
+/// Returns diagnostics for ALL SQLite files as JSON. Caller must free with `privstack_free_string`.
 #[unsafe(no_mangle)]
 pub extern "C" fn privstack_db_diagnostics() -> *mut c_char {
     use privstack_storage::scan_db_file;
@@ -5679,7 +5679,7 @@ pub extern "C" fn privstack_db_diagnostics() -> *mut c_char {
             // 1. Entity store (uses existing open connection)
             if let Ok(diag) = h.entity_store.db_diagnostics() {
                 // Add file_size from disk
-                let entity_path = Path::new(&h.db_path).with_extension("entities.duckdb");
+                let entity_path = Path::new(&h.db_path).with_extension("entities.db");
                 let file_size = std::fs::metadata(&entity_path)
                     .map(|m| m.len() as i64)
                     .unwrap_or(0);
@@ -5690,13 +5690,13 @@ pub extern "C" fn privstack_db_diagnostics() -> *mut c_char {
                 all_dbs.insert("entities".to_string(), val);
             }
 
-            // 2. Scan sibling DuckDB files (opens read-only connections)
+            // 2. Scan sibling SQLite files (opens read-only connections)
             let base = Path::new(&h.db_path);
             let siblings = [
-                ("datasets", base.with_extension("datasets.duckdb")),
-                ("blobs", base.with_extension("blobs.duckdb")),
-                ("events", base.with_extension("events.duckdb")),
-                ("vault", base.with_extension("vault.duckdb")),
+                ("datasets", base.with_extension("datasets.db")),
+                ("blobs", base.with_extension("blobs.db")),
+                ("events", base.with_extension("events.db")),
+                ("vault", base.with_extension("vault.db")),
             ];
 
             for (label, path) in &siblings {
@@ -5711,7 +5711,7 @@ pub extern "C" fn privstack_db_diagnostics() -> *mut c_char {
     }
 }
 
-/// Compacts all DuckDB databases by copying data to fresh files (reclaims allocated-but-empty blocks).
+/// Compacts all SQLite databases by copying data to fresh files (reclaims allocated-but-empty blocks).
 /// Returns JSON with per-database before/after sizes. Caller must free with `privstack_free_string`.
 #[unsafe(no_mangle)]
 pub extern "C" fn privstack_compact_databases() -> *mut c_char {
@@ -5724,7 +5724,7 @@ pub extern "C" fn privstack_compact_databases() -> *mut c_char {
             let base = Path::new(&h.db_path);
 
             // 1. Entity store — uses the managed connection swap approach
-            let entity_path = base.with_extension("entities.duckdb");
+            let entity_path = base.with_extension("entities.db");
             match h.entity_store.compact(&entity_path) {
                 Ok((before, after)) => {
                     results.insert("entities".into(), serde_json::json!({
@@ -5741,9 +5741,9 @@ pub extern "C" fn privstack_compact_databases() -> *mut c_char {
 
             // 2. Sibling databases — standalone compact (open, copy, close, swap)
             let siblings = [
-                ("datasets", base.with_extension("datasets.duckdb")),
-                ("blobs", base.with_extension("blobs.duckdb")),
-                ("events", base.with_extension("events.duckdb")),
+                ("datasets", base.with_extension("datasets.db")),
+                ("blobs", base.with_extension("blobs.db")),
+                ("events", base.with_extension("events.db")),
             ];
 
             for (label, path) in &siblings {
