@@ -7,6 +7,7 @@
              xmlns:sdk="using:PrivStack.Sdk"
              xmlns:cap="using:PrivStack.Sdk.Capabilities"
              xmlns:controls="using:PrivStack.Desktop.Controls"
+             xmlns:app="using:PrivStack.Desktop"
              mc:Ignorable="d" d:DesignWidth="220" d:DesignHeight="600"
              x:Class="PrivStack.Desktop.Views.NavigationSidebar"
              x:DataType="vm:MainWindowViewModel">
@@ -553,7 +554,33 @@
                             </Border>
                         </Button>
 
-                        <!-- Sync status -->
+                        <!-- AI Persona -->
+                        <Button Classes="nav-footer-item"
+                                Command="{Binding ToggleAiTrayCommand}"
+                                IsVisible="{Binding AiTrayVM.IsEnabled}"
+                                ToolTip.Tip="{x:Static app:AiPersona.Name}">
+                            <Border Classes="nav-bg" Padding="10,7" CornerRadius="6">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                                    <PathIcon x:Name="AiStarIcon"
+                                              Data="M12,0 L14.5,9.5 L24,12 L14.5,14.5 L12,24 L9.5,14.5 L0,12 L9.5,9.5 Z"
+                                              Width="16" Height="16"
+                                              Foreground="{DynamicResource ThemeNavTextBrush}"/>
+                                    <TextBlock Text="AI" FontSize="{DynamicResource ThemeFontSizeSm}"/>
+                                </StackPanel>
+                                <!-- Gold dot when unseen insight -->
+                                <Border Grid.Column="2" Width="7" Height="7" CornerRadius="4"
+                                        VerticalAlignment="Center" Margin="8,0,0,0"
+                                        IsVisible="{Binding AiTrayVM.HasUnseenInsight}">
+                                    <Border.Background>
+                                        <SolidColorBrush Color="#FFD700"/>
+                                    </Border.Background>
+                                </Border>
+                            </Grid>
+                            </Border>
+                        </Button>
+
+                        <!-- Sync status + storage state -->
                         <Button Classes="nav-footer-item"
                                 Command="{Binding OpenSyncFromMenuCommand}"
                                 ToolTip.Tip="Sync Settings">
@@ -563,9 +590,17 @@
                                     <controls:IconControl Icon="Sync" Size="16" StrokeThickness="1.5"/>
                                     <TextBlock Text="Sync" FontSize="{DynamicResource ThemeFontSizeSm}"/>
                                 </StackPanel>
-                                <Border Grid.Column="2" Width="7" Height="7" CornerRadius="4"
-                                        VerticalAlignment="Center" Margin="8,0,0,0"
-                                        Background="{DynamicResource ThemeSuccessBrush}"/>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6"
+                                            VerticalAlignment="Center" Margin="8,0,0,0">
+                                    <Border Width="7" Height="7" CornerRadius="4"
+                                            VerticalAlignment="Center"
+                                            Background="{DynamicResource ThemeSuccessBrush}"/>
+                                    <TextBlock Text="{Binding StorageStatePillVM.PillText}"
+                                               Foreground="{Binding StorageStatePillVM.PillColor}"
+                                               FontSize="{DynamicResource ThemeFontSizeXs}"
+                                               FontWeight="Medium"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
                             </Grid>
                             </Border>
                         </Button>
@@ -715,10 +750,33 @@
                             </Border>
                         </Button>
 
+                        <!-- AI Persona -->
+                        <Button Classes="nav-footer-item-collapsed"
+                                Command="{Binding ToggleAiTrayCommand}"
+                                IsVisible="{Binding AiTrayVM.IsEnabled}"
+                                ToolTip.Tip="{x:Static app:AiPersona.Name}">
+                            <Border Classes="nav-bg" Padding="10,7" CornerRadius="6" HorizontalAlignment="Stretch">
+                                <Panel HorizontalAlignment="Center">
+                                    <PathIcon Data="M12,0 L14.5,9.5 L24,12 L14.5,14.5 L12,24 L9.5,14.5 L0,12 L9.5,9.5 Z"
+                                              Width="16" Height="16"
+                                              Foreground="{DynamicResource ThemeNavTextBrush}"/>
+                                    <!-- Gold dot indicator for unseen insight -->
+                                    <Border Width="6" Height="6" CornerRadius="3"
+                                            HorizontalAlignment="Right" VerticalAlignment="Top"
+                                            Margin="0,-2,-2,0"
+                                            IsVisible="{Binding AiTrayVM.HasUnseenInsight}">
+                                        <Border.Background>
+                                            <SolidColorBrush Color="#FFD700"/>
+                                        </Border.Background>
+                                    </Border>
+                                </Panel>
+                            </Border>
+                        </Button>
+
                         <!-- Sync -->
                         <Button Classes="nav-footer-item-collapsed"
                                 Command="{Binding OpenSyncFromMenuCommand}"
-                                ToolTip.Tip="Sync">
+                                ToolTip.Tip="{Binding StorageStatePillVM.PillText, StringFormat='Sync · {0}'}">
                             <Border Classes="nav-bg" Padding="10,7" CornerRadius="6" HorizontalAlignment="Stretch">
                                 <controls:IconControl Icon="Sync" Size="16" StrokeThickness="1.5" HorizontalAlignment="Center"/>
                             </Border>

@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using AvaloniaEdit;
 using Microsoft.Extensions.DependencyInjection;
 using PrivStack.Desktop.Controls;
@@ -542,7 +543,10 @@ public partial class MainWindow : Window
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     var balloon = this.FindControl<Border>("AiBalloon");
-                    var starIcon = this.FindControl<PathIcon>("AiStarIcon");
+                    // AiStarIcon is inside NavigationSidebar (separate name scope) — search visual tree
+                    var starIcon = this.GetVisualDescendants()
+                        .OfType<PathIcon>()
+                        .FirstOrDefault(p => p.Name == "AiStarIcon");
                     if (balloon != null && starIcon != null)
                         PositionBalloonOverStar(balloon, starIcon);
                 }, Avalonia.Threading.DispatcherPriority.Render);
@@ -564,19 +568,19 @@ public partial class MainWindow : Window
 
             if (starCenter == null) return;
 
-            // The arrow tip is 32px from the balloon's right edge (24px arrow margin + 8px half-width)
-            const double arrowOffsetFromRight = 32;
+            // The arrow tip is 32px from the balloon's left edge (24px arrow margin + 8px half-width)
+            const double arrowOffsetFromLeft = 32;
 
-            // Calculate right margin so arrow tip aligns with star center
-            var rightMargin = Bounds.Width - starCenter.Value.X - arrowOffsetFromRight;
-            rightMargin = Math.Max(8, rightMargin); // floor at 8px
+            // Calculate left margin so arrow tip aligns with star center
+            var leftMargin = starCenter.Value.X - arrowOffsetFromLeft;
+            leftMargin = Math.Max(8, leftMargin); // floor at 8px
 
-            balloon.Margin = new Thickness(0, 0, rightMargin, 48);
+            balloon.Margin = new Thickness(leftMargin, 0, 0, 48);
         }
         catch
         {
             // Fallback to default position if measurement fails
-            balloon.Margin = new Thickness(0, 0, 120, 48);
+            balloon.Margin = new Thickness(260, 0, 0, 48);
         }
     }
 }

@@ -25,23 +25,6 @@
         ExtendClientAreaTitleBarHeightHint="28">
 
     <Window.Styles>
-        <!-- Timer pulse animation -->
-        <Style Selector="Border.timer-pulse">
-            <Style.Animations>
-                <Animation Duration="0:0:1.5" IterationCount="INFINITE">
-                    <KeyFrame Cue="0%">
-                        <Setter Property="Opacity" Value="1"/>
-                    </KeyFrame>
-                    <KeyFrame Cue="50%">
-                        <Setter Property="Opacity" Value="0.3"/>
-                    </KeyFrame>
-                    <KeyFrame Cue="100%">
-                        <Setter Property="Opacity" Value="1"/>
-                    </KeyFrame>
-                </Animation>
-            </Style.Animations>
-        </Style>
-
         <!-- Sidebar width transitions -->
         <Style Selector="views|NavigationSidebar">
             <Setter Property="Width" Value="220"/>
@@ -141,220 +124,6 @@
                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" Background="Transparent"
                             BorderBrush="{DynamicResource ThemeTextPrimaryBrush}" BorderThickness="1" Padding="12,4" FontSize="{DynamicResource ThemeFontSizeSm}"
                             Cursor="Hand"/>
-                </Grid>
-            </Border>
-
-            <!-- Status Bar: docked to bottom BEFORE content so DockPanel subtracts it first -->
-            <Border DockPanel.Dock="Bottom" Background="{DynamicResource ThemeBackgroundBrush}"
-                    BorderBrush="{DynamicResource ThemeBorderSubtleBrush}"
-                    BorderThickness="0,1,0,0"
-                    BoxShadow="0 -1 4 0 #0A000000"
-                    Padding="16,6"
-                    IsVisible="{Binding !IsFocusMode}">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <!-- Left side: Status message -->
-                    <TextBlock Text="{Binding StatusMessage}"
-                               Foreground="{DynamicResource ThemeTextMutedBrush}"
-                               FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                               VerticalAlignment="Center"/>
-
-                    <!-- Center: Active Timer Indicator -->
-                    <Border Grid.Column="1"
-                            IsVisible="{Binding HasActiveTimers}"
-                            Background="{DynamicResource ThemePrimaryMutedBrush}"
-                            CornerRadius="{DynamicResource ThemeRadiusSm}"
-                            Padding="10,3"
-                            Margin="16,0"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <!-- Pulsing dot: green when running -->
-                            <Border Classes="timer-pulse"
-                                    Width="7" Height="7" CornerRadius="4"
-                                    Background="{DynamicResource ThemeSuccessBrush}"
-                                    VerticalAlignment="Center"
-                                    IsVisible="{Binding IsTaskTimerRunning}"/>
-                            <!-- Static dot: yellow when paused -->
-                            <Border Width="7" Height="7" CornerRadius="4"
-                                    Background="{DynamicResource ThemeWarningBrush}"
-                                    VerticalAlignment="Center"
-                                    IsVisible="{Binding IsTaskTimerPaused}"/>
-
-                            <!-- Task title (clickable to navigate) -->
-                            <Button Command="{Binding NavigateToTimedTaskCommand}"
-                                    Background="Transparent" Padding="0" Margin="0"
-                                    Cursor="Hand" VerticalAlignment="Center"
-                                    BorderThickness="0" MinHeight="0" MinWidth="0">
-                                <Button.Styles>
-                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                        <Setter Property="Background" Value="Transparent"/>
-                                    </Style>
-                                </Button.Styles>
-                                <TextBlock Text="{Binding TimedTaskTitle}"
-                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                           MaxWidth="200" TextTrimming="CharacterEllipsis"
-                                           VerticalAlignment="Center"/>
-                            </Button>
-
-                            <!-- Elapsed time -->
-                            <TextBlock Text="{Binding TaskTimerDisplay}"
-                                       FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                       FontWeight="SemiBold"
-                                       FontFamily="{DynamicResource ThemeFontMono}"
-                                       Foreground="{DynamicResource ThemePrimaryBrush}"
-                                       VerticalAlignment="Center"/>
-
-                            <!-- Multi-timer count badge -->
-                            <Border IsVisible="{Binding HasMultipleTimers}"
-                                    Background="{DynamicResource ThemeSecondaryMutedBrush}"
-                                    CornerRadius="{DynamicResource ThemeRadiusXs}"
-                                    Padding="5,1" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding AdditionalTimerText}"
-                                           FontSize="{DynamicResource ThemeFontSizeXs}"
-                                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                                           VerticalAlignment="Center"/>
-                            </Border>
-
-                            <!-- Separator -->
-                            <Border Width="1" Height="12"
-                                    Background="{DynamicResource ThemeBorderSubtleBrush}"
-                                    VerticalAlignment="Center" Margin="2,0"/>
-
-                            <!-- Pause button (visible when running) -->
-                            <Button Command="{Binding PauseTaskTimerCommand}"
-                                    IsVisible="{Binding IsTaskTimerRunning}"
-                                    Background="Transparent" Padding="3,1" Margin="0"
-                                    BorderThickness="0" MinHeight="0" MinWidth="0"
-                                    Cursor="Hand" ToolTip.Tip="Pause timer"
-                                    VerticalAlignment="Center">
-                                <Button.Styles>
-                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
-                                    </Style>
-                                </Button.Styles>
-                                <PathIcon Data="M6 19h4V5H6v14zm8-14v14h4V5h-4z"
-                                         Width="10" Height="10"
-                                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-                            </Button>
-
-                            <!-- Resume button (visible when paused) -->
-                            <Button Command="{Binding ResumeTaskTimerCommand}"
-                                    IsVisible="{Binding IsTaskTimerPaused}"
-                                    Background="Transparent" Padding="3,1" Margin="0"
-                                    BorderThickness="0" MinHeight="0" MinWidth="0"
-                                    Cursor="Hand" ToolTip.Tip="Resume timer"
-                                    VerticalAlignment="Center">
-                                <Button.Styles>
-                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
-                                    </Style>
-                                </Button.Styles>
-                                <PathIcon Data="M8 5v14l11-7z"
-                                         Width="10" Height="10"
-                                         Foreground="{DynamicResource ThemeSuccessBrush}"/>
-                            </Button>
-
-                            <!-- Stop button -->
-                            <Button Command="{Binding StopTaskTimerCommand}"
-                                    Background="Transparent" Padding="3,1" Margin="0"
-                                    BorderThickness="0" MinHeight="0" MinWidth="0"
-                                    Cursor="Hand" ToolTip.Tip="Stop timer"
-                                    VerticalAlignment="Center">
-                                <Button.Styles>
-                                    <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                        <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
-                                    </Style>
-                                </Button.Styles>
-                                <PathIcon Data="M6 6h12v12H6z"
-                                         Width="10" Height="10"
-                                         Foreground="{DynamicResource ThemeDangerBrush}"/>
-                            </Button>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Right side: Intent Tray + Update status + Subscription + Storage -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="16">
-                        <!-- AI Persona Button -->
-                        <Button Command="{Binding ToggleAiTrayCommand}"
-                                IsVisible="{Binding AiTrayVM.IsEnabled}"
-                                Background="Transparent" BorderThickness="0"
-                                Padding="0" Margin="0"
-                                MinHeight="0" MinWidth="0"
-                                Cursor="Hand"
-                                VerticalAlignment="Center"
-                                ToolTip.Tip="{x:Static app:AiPersona.Name}">
-                            <Button.Styles>
-                                <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                    <Setter Property="Background" Value="Transparent"/>
-                                </Style>
-                            </Button.Styles>
-                            <PathIcon x:Name="AiStarIcon"
-                                     Data="M12,0 L14.5,9.5 L24,12 L14.5,14.5 L12,24 L9.5,14.5 L0,12 L9.5,9.5 Z"
-                                     Width="14" Height="14"
-                                     Foreground="{Binding AiTrayVM.HasUnseenInsight, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#FFD700|ThemePrimary'}"/>
-                        </Button>
-
-                        <!-- Update Status Indicator -->
-                        <Button Command="{Binding UpdateVM.StatusBarClickCommand}"
-                                Background="Transparent" BorderThickness="0"
-                                Padding="0" Margin="0"
-                                MinHeight="0" MinWidth="0"
-                                Cursor="Hand"
-                                VerticalAlignment="Center">
-                            <Button.Styles>
-                                <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                    <Setter Property="Background" Value="Transparent"/>
-                                </Style>
-                            </Button.Styles>
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <!-- Green dot when update is available -->
-                                <Border Width="6" Height="6" CornerRadius="3"
-                                        Background="{DynamicResource ThemeSuccessBrush}"
-                                        VerticalAlignment="Center"
-                                        IsVisible="{Binding UpdateVM.IsStatusBarHighlighted}"/>
-                                <TextBlock Text="{Binding UpdateVM.StatusBarText}"
-                                           FontSize="{DynamicResource ThemeFontSizeXsSm}"
-                                           VerticalAlignment="Center">
-                                    <TextBlock.Styles>
-                                        <Style Selector="TextBlock">
-                                            <Setter Property="Foreground" Value="{DynamicResource ThemePrimaryBrush}"/>
-                                        </Style>
-                                    </TextBlock.Styles>
-                                </TextBlock>
-                            </StackPanel>
-                        </Button>
-
-                        <!-- Subscription Badge -->
-                        <Button IsVisible="{Binding SubscriptionBadgeVM.IsBadgeVisible}"
-                                Command="{Binding SubscriptionBadgeVM.OpenModalCommand}"
-                                Background="{DynamicResource ThemePrimaryMutedBrush}"
-                                BorderThickness="0"
-                                CornerRadius="{DynamicResource ThemeRadiusSm}"
-                                Padding="8,3"
-                                VerticalContentAlignment="Center"
-                                Cursor="Hand"
-                                MinHeight="0" MinWidth="0"
-                                VerticalAlignment="Center">
-                            <Button.Styles>
-                                <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                    <Setter Property="Background" Value="{DynamicResource ThemeHoverBrush}"/>
-                                </Style>
-                            </Button.Styles>
-                            <TextBlock Text="{Binding SubscriptionBadgeVM.BadgeText}"
-                                       FontSize="{DynamicResource ThemeFontSizeXs}"
-                                       FontWeight="Medium"
-                                       Foreground="{DynamicResource ThemePrimaryBrush}"
-                                       VerticalAlignment="Center"/>
-                        </Button>
-
-                        <!-- Storage State Pill -->
-                        <TextBlock Text="{Binding StorageStatePillVM.PillText}"
-                                   Foreground="{Binding StorageStatePillVM.PillColor}"
-                                   FontSize="{DynamicResource ThemeFontSizeXs}"
-                                   FontWeight="Medium"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -660,10 +429,10 @@
             </Grid>
         </DockPanel>
 
-        <!-- AI Persona Speech Balloon (dynamically positioned above AI star icon) -->
+        <!-- AI Persona Speech Balloon (dynamically positioned above sidebar AI star icon) -->
         <Border x:Name="AiBalloon"
-                HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                Margin="0,0,120,48" ZIndex="998"
+                HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                Margin="260,0,0,48" ZIndex="998"
                 IsHitTestVisible="{Binding AiTrayVM.HasBalloonMessage}"
                 Classes.balloon-visible="{Binding AiTrayVM.HasBalloonMessage}">
             <Button Command="{Binding ToggleAiTrayCommand}"
@@ -695,7 +464,7 @@
                           Fill="{DynamicResource ThemeSurfaceElevatedBrush}"
                           Stroke="{DynamicResource ThemePrimaryBrush}"
                           StrokeThickness="1.5"
-                          HorizontalAlignment="Right" Margin="0,-1.5,24,0"/>
+                          HorizontalAlignment="Left" Margin="24,-1.5,0,0"/>
                 </StackPanel>
             </Button>
         </Border>
