@@ -103,16 +103,21 @@
     </Design.DataContext>
 
     <Panel>
-        <!-- Main layout: Grid with explicit row definitions for deterministic height constraints.
-             Row 0 = title bar spacer (fixed 28px), Row 1 = license banner (Auto), Row 2 = content (star). -->
-        <Grid RowDefinitions="28,Auto,*">
-            <!-- Title bar drag region / spacer for macOS traffic lights -->
-            <Border Grid.Row="0" x:Name="TitleBarSpacer"
-                    Background="{DynamicResource ThemeBackgroundBrush}"
-                    IsHitTestVisible="False"/>
+        <!-- Title bar drag region: visual overlay behind macOS traffic lights.
+             NOT part of the content layout — sits on top at z-order, does not consume grid space. -->
+        <Border x:Name="TitleBarSpacer" Height="28"
+                VerticalAlignment="Top"
+                Background="{DynamicResource ThemeBackgroundBrush}"
+                IsHitTestVisible="False"
+                ZIndex="50"/>
+
+        <!-- Main content layout: top margin pushes below title bar.
+             The Grid receives (ClientSize.Height - 28) as its arranged height via Margin,
+             ensuring content fits exactly in the visible area below the title bar. -->
+        <Grid RowDefinitions="Auto,*" Margin="0,28,0,0">
 
             <!-- License expiration banner -->
-            <Border Grid.Row="1"
+            <Border Grid.Row="0"
                     IsVisible="{Binding IsLicenseExpiredBannerVisible}"
                     Background="{DynamicResource ThemeDangerBrush}" Padding="8,6"
                     HorizontalAlignment="Stretch">
@@ -127,8 +132,8 @@
                 </Grid>
             </Border>
 
-            <!-- Sidebar + Content area (star row — takes all remaining space after fixed rows) -->
-            <Grid Grid.Row="2" ColumnDefinitions="Auto,*">
+            <!-- Sidebar + Content area (star row — takes all remaining space after banner) -->
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,*">
                 <!-- Navigation Sidebar -->
                 <views:NavigationSidebar Grid.Column="0"
                                          Classes.collapsed="{Binding IsSidebarCollapsed}"
