@@ -138,7 +138,9 @@
                 <!-- Content Area -->
                 <Panel Grid.Column="1" ClipToBounds="True">
                     <!-- Main Content Area + Info Panel overlay -->
-                        <ContentControl Content="{Binding CurrentViewModel}" ClipToBounds="True"/>
+                        <ContentControl Content="{Binding CurrentViewModel}" ClipToBounds="True"
+                                        HorizontalContentAlignment="Stretch"
+                                        VerticalContentAlignment="Stretch"/>
 
                         <!-- Toast Notification Container (centered on plugin content area) -->
                         <toast:ToastContainer ZIndex="1100"

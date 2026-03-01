@@ -158,6 +158,23 @@ public partial class MainWindow : Window
     {
         _isInitialized = true;
 
+        // Sync the title bar spacer row to the actual platform decoration height.
+        // On macOS with notch displays, the system title bar can be taller than our
+        // hardcoded 28px hint, causing content to overflow the window bottom.
+        var decorTop = WindowDecorationMargin.Top;
+        var offScreen = OffScreenMargin;
+        Log.Information("[MainWindow] Decorations: Top={DecorTop} OffScreen={OffScreen}", decorTop, offScreen);
+        Log.Information("[MainWindow] Sizes: ClientSize={ClientSize} Bounds={Bounds}", ClientSize, Bounds);
+        if (decorTop > 0 && Math.Abs(decorTop - 28) > 0.5)
+        {
+            Log.Information("[MainWindow] Adjusting title bar spacer from 28 to {DecorTop}", decorTop);
+            var rootGrid = this.Content as Panel;
+            var mainGrid = rootGrid?.Children.OfType<Avalonia.Controls.Grid>().FirstOrDefault();
+            if (mainGrid?.RowDefinitions.Count > 0)
+                mainGrid.RowDefinitions[0].Height = new GridLength(decorTop);
+            TitleBarSpacer.Height = decorTop;
+        }
+
         (App.Services.GetRequiredService<IDialogService>() as DialogService)?.SetOwner(this);
 
         if (DataContext is MainWindowViewModel vm)
