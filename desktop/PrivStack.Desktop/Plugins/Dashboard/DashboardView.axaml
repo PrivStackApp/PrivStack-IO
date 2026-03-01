@@ -893,11 +893,10 @@
         </Border>
 
         <!-- ==================== SUBSYSTEMS TAB ==================== -->
-        <Border Grid.Row="2"
-                IsVisible="{Binding IsSubsystemsTab}"
-                Background="{DynamicResource ThemeSurfaceBrush}">
-            <ScrollViewer Padding="24,24,24,120" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Spacing="24" MaxWidth="900" HorizontalAlignment="Center">
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      Padding="24,0,24,32"
+                      IsVisible="{Binding IsSubsystemsTab}">
+            <StackPanel Spacing="24" MaxWidth="900" HorizontalAlignment="Center">
 
                     <!-- Summary Cards -->
                     <StackPanel Spacing="8">
@@ -1030,7 +1029,6 @@
                     </ItemsControl>
 
                 </StackPanel>
-            </ScrollViewer>
-        </Border>
+        </ScrollViewer>
     </Grid>
 </UserControl>
