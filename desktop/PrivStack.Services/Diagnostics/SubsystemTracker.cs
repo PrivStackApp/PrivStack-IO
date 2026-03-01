@@ -341,7 +341,7 @@ public struct SubsystemSnapshot
     public long NativeBytes;
     public long NativeAllocs;
 
-    public readonly string Status => ActiveTaskCount > 0 ? "Active" : NativeBytes > 0 ? "Idle" : "Stopped";
+    public readonly string Status => ActiveTaskCount > 0 ? "Active" : "Stopped";
 }
 
 public struct NativeSubsystemEntry
