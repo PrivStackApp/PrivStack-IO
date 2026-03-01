@@ -136,9 +136,8 @@
 
         <!-- ==================== OVERVIEW TAB ==================== -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                      Padding="24,0,24,80"
                       IsVisible="{Binding IsOverviewTab}">
-            <StackPanel Spacing="20">
+            <StackPanel Spacing="20" Margin="24,0,24,80">
 
                 <!-- System Overview Cards -->
                 <StackPanel Spacing="8">
@@ -489,8 +488,9 @@
         <Border Grid.Row="2"
                 IsVisible="{Binding IsDataTab}"
                 Background="{DynamicResource ThemeSurfaceBrush}">
-            <ScrollViewer Padding="24,24,24,80" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Spacing="24" MaxWidth="900" HorizontalAlignment="Center">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="24" MaxWidth="900" HorizontalAlignment="Center"
+                            Margin="24,24,24,80">
                     <!-- Storage Overview Cards -->
                     <TextBlock Text="Storage Overview" Classes="section-heading"/>
                     <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left">
@@ -894,9 +894,9 @@
 
         <!-- ==================== SUBSYSTEMS TAB ==================== -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                      Padding="24,0,24,80"
                       IsVisible="{Binding IsSubsystemsTab}">
-            <StackPanel Spacing="24" MaxWidth="900" HorizontalAlignment="Center">
+            <StackPanel Spacing="24" MaxWidth="900" HorizontalAlignment="Center"
+                        Margin="24,0,24,80">
 
                     <!-- Summary Cards -->
                     <StackPanel Spacing="8">
