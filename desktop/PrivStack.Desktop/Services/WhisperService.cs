@@ -184,6 +184,7 @@ public sealed class WhisperService : INotifyPropertyChanged, IDisposable
 
             // Dispose existing processor
             _processor?.Dispose();
+            PrivStack.Services.Diagnostics.SubsystemTracker.ReportNativeBytesStatic("ai.whisper", 0);
 
             // Load the model on a background thread
             var useBeamSearch = BeamSearchEnabled;
@@ -204,6 +205,14 @@ public sealed class WhisperService : INotifyPropertyChanged, IDisposable
             _loadedModelPath = modelPath;
             _lastBeamSearch = useBeamSearch;
             IsModelLoaded = true;
+
+            // Report native memory (Whisper.net loads GGML weights outside managed heap)
+            try
+            {
+                var modelSize = new FileInfo(modelPath).Length;
+                PrivStack.Services.Diagnostics.SubsystemTracker.ReportNativeBytesStatic("ai.whisper", modelSize);
+            }
+            catch { /* file size lookup is best-effort */ }
 
             _log.Information("Whisper model loaded successfully");
         }
@@ -419,5 +428,6 @@ public sealed class WhisperService : INotifyPropertyChanged, IDisposable
         _processor?.Dispose();
         _processor = null;
         IsModelLoaded = false;
+        PrivStack.Services.Diagnostics.SubsystemTracker.ReportNativeBytesStatic("ai.whisper", 0);
     }
 }

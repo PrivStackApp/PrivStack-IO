@@ -44,6 +44,8 @@ internal sealed class EmbeddingService : PrivStack.Services.AI.IEmbeddingService
             _session = null;
             _tokenizer = null;
 
+            PrivStack.Services.Diagnostics.SubsystemTracker.ReportNativeBytesStatic("ai.embedding", 0);
+
             // Nudge the GC to reclaim the native ONNX buffers promptly
             GC.Collect(2, GCCollectionMode.Aggressive, blocking: false);
 
@@ -93,6 +95,14 @@ internal sealed class EmbeddingService : PrivStack.Services.AI.IEmbeddingService
                 using var vocabStream = File.OpenRead(_modelManager.VocabPath);
                 return Microsoft.ML.Tokenizers.WordPieceTokenizer.Create(vocabStream);
             }, ct);
+
+            // Report native memory (ONNX Runtime allocates model weights outside managed heap)
+            try
+            {
+                var modelSize = new FileInfo(_modelManager.ModelPath).Length;
+                PrivStack.Services.Diagnostics.SubsystemTracker.ReportNativeBytesStatic("ai.embedding", modelSize);
+            }
+            catch { /* file size lookup is best-effort */ }
 
             _log.Information("Embedding model loaded ({Dim}-dim)", EmbeddingDim);
         }
@@ -209,5 +219,6 @@ internal sealed class EmbeddingService : PrivStack.Services.AI.IEmbeddingService
         _disposed = true;
         _session?.Dispose();
         _semaphore.Dispose();
+        PrivStack.Services.Diagnostics.SubsystemTracker.ReportNativeBytesStatic("ai.embedding", 0);
     }
 }

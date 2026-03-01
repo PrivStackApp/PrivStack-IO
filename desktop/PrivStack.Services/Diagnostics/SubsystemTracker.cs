@@ -111,6 +111,26 @@ public sealed class SubsystemTracker
     }
 
     /// <summary>
+    /// Report native memory usage for a subsystem from C# code.
+    /// Used by AI services to report model sizes (ONNX, GGUF, Whisper GGML)
+    /// that allocate through their own native libraries, not the Rust allocator.
+    /// Pass 0 to clear on model unload.
+    /// </summary>
+    public void ReportNativeBytes(string subsystemId, long bytes)
+    {
+        var state = GetOrCreateState(subsystemId);
+        Interlocked.Exchange(ref state.NativeBytes, bytes);
+    }
+
+    /// <summary>
+    /// Static convenience: report native bytes if tracker is available.
+    /// </summary>
+    public static void ReportNativeBytesStatic(string subsystemId, long bytes)
+    {
+        Instance?.ReportNativeBytes(subsystemId, bytes);
+    }
+
+    /// <summary>
     /// Merge native (Rust) subsystem memory counters into the tracker.
     /// Called periodically from the Dashboard timer.
     /// </summary>

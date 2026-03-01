@@ -234,6 +234,7 @@ internal sealed class LocalLlamaProvider : IAiProvider
         _context = null;
         _weights = null;
         _loadedModelPath = null;
+        PrivStack.Services.Diagnostics.SubsystemTracker.ReportNativeBytesStatic("ai.llm", 0);
 
         _log.Information("Loading local LLM model from {Path}", modelPath);
 
@@ -259,6 +260,15 @@ internal sealed class LocalLlamaProvider : IAiProvider
         });
 
         _loadedModelPath = modelPath;
+
+        // Report native memory (LLamaSharp loads GGUF weights outside managed heap)
+        try
+        {
+            var modelSize = new FileInfo(modelPath).Length;
+            PrivStack.Services.Diagnostics.SubsystemTracker.ReportNativeBytesStatic("ai.llm", modelSize);
+        }
+        catch { /* file size lookup is best-effort */ }
+
         _log.Information("Local LLM model loaded: {Path}", modelPath);
     }
 
@@ -393,6 +403,8 @@ internal sealed class LocalLlamaProvider : IAiProvider
             _weights = null;
             _loadedModelPath = null;
 
+            PrivStack.Services.Diagnostics.SubsystemTracker.ReportNativeBytesStatic("ai.llm", 0);
+
             GC.Collect(2, GCCollectionMode.Aggressive, blocking: false);
 
             _log.Information("Local LLM model unloaded from memory");
@@ -430,5 +442,6 @@ internal sealed class LocalLlamaProvider : IAiProvider
         _context?.Dispose();
         _weights?.Dispose();
         _inferLock.Dispose();
+        PrivStack.Services.Diagnostics.SubsystemTracker.ReportNativeBytesStatic("ai.llm", 0);
     }
 }
