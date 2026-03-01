@@ -503,12 +503,11 @@ public partial class SyncPairingViewModel : ViewModelBase
         }
     }
 
-    /// <summary>
-    /// Cleans up resources.
-    /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        StopDiscoveryTimer();
+        if (disposing)
+            StopDiscoveryTimer();
+        base.Dispose(disposing);
     }
 }
 

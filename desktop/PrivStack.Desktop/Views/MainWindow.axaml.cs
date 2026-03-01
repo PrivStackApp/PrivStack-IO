@@ -34,6 +34,9 @@ public partial class MainWindow : Window
     private double _aiTrayResizeStartWidth;
     private AiTrayWindow? _floatingAiWindow;
     private bool _isReattaching;
+    private SpeechRecordingViewModel? _speechWiredVm;
+    private System.ComponentModel.PropertyChangedEventHandler? _balloonHandler;
+    private PrivStack.Desktop.ViewModels.AiTray.AiSuggestionTrayViewModel? _balloonWiredVm;
 
     public MainWindow()
     {
@@ -82,18 +85,18 @@ public partial class MainWindow : Window
 
     private void SetupSpeechRecording()
     {
-        if (DataContext is MainWindowViewModel vm)
-        {
-            vm.SpeechRecordingVM.TranscriptionReady += OnTranscriptionReady;
-        }
+        WireSpeechRecording();
+        this.DataContextChanged += (_, _) => WireSpeechRecording();
+    }
 
-        this.DataContextChanged += (_, _) =>
-        {
-            if (DataContext is MainWindowViewModel newVm)
-            {
-                newVm.SpeechRecordingVM.TranscriptionReady += OnTranscriptionReady;
-            }
-        };
+    private void WireSpeechRecording()
+    {
+        if (_speechWiredVm != null)
+            _speechWiredVm.TranscriptionReady -= OnTranscriptionReady;
+
+        _speechWiredVm = (DataContext as MainWindowViewModel)?.SpeechRecordingVM;
+        if (_speechWiredVm != null)
+            _speechWiredVm.TranscriptionReady += OnTranscriptionReady;
     }
 
     private void OnTranscriptionReady(object? sender, string transcription)
@@ -260,6 +263,32 @@ public partial class MainWindow : Window
         _windowSettings.UpdateWindowBounds(this);
         _settings.Flush();
 
+        // Unsubscribe window-level event handlers
+        TitleBarSpacer.PointerPressed -= OnTitleBarPointerPressed;
+        this.Opened -= OnWindowOpened;
+        this.PositionChanged -= OnPositionChanged;
+        this.PropertyChanged -= OnWindowPropertyChanged;
+
+        // Unsubscribe balloon PropertyChanged handler
+        if (_balloonWiredVm != null && _balloonHandler != null)
+        {
+            _balloonWiredVm.PropertyChanged -= _balloonHandler;
+            _balloonHandler = null;
+            _balloonWiredVm = null;
+        }
+
+        // Unsubscribe speech TranscriptionReady handler
+        if (_speechWiredVm != null)
+        {
+            _speechWiredVm.TranscriptionReady -= OnTranscriptionReady;
+            _speechWiredVm = null;
+        }
+
+        // Dispose chord timer
+        _chordTimer?.Stop();
+        _chordTimer?.Dispose();
+        _chordTimer = null;
+
         // Close floating AI window if open
         if (_floatingAiWindow != null)
         {
@@ -270,6 +299,7 @@ public partial class MainWindow : Window
 
         if (DataContext is MainWindowViewModel vm)
         {
+            vm.PropertyChanged -= OnMainVmPropertyChanged;
             vm.Cleanup();
         }
 
@@ -552,9 +582,14 @@ public partial class MainWindow : Window
 
     private void WireBalloonPositioning()
     {
+        // Unsubscribe previous handler to prevent accumulation
+        if (_balloonWiredVm != null && _balloonHandler != null)
+            _balloonWiredVm.PropertyChanged -= _balloonHandler;
+
         if (DataContext is not MainWindowViewModel vm) return;
 
-        vm.AiTrayVM.PropertyChanged += (_, e) =>
+        _balloonWiredVm = vm.AiTrayVM;
+        _balloonHandler = (_, e) =>
         {
             if (e.PropertyName == nameof(vm.AiTrayVM.BalloonMessage) ||
                 e.PropertyName == nameof(vm.AiTrayVM.HasBalloonMessage))
@@ -568,6 +603,7 @@ public partial class MainWindow : Window
                 }, Avalonia.Threading.DispatcherPriority.Render);
             }
         };
+        _balloonWiredVm.PropertyChanged += _balloonHandler;
     }
 
     private void PositionBalloonOverFab(Border balloon, Border fab)

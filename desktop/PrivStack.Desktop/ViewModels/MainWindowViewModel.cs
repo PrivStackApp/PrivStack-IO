@@ -139,16 +139,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 try
                 {
                     _settingsVM = App.Services.GetRequiredService<SettingsViewModel>();
-                    _settingsVM.SwitchWorkspaceRequested += (_, _) =>
-                    {
-                        IsSettingsPanelOpen = false;
-                        WorkspaceSwitcherVM.OpenCommand.Execute(null);
-                    };
-                    _settingsVM.LogoutRequested += (_, _) =>
-                    {
-                        IsSettingsPanelOpen = false;
-                        (App.Current as App)?.RequestLogout();
-                    };
+                    _settingsVM.SwitchWorkspaceRequested += OnSettingsSwitchWorkspaceRequested;
+                    _settingsVM.LogoutRequested += OnSettingsLogoutRequested;
                 }
                 catch (Exception ex)
                 {
@@ -159,6 +151,18 @@ public partial class MainWindowViewModel : ViewModelBase
             }
             return _settingsVM;
         }
+    }
+
+    private void OnSettingsSwitchWorkspaceRequested(object? sender, EventArgs e)
+    {
+        IsSettingsPanelOpen = false;
+        WorkspaceSwitcherVM.OpenCommand.Execute(null);
+    }
+
+    private void OnSettingsLogoutRequested(object? sender, EventArgs e)
+    {
+        IsSettingsPanelOpen = false;
+        (App.Current as App)?.RequestLogout();
     }
 
     private SpeechRecordingViewModel? _speechRecordingVM;
@@ -1164,7 +1168,8 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     public void EvictPluginCache(string navItemId)
     {
-        _pluginViewModelCache.Remove(navItemId);
+        if (_pluginViewModelCache.Remove(navItemId, out var vm))
+            vm.Dispose();
     }
 
     /// <summary>
@@ -1173,7 +1178,8 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     public async Task ReloadPluginAsync(string navItemId)
     {
-        _pluginViewModelCache.Remove(navItemId);
+        if (_pluginViewModelCache.Remove(navItemId, out var vm))
+            vm.Dispose();
 
         if (SelectedTab == navItemId)
         {
@@ -1193,6 +1199,8 @@ public partial class MainWindowViewModel : ViewModelBase
         try { App.Services.GetRequiredService<ReminderSchedulerService>().Stop(); }
         catch { /* Ignore if not registered */ }
 
+        foreach (var vm in _pluginViewModelCache.Values)
+            vm.Dispose();
         _pluginViewModelCache.Clear();
         _syncVM = null;
         _storageStatePillVM = null;
@@ -1245,6 +1253,19 @@ public partial class MainWindowViewModel : ViewModelBase
     public void Cleanup()
     {
         _appSettings.ProfileChanged -= OnProfileChanged;
+
+        // Unsubscribe SettingsVM event handlers
+        if (_settingsVM != null)
+        {
+            _settingsVM.SwitchWorkspaceRequested -= OnSettingsSwitchWorkspaceRequested;
+            _settingsVM.LogoutRequested -= OnSettingsLogoutRequested;
+        }
+
+        // Dispose all cached plugin ViewModels
+        foreach (var vm in _pluginViewModelCache.Values)
+            vm.Dispose();
+        _pluginViewModelCache.Clear();
+
         _userProfileImage?.Dispose();
         _userProfileImage = null;
 

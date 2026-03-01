@@ -248,8 +248,7 @@ public sealed class SubsystemTracker
         var uiBytes = GC.GetAllocatedBytesForCurrentThread();
         var uiDelta = uiBytes - _lastUiThreadBytes;
         _lastUiThreadBytes = uiBytes;
-        if (uiDelta > 0)
-            Interlocked.Add(ref renderState.ManagedAllocBytes, uiDelta);
+        Interlocked.Exchange(ref renderState.ManagedAllocBytes, uiDelta > 0 ? uiDelta : 0);
         Volatile.Write(ref renderState.ActiveTaskCount, 1);
 
         // ── Shell — process-level thread count ──
