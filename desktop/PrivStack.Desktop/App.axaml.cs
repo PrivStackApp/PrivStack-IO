@@ -654,9 +654,14 @@ public partial class App : Application
                     Services.GetRequiredService<IWorkspaceService>(),
                     Services.GetRequiredService<IDatasetService>());
 
-                Services.GetRequiredService<IIpcServer>().Start();
-
+                // IPC server + native messaging registration — only if the bridge binary
+                // exists (web clipper extension installed) or the local API is enabled.
                 var bridgePath = FindBridgePath();
+                if (bridgePath != null || appSettings.Settings.ApiEnabled)
+                {
+                    Services.GetRequiredService<IIpcServer>().Start();
+                }
+
                 if (bridgePath != null)
                     NativeMessagingRegistrar.Register(bridgePath, appSettings);
 
