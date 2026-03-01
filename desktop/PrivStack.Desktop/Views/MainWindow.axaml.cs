@@ -165,6 +165,8 @@ public partial class MainWindow : Window
         var offScreen = OffScreenMargin;
         Log.Information("[MainWindow] Decorations: Top={DecorTop} OffScreen={OffScreen}", decorTop, offScreen);
         Log.Information("[MainWindow] Sizes: ClientSize={ClientSize} Bounds={Bounds}", ClientSize, Bounds);
+
+        // Adjust title bar spacer to actual platform decoration height
         if (decorTop > 0 && Math.Abs(decorTop - 28) > 0.5)
         {
             Log.Information("[MainWindow] Adjusting title bar spacer from 28 to {DecorTop}", decorTop);
@@ -173,6 +175,17 @@ public partial class MainWindow : Window
             if (mainGrid?.RowDefinitions.Count > 0)
                 mainGrid.RowDefinitions[0].Height = new GridLength(decorTop);
             TitleBarSpacer.Height = decorTop;
+        }
+
+        // Compensate for any off-screen margin that extends the layout area
+        // beyond the visible window (e.g., macOS window shadow area)
+        if (offScreen.Bottom > 0 || offScreen.Top > 0)
+        {
+            Log.Information("[MainWindow] Applying OffScreenMargin compensation");
+            var rootGrid = this.Content as Panel;
+            var mainGrid = rootGrid?.Children.OfType<Avalonia.Controls.Grid>().FirstOrDefault();
+            if (mainGrid != null)
+                mainGrid.Margin = new Thickness(offScreen.Left, 0, offScreen.Right, offScreen.Bottom);
         }
 
         (App.Services.GetRequiredService<IDialogService>() as DialogService)?.SetOwner(this);
