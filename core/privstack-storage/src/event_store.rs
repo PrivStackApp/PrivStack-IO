@@ -42,6 +42,17 @@ impl EventStore {
         Ok(Self { conn })
     }
 
+    /// Re-runs schema initialization on the current connection.
+    ///
+    /// Call this after swapping the underlying `Connection` inside the shared
+    /// `Arc<Mutex<Connection>>` (e.g., when transitioning from an in-memory
+    /// placeholder to an encrypted on-disk database).
+    pub fn reinitialize_schema(&self) -> StorageResult<()> {
+        let c = self.conn.lock().unwrap();
+        initialize_event_schema(&c)?;
+        Ok(())
+    }
+
     /// Flushes the WAL to the main database file.
     pub fn checkpoint(&self) -> StorageResult<()> {
         let conn = self.conn.lock().unwrap();

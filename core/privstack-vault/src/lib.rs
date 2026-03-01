@@ -500,6 +500,17 @@ impl VaultManager {
         })
     }
 
+    /// Clears all cached vault instances so they are re-created (with
+    /// `ensure_tables`) on the next access.
+    ///
+    /// Call this after swapping the underlying `Connection` inside the shared
+    /// `Arc<Mutex<Connection>>` (e.g., when transitioning from an in-memory
+    /// placeholder to an encrypted on-disk database).
+    pub fn reinitialize_vaults(&self) {
+        let mut vaults = self.vaults.write().unwrap();
+        vaults.clear();
+    }
+
     /// Create (or get) a vault by ID.
     pub fn create_vault(&self, vault_id: &str) -> VaultResult<()> {
         let mut vaults = self.vaults.write().unwrap();

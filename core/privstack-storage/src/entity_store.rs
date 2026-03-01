@@ -51,6 +51,19 @@ impl EntityStore {
         Ok(Self { conn })
     }
 
+    /// Re-runs schema initialization on the current connection.
+    ///
+    /// Call this after swapping the underlying `Connection` inside the shared
+    /// `Arc<Mutex<Connection>>` (e.g., when transitioning from an in-memory
+    /// placeholder to an encrypted on-disk database).
+    pub fn reinitialize_schema(&self) -> StorageResult<()> {
+        let c = self.conn.lock().unwrap();
+        privstack_db::register_custom_functions(&c)
+            .map_err(StorageError::Db)?;
+        initialize_entity_schema(&c)?;
+        Ok(())
+    }
+
     /// Save (upsert) an entity with schema-driven field extraction.
     pub fn save_entity(&self, entity: &Entity, schema: &EntitySchema) -> StorageResult<()> {
         let conn = self.conn.lock().unwrap();

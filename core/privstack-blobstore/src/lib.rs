@@ -68,6 +68,15 @@ impl BlobStore {
         Ok(store)
     }
 
+    /// Re-runs table creation on the current connection.
+    ///
+    /// Call this after swapping the underlying `Connection` inside the shared
+    /// `Arc<Mutex<Connection>>` (e.g., when transitioning from an in-memory
+    /// placeholder to an encrypted on-disk database).
+    pub fn reinitialize_schema(&self) -> BlobStoreResult<()> {
+        self.ensure_tables()
+    }
+
     /// Open in-memory (for testing).
     pub fn open_in_memory() -> BlobStoreResult<Self> {
         let conn =

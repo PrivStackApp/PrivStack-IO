@@ -211,6 +211,12 @@ impl EntityRegistry {
 pub struct PrivStackHandle {
     /// The database path passed to privstack_init (needed for deriving keypair file path).
     db_path: String,
+    /// Shared database connection.  All stores (entity, event, blob, vault)
+    /// hold an `Arc::clone` of this same `Arc<Mutex<Connection>>`.  When
+    /// transitioning from an in-memory placeholder to an encrypted on-disk
+    /// database, we swap the `Connection` *inside* the Mutex so every store
+    /// automatically uses the new connection on its next operation.
+    main_conn: Arc<std::sync::Mutex<privstack_db::rusqlite::Connection>>,
     entity_store: Arc<EntityStore>,
     #[allow(dead_code)]
     event_store: Arc<EventStore>,
@@ -247,6 +253,68 @@ pub struct PrivStackHandle {
     cloud_dek_registry: Option<privstack_cloud::dek_registry::DekRegistry>,
     cloud_user_id: Option<i64>,
     cloud_active_workspace: Option<String>,
+}
+
+/// Salt file extension stored alongside the database.  If this file exists,
+/// the database is SQLCipher-encrypted and requires a password to open.
+const SALT_FILE_EXT: &str = "privstack.salt";
+
+impl PrivStackHandle {
+    /// Returns the path to the salt file for this database.
+    fn salt_path(&self) -> std::path::PathBuf {
+        Path::new(&self.db_path).with_extension(SALT_FILE_EXT)
+    }
+
+    /// Returns the path to the main database file.
+    fn main_db_path(&self) -> std::path::PathBuf {
+        Path::new(&self.db_path).with_extension("privstack.db")
+    }
+
+    /// Checks whether a salt file exists, indicating the database is encrypted.
+    fn has_salt_file(&self) -> bool {
+        self.db_path != ":memory:" && self.salt_path().exists()
+    }
+
+    /// Swap the placeholder in-memory connection for a real encrypted (or
+    /// unencrypted) on-disk connection, then re-initialize all store schemas.
+    ///
+    /// This is the core of the two-phase init: `init_core()` opens an
+    /// in-memory placeholder so the handle exists immediately, and this
+    /// method replaces it with the real database once the password is
+    /// available.
+    fn swap_connection(&self, new_conn: privstack_db::rusqlite::Connection) -> Result<(), PrivStackError> {
+        // Register custom SQL functions on the new connection.
+        privstack_db::register_custom_functions(&new_conn).map_err(|e| {
+            ffi_error!("[FFI] Failed to register custom functions after swap: {e:?}");
+            PrivStackError::StorageError
+        })?;
+
+        // Swap the Connection inside the shared Mutex.
+        {
+            let mut guard = self.main_conn.lock().unwrap();
+            *guard = new_conn;
+        }
+
+        // Re-initialize schemas on the new connection.
+        self.entity_store.reinitialize_schema().map_err(|e| {
+            ffi_error!("[FFI] Failed to reinitialize entity schema: {e:?}");
+            PrivStackError::StorageError
+        })?;
+        self.event_store.reinitialize_schema().map_err(|e| {
+            ffi_error!("[FFI] Failed to reinitialize event schema: {e:?}");
+            PrivStackError::StorageError
+        })?;
+        self.blob_store.reinitialize_schema().map_err(|e| {
+            ffi_error!("[FFI] Failed to reinitialize blob schema: {e:?}");
+            PrivStackError::StorageError
+        })?;
+
+        // Clear cached vault instances so they re-run ensure_tables() on
+        // the new connection the next time they are accessed.
+        self.vault_manager.reinitialize_vaults();
+
+        Ok(())
+    }
 }
 
 /// Discovered peer info for JSON serialization.
@@ -495,24 +563,45 @@ fn load_or_create_keypair(db_path: &str) -> Keypair {
 
 /// Core init logic — sets up vault, blob, entity, event stores, runtime, sync engine.
 /// Used directly when wasm-plugins feature is disabled.
+///
+/// **Two-phase initialization for SQLCipher:**
+/// - If no salt file exists (first run or legacy unencrypted): opens the
+///   database unencrypted so the app can operate immediately.  Encryption is
+///   enabled later when the user calls `privstack_auth_initialize`.
+/// - If a salt file exists (encrypted database): opens an **in-memory
+///   placeholder** so the handle exists for non-DB operations.  The real
+///   encrypted database is opened later by `privstack_auth_unlock`.
 #[cfg(not(feature = "wasm-plugins"))]
 pub fn init_core(path: &str) -> PrivStackError {
     let peer_id = load_or_create_peer_id(path);
 
-    // Open single shared database for entities, events, blobs, and vault
+    // Detect whether the database is encrypted (salt file present).
+    let salt_path = Path::new(path).with_extension(SALT_FILE_EXT);
+    let is_encrypted = path != ":memory:" && salt_path.exists();
+
+    // Open the initial connection:
+    //   :memory: path   → in-memory (testing)
+    //   encrypted       → in-memory placeholder (real DB opened on auth)
+    //   unencrypted     → open on-disk unencrypted (legacy / first run)
     let main_db_path = if path == ":memory:" {
         Path::new(":memory:").to_path_buf()
     } else {
         Path::new(path).with_extension("privstack.db")
     };
-    ffi_debug!("[FFI] Opening main database: {}", main_db_path.display());
 
-    let main_conn = if path == ":memory:" {
+    let open_result = if path == ":memory:" || is_encrypted {
+        if is_encrypted {
+            ffi_info!(
+                "[FFI] Salt file found — opening in-memory placeholder until auth_unlock"
+            );
+        }
         privstack_db::open_in_memory()
     } else {
+        ffi_debug!("[FFI] Opening main database (unencrypted): {}", main_db_path.display());
         privstack_db::open_db_unencrypted(&main_db_path)
     };
-    let main_conn = match main_conn {
+
+    let main_conn = match open_result {
         Ok(conn) => {
             privstack_db::register_custom_functions(&conn).ok();
             Arc::new(std::sync::Mutex::new(conn))
@@ -587,7 +676,7 @@ pub fn init_core(path: &str) -> PrivStackError {
         .map(|h| h.to_string_lossy().to_string())
         .unwrap_or_else(|_| "PrivStack Device".to_string());
 
-    // Dataset store (unencrypted SQLite for tabular data)
+    // Dataset store (unencrypted SQLite for tabular data — not affected by SQLCipher)
     let dataset_store = {
         let ds_path = if path == ":memory:" {
             None
@@ -618,6 +707,7 @@ pub fn init_core(path: &str) -> PrivStackError {
     let mut handle = HANDLE.lock().unwrap();
     *handle = Some(PrivStackHandle {
         db_path: path.to_string(),
+        main_conn,
         entity_store,
         event_store,
         entity_registry,
@@ -653,6 +743,8 @@ pub fn init_core(path: &str) -> PrivStackError {
 
 /// Shared init logic with plugin host — accepts a closure to construct the PluginHostManager,
 /// so tests can inject a policy-free manager without touching the filesystem.
+///
+/// See `init_core` for the two-phase initialization logic.
 #[cfg(feature = "wasm-plugins")]
 pub fn init_with_plugin_host_builder<F>(path: &str, build_plugin_host: F) -> PrivStackError
 where
@@ -660,20 +752,29 @@ where
 {
     let peer_id = load_or_create_peer_id(path);
 
-    // Open single shared database for entities, events, blobs, and vault
+    // Detect whether the database is encrypted (salt file present).
+    let salt_path = Path::new(path).with_extension(SALT_FILE_EXT);
+    let is_encrypted = path != ":memory:" && salt_path.exists();
+
     let main_db_path = if path == ":memory:" {
         Path::new(":memory:").to_path_buf()
     } else {
         Path::new(path).with_extension("privstack.db")
     };
-    ffi_debug!("[FFI] Opening main database: {}", main_db_path.display());
 
-    let main_conn = if path == ":memory:" {
+    let open_result = if path == ":memory:" || is_encrypted {
+        if is_encrypted {
+            ffi_info!(
+                "[FFI] Salt file found — opening in-memory placeholder until auth_unlock"
+            );
+        }
         privstack_db::open_in_memory()
     } else {
+        ffi_debug!("[FFI] Opening main database (unencrypted): {}", main_db_path.display());
         privstack_db::open_db_unencrypted(&main_db_path)
     };
-    let main_conn = match main_conn {
+
+    let main_conn = match open_result {
         Ok(conn) => {
             privstack_db::register_custom_functions(&conn).ok();
             Arc::new(std::sync::Mutex::new(conn))
@@ -784,6 +885,7 @@ where
     let mut handle = HANDLE.lock().unwrap();
     *handle = Some(PrivStackHandle {
         db_path: path.to_string(),
+        main_conn,
         entity_store,
         event_store,
         entity_registry,
@@ -885,8 +987,26 @@ pub unsafe extern "C" fn privstack_free_bytes(data: *mut u8, len: usize) { unsaf
 // App-Level Authentication Functions
 // ============================================================================
 
+/// Derives a SQLCipher encryption key from a password and salt.
+///
+/// Uses Argon2id (via `privstack_crypto`) to derive a 256-bit key, then
+/// formats it as a SQLCipher raw hex key string (`x'...'`).
+fn derive_db_key(
+    password: &str,
+    salt: &privstack_crypto::Salt,
+) -> Result<String, PrivStackError> {
+    let params = privstack_crypto::KdfParams::default();
+    let derived = privstack_crypto::derive_key(password, salt, &params).map_err(|e| {
+        ffi_error!("[FFI] Key derivation failed: {e:?}");
+        PrivStackError::AuthError
+    })?;
+    Ok(privstack_crypto::derive_sqlcipher_key(&derived))
+}
+
 /// Checks if the app master password has been initialized.
-/// Uses the "default" vault as the source of truth.
+///
+/// Returns `true` if the salt file exists (encrypted database was created)
+/// OR if the vault metadata indicates initialization (legacy unencrypted mode).
 #[unsafe(no_mangle)]
 pub extern "C" fn privstack_auth_is_initialized() -> bool {
     let handle = HANDLE.lock().unwrap();
@@ -894,6 +1014,13 @@ pub extern "C" fn privstack_auth_is_initialized() -> bool {
         Some(h) => h,
         None => return false,
     };
+
+    // Salt file is the primary indicator for encrypted databases.
+    if handle.has_salt_file() {
+        return true;
+    }
+
+    // Fallback: check vault metadata (legacy unencrypted or :memory: mode).
     handle.vault_manager.is_initialized("default")
 }
 
@@ -909,7 +1036,14 @@ pub extern "C" fn privstack_auth_is_unlocked() -> bool {
 }
 
 /// Initializes the app with a master password (first-time setup).
-/// Creates and initializes the "default" vault.
+///
+/// For on-disk databases this:
+/// 1. Generates a random salt and writes it to `<db_path>.privstack.salt`
+/// 2. Derives a SQLCipher key from the password + salt
+/// 3. Creates the encrypted `privstack.db` and swaps the in-memory placeholder
+/// 4. Initializes the "default" vault on the now-open encrypted database
+///
+/// For `:memory:` databases, only step 4 is performed.
 ///
 /// # Safety
 /// - `master_password` must be a valid null-terminated UTF-8 string.
@@ -932,11 +1066,52 @@ pub unsafe extern "C" fn privstack_auth_initialize(
         None => return PrivStackError::NotInitialized,
     };
 
-    match handle.vault_manager.initialize("default", password) {
-        Ok(_) => {
-            // Encryption is now handled at the database level (SQLCipher)
-            PrivStackError::Ok
+    // For on-disk databases: generate salt, create encrypted DB, swap connection
+    if handle.db_path != ":memory:" {
+        if handle.has_salt_file() {
+            ffi_warn!("[FFI] auth_initialize called but salt file already exists");
+            return PrivStackError::VaultAlreadyInitialized;
         }
+
+        // 1. Generate salt
+        let salt = privstack_crypto::Salt::random();
+
+        // 2. Derive SQLCipher key
+        let db_key = match derive_db_key(password, &salt) {
+            Ok(k) => k,
+            Err(e) => return e,
+        };
+
+        // 3. Create encrypted database
+        let db_path = handle.main_db_path();
+        ffi_info!("[FFI] Creating encrypted database: {}", db_path.display());
+
+        let new_conn = match privstack_db::open_db(&db_path, &db_key) {
+            Ok(c) => c,
+            Err(e) => {
+                ffi_error!("[FFI] Failed to create encrypted database: {e:?}");
+                return PrivStackError::StorageError;
+            }
+        };
+
+        // 4. Swap connection — all stores now point at the encrypted DB
+        if let Err(e) = handle.swap_connection(new_conn) {
+            ffi_error!("[FFI] Failed to swap connection: {e:?}");
+            return e;
+        }
+
+        // 5. Write salt file AFTER successful DB creation (crash-safe ordering)
+        if let Err(e) = std::fs::write(handle.salt_path(), salt.as_bytes()) {
+            ffi_error!("[FFI] Failed to write salt file: {e:?}");
+            return PrivStackError::StorageError;
+        }
+
+        ffi_info!("[FFI] Encrypted database created and salt file written");
+    }
+
+    // Initialize the vault on the (now real) database
+    match handle.vault_manager.initialize("default", password) {
+        Ok(_) => PrivStackError::Ok,
         Err(privstack_vault::VaultError::PasswordTooShort) => PrivStackError::PasswordTooShort,
         Err(privstack_vault::VaultError::AlreadyInitialized) => PrivStackError::VaultAlreadyInitialized,
         Err(privstack_vault::VaultError::Storage(_)) => PrivStackError::StorageError,
@@ -945,7 +1120,14 @@ pub unsafe extern "C" fn privstack_auth_initialize(
 }}
 
 /// Unlocks the app with a master password.
-/// Unlocks all initialized vaults sharing the master password.
+///
+/// For encrypted databases (salt file exists):
+/// 1. Reads the salt from `<db_path>.privstack.salt`
+/// 2. Derives the SQLCipher key from the password + salt
+/// 3. Opens the encrypted `privstack.db` and swaps the in-memory placeholder
+/// 4. Unlocks all initialized vaults on the now-open encrypted database
+///
+/// For unencrypted databases, only step 4 is performed (DB already open).
 ///
 /// # Safety
 /// - `master_password` must be a valid null-terminated UTF-8 string.
@@ -968,16 +1150,69 @@ pub unsafe extern "C" fn privstack_auth_unlock(
         None => return PrivStackError::NotInitialized,
     };
 
-    match handle.vault_manager.unlock_all(password) {
-        Ok(_) => {
-            // Encryption is now handled at the database level (SQLCipher)
-            PrivStackError::Ok
+    // For encrypted databases: read salt, derive key, open DB, swap connection
+    if handle.has_salt_file() {
+        // 1. Read salt
+        let salt_bytes = match std::fs::read(handle.salt_path()) {
+            Ok(b) => b,
+            Err(e) => {
+                ffi_error!("[FFI] Failed to read salt file: {e:?}");
+                return PrivStackError::StorageError;
+            }
+        };
+
+        if salt_bytes.len() != privstack_crypto::SALT_SIZE {
+            ffi_error!(
+                "[FFI] Salt file has invalid size: {} (expected {})",
+                salt_bytes.len(),
+                privstack_crypto::SALT_SIZE
+            );
+            return PrivStackError::StorageError;
         }
+
+        let mut salt_arr = [0u8; privstack_crypto::SALT_SIZE];
+        salt_arr.copy_from_slice(&salt_bytes);
+        let salt = privstack_crypto::Salt::from_bytes(salt_arr);
+
+        // 2. Derive SQLCipher key
+        let db_key = match derive_db_key(password, &salt) {
+            Ok(k) => k,
+            Err(e) => return e,
+        };
+
+        // 3. Open encrypted database
+        let db_path = handle.main_db_path();
+        ffi_info!("[FFI] Opening encrypted database: {}", db_path.display());
+
+        let new_conn = match privstack_db::open_db(&db_path, &db_key) {
+            Ok(c) => c,
+            Err(e) => {
+                ffi_error!("[FFI] Failed to open encrypted database (wrong password?): {e:?}");
+                return PrivStackError::AuthError;
+            }
+        };
+
+        // 4. Swap connection — all stores now point at the encrypted DB
+        if let Err(e) = handle.swap_connection(new_conn) {
+            ffi_error!("[FFI] Failed to swap connection: {e:?}");
+            return e;
+        }
+
+        ffi_info!("[FFI] Encrypted database opened successfully");
+    }
+
+    // Unlock vaults on the (now real) database
+    match handle.vault_manager.unlock_all(password) {
+        Ok(_) => PrivStackError::Ok,
         Err(_) => PrivStackError::AuthError,
     }
 }}
 
 /// Locks the app, securing all sensitive data.
+///
+/// For encrypted databases, this also swaps the real database connection
+/// back to an in-memory placeholder, ensuring no data is accessible from
+/// the encrypted DB while locked.
 #[unsafe(no_mangle)]
 pub extern "C" fn privstack_auth_lock() -> PrivStackError {
     let handle = HANDLE.lock().unwrap();
@@ -986,11 +1221,31 @@ pub extern "C" fn privstack_auth_lock() -> PrivStackError {
         None => return PrivStackError::NotInitialized,
     };
 
+    // Lock all vaults first (clears in-memory DEKs)
     handle.vault_manager.lock_all();
+
+    // For encrypted databases: swap back to in-memory placeholder so the
+    // encrypted DB file is no longer held open.
+    if handle.has_salt_file() {
+        match privstack_db::open_in_memory() {
+            Ok(placeholder) => {
+                let mut guard = handle.main_conn.lock().unwrap();
+                *guard = placeholder;
+                ffi_info!("[FFI] Swapped to in-memory placeholder on lock");
+            }
+            Err(e) => {
+                ffi_warn!("[FFI] Failed to create placeholder on lock: {e:?}");
+            }
+        }
+    }
+
     PrivStackError::Ok
 }
 
 /// Changes the master password for all vaults.
+///
+/// For encrypted databases, this also re-keys the SQLCipher database with
+/// a new key derived from the new password + a fresh salt.
 ///
 /// # Safety
 /// - `old_password` and `new_password` must be valid null-terminated UTF-8 strings.
@@ -1023,14 +1278,38 @@ pub unsafe extern "C" fn privstack_auth_change_password(
         None => return PrivStackError::NotInitialized,
     };
 
-    // Old key bytes no longer needed — re-encryption is handled at the SQLCipher level
-    let _old_key_bytes = handle.vault_manager.default_key_bytes();
+    // For encrypted databases: rekey with new password + fresh salt
+    if handle.has_salt_file() {
+        // Generate new salt
+        let new_salt = privstack_crypto::Salt::random();
 
-    match handle.vault_manager.change_password_all(old_pwd, new_pwd) {
-        Ok(_) => {
-            // Re-encryption is handled at the database level (SQLCipher rekey)
-            PrivStackError::Ok
+        // Derive new SQLCipher key
+        let new_db_key = match derive_db_key(new_pwd, &new_salt) {
+            Ok(k) => k,
+            Err(e) => return e,
+        };
+
+        // Rekey the database (must be done while DB is open with old key)
+        {
+            let conn = handle.main_conn.lock().unwrap();
+            if let Err(e) = privstack_db::rekey(&conn, &new_db_key) {
+                ffi_error!("[FFI] Failed to rekey database: {e:?}");
+                return PrivStackError::StorageError;
+            }
         }
+
+        // Write new salt file AFTER successful rekey
+        if let Err(e) = std::fs::write(handle.salt_path(), new_salt.as_bytes()) {
+            ffi_error!("[FFI] Failed to update salt file: {e:?}");
+            return PrivStackError::StorageError;
+        }
+
+        ffi_info!("[FFI] Database rekeyed with new password");
+    }
+
+    // Change vault password (re-encrypts vault blobs with new key)
+    match handle.vault_manager.change_password_all(old_pwd, new_pwd) {
+        Ok(_) => PrivStackError::Ok,
         Err(_) => PrivStackError::AuthError,
     }
 }}
@@ -1087,7 +1366,10 @@ pub extern "C" fn privstack_auth_has_recovery() -> bool {
 }
 
 /// Resets the master password using a recovery mnemonic.
-/// Re-encrypts all vault blobs, entity store, and blob store.
+///
+/// For encrypted databases, also rekeys the SQLCipher database with a key
+/// derived from the new password + fresh salt.  The database must already
+/// be open (the user must have authenticated at least once in this session).
 ///
 /// # Safety
 /// - `mnemonic` and `new_password` must be valid null-terminated UTF-8 strings.
@@ -1120,27 +1402,58 @@ pub unsafe extern "C" fn privstack_auth_reset_with_recovery(
         None => return PrivStackError::NotInitialized,
     };
 
+    // Vault recovery (re-encrypts vault blobs)
     match handle
         .vault_manager
         .reset_password_with_recovery("default", mnemonic_str, new_pwd)
     {
-        Ok((_old_kb, _new_kb)) => {
-            // Re-encryption is handled at the database level (SQLCipher rekey)
-            PrivStackError::Ok
-        }
+        Ok((_old_kb, _new_kb)) => {}
         Err(privstack_vault::VaultError::RecoveryNotConfigured) => {
-            PrivStackError::RecoveryNotConfigured
+            return PrivStackError::RecoveryNotConfigured;
         }
         Err(privstack_vault::VaultError::InvalidRecoveryMnemonic) => {
-            PrivStackError::InvalidRecoveryMnemonic
+            return PrivStackError::InvalidRecoveryMnemonic;
         }
-        Err(privstack_vault::VaultError::PasswordTooShort) => PrivStackError::PasswordTooShort,
-        Err(_) => PrivStackError::AuthError,
+        Err(privstack_vault::VaultError::PasswordTooShort) => {
+            return PrivStackError::PasswordTooShort;
+        }
+        Err(_) => {
+            return PrivStackError::AuthError;
+        }
     }
+
+    // Rekey encrypted database with new password + fresh salt
+    if handle.has_salt_file() {
+        let new_salt = privstack_crypto::Salt::random();
+        let new_db_key = match derive_db_key(new_pwd, &new_salt) {
+            Ok(k) => k,
+            Err(e) => return e,
+        };
+
+        {
+            let conn = handle.main_conn.lock().unwrap();
+            if let Err(e) = privstack_db::rekey(&conn, &new_db_key) {
+                ffi_error!("[FFI] Failed to rekey database during recovery: {e:?}");
+                return PrivStackError::StorageError;
+            }
+        }
+
+        if let Err(e) = std::fs::write(handle.salt_path(), new_salt.as_bytes()) {
+            ffi_error!("[FFI] Failed to update salt file during recovery: {e:?}");
+            return PrivStackError::StorageError;
+        }
+
+        ffi_info!("[FFI] Database rekeyed during recovery");
+    }
+
+    PrivStackError::Ok
 }}
 
 /// Resets the master password using a recovery mnemonic and also recovers
 /// cloud keypair (best-effort). Unified recovery for both vault + cloud.
+///
+/// For encrypted databases, also rekeys the SQLCipher database with a key
+/// derived from the new password + fresh salt.
 ///
 /// # Safety
 /// - `mnemonic` and `new_password` must be valid null-terminated UTF-8 strings.
@@ -1178,9 +1491,7 @@ pub unsafe extern "C" fn privstack_auth_reset_with_unified_recovery(
         .vault_manager
         .reset_password_with_recovery("default", mnemonic_str, new_pwd)
     {
-        Ok((_old_kb, _new_kb)) => {
-            // Re-encryption is handled at the database level (SQLCipher rekey)
-        }
+        Ok((_old_kb, _new_kb)) => {}
         Err(privstack_vault::VaultError::RecoveryNotConfigured) => {
             return PrivStackError::RecoveryNotConfigured;
         }
@@ -1195,7 +1506,31 @@ pub unsafe extern "C" fn privstack_auth_reset_with_unified_recovery(
         }
     }
 
-    // 2. Cloud recovery (best-effort — log failures, don't block vault recovery)
+    // 2. Rekey encrypted database with new password + fresh salt
+    if handle.has_salt_file() {
+        let new_salt = privstack_crypto::Salt::random();
+        let new_db_key = match derive_db_key(new_pwd, &new_salt) {
+            Ok(k) => k,
+            Err(e) => return e,
+        };
+
+        {
+            let conn = handle.main_conn.lock().unwrap();
+            if let Err(e) = privstack_db::rekey(&conn, &new_db_key) {
+                ffi_error!("[FFI] Failed to rekey database during unified recovery: {e:?}");
+                return PrivStackError::StorageError;
+            }
+        }
+
+        if let Err(e) = std::fs::write(handle.salt_path(), new_salt.as_bytes()) {
+            ffi_error!("[FFI] Failed to update salt file during unified recovery: {e:?}");
+            return PrivStackError::StorageError;
+        }
+
+        ffi_info!("[FFI] Database rekeyed during unified recovery");
+    }
+
+    // 3. Cloud recovery (best-effort — log failures, don't block vault recovery)
     if let (Some(env_mgr), Some(api), Some(config)) = (
         &handle.cloud_envelope_mgr,
         &handle.cloud_api,
