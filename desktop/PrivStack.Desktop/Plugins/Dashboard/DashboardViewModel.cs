@@ -556,39 +556,50 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
             SubsystemNativeTotal = SystemMetricsHelper.FormatBytes(Math.Max(0, nativeEstimate));
             ActiveSubsystemCount = activeCount;
 
-            // Update or create items (sorted: active first, then by category)
-            foreach (var snap in snapshots)
+            // Sort: by category order, then by name within category
+            var sorted = snapshots.OrderBy(s => CategorySortOrder(s.Category))
+                                  .ThenBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
+                                  .ToArray();
+
+            // Rebuild collection on first populate; update in-place on subsequent ticks
+            var needsRebuild = SubsystemItems.Count != sorted.Length;
+
+            if (needsRebuild)
             {
-                var existing = SubsystemItems.FirstOrDefault(i => i.Id == snap.Id);
-                if (existing == null)
+                SubsystemItems.Clear();
+                foreach (var snap in sorted)
                 {
-                    existing = new SubsystemItemViewModel
+                    SubsystemItems.Add(new SubsystemItemViewModel
                     {
                         Id = snap.Id,
                         DisplayName = snap.DisplayName,
                         Category = snap.Category,
-                    };
-                    SubsystemItems.Add(existing);
+                    });
                 }
+            }
 
-                existing.ActiveTaskCount = snap.ActiveTaskCount;
-                existing.NativeBytes = snap.NativeBytes;
-                existing.ManagedAllocBytes = snap.ManagedAllocBytes;
+            for (var i = 0; i < sorted.Length; i++)
+            {
+                var snap = sorted[i];
+                var item = SubsystemItems[i];
 
-                // Format memory display: show Rust-tracked native bytes if available,
-                // or managed alloc bytes from completed scopes
+                item.ActiveTaskCount = snap.ActiveTaskCount;
+                item.NativeBytes = snap.NativeBytes;
+                item.ManagedAllocBytes = snap.ManagedAllocBytes;
+
+                // Format memory display
                 var rustBytes = Math.Max(0, snap.NativeBytes);
                 var managedBytes = snap.ManagedAllocBytes;
                 if (rustBytes > 0 && managedBytes > 0)
-                    existing.MemoryDisplay = $"{SystemMetricsHelper.FormatBytes(rustBytes)} native + {SystemMetricsHelper.FormatBytes(managedBytes)} managed";
+                    item.MemoryDisplay = $"{SystemMetricsHelper.FormatBytes(rustBytes)} native + {SystemMetricsHelper.FormatBytes(managedBytes)} managed";
                 else if (rustBytes > 0)
-                    existing.MemoryDisplay = $"{SystemMetricsHelper.FormatBytes(rustBytes)} native";
+                    item.MemoryDisplay = $"{SystemMetricsHelper.FormatBytes(rustBytes)} native";
                 else if (managedBytes > 0)
-                    existing.MemoryDisplay = SystemMetricsHelper.FormatBytes(managedBytes);
+                    item.MemoryDisplay = SystemMetricsHelper.FormatBytes(managedBytes);
                 else
-                    existing.MemoryDisplay = "—";
+                    item.MemoryDisplay = "—";
 
-                existing.AllocRateDisplay = snap.ManagedAllocRate > 0
+                item.AllocRateDisplay = snap.ManagedAllocRate > 0
                     ? $"{SystemMetricsHelper.FormatBytes(snap.ManagedAllocRate)}/s"
                     : "—";
             }
@@ -598,6 +609,17 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
             _log.Debug(ex, "Subsystem metrics refresh failed");
         }
     }
+
+    private static int CategorySortOrder(string category) => category switch
+    {
+        "Core" => 0,
+        "AI" => 1,
+        "Services" => 2,
+        "UI" => 3,
+        "Runtime" => 4,
+        "Plugin" => 5,
+        _ => 6,
+    };
 
     // =========================================================================
     // Plugin activation toggle (workspace on/off)

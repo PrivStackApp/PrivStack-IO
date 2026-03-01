@@ -63,7 +63,11 @@ internal sealed class IntentEngine : IIntentEngine, IRecipient<IntentSignalMessa
         LoadSuggestionsFromDisk();
 
         WeakReferenceMessenger.Default.Register<IntentSignalMessage>(this);
-        _consumerTask = Diagnostics.SubsystemTracker.RunTaggedStatic("ai.intent", () => ConsumeSignalsAsync(_disposeCts.Token));
+
+        // Only start the consumer task if AI + intents are enabled.
+        // The consumer sits on ReadAllAsync forever; no point running it when AI is off.
+        if (_appSettings.Settings.AiEnabled && _appSettings.Settings.AiIntentEnabled)
+            _consumerTask = Diagnostics.SubsystemTracker.RunTaggedStatic("ai.intent", () => ConsumeSignalsAsync(_disposeCts.Token));
     }
 
     // ── IIntentEngine ─────────────────────────────────────────────────
