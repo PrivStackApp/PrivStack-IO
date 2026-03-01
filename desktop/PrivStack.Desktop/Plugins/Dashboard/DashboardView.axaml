@@ -949,7 +949,7 @@
                         <TextBlock Text="Per-Subsystem Breakdown" Classes="section-heading"/>
 
                         <!-- Header row -->
-                        <Grid ColumnDefinitions="24,*,100,100,100,100" Margin="0,0,0,4">
+                        <Grid ColumnDefinitions="24,*,80,60,180,100" Margin="0,0,0,4">
                             <TextBlock Grid.Column="1" Text="Subsystem"
                                        FontSize="{DynamicResource ThemeFontSizeXs}"
                                        Foreground="{DynamicResource ThemeTextMutedBrush}" FontWeight="SemiBold"/>
@@ -961,7 +961,7 @@
                                        FontSize="{DynamicResource ThemeFontSizeXs}"
                                        Foreground="{DynamicResource ThemeTextMutedBrush}" FontWeight="SemiBold"
                                        HorizontalAlignment="Center"/>
-                            <TextBlock Grid.Column="4" Text="Memory"
+                            <TextBlock Grid.Column="4" Text="Tracked Memory"
                                        FontSize="{DynamicResource ThemeFontSizeXs}"
                                        Foreground="{DynamicResource ThemeTextMutedBrush}" FontWeight="SemiBold"
                                        HorizontalAlignment="Right"/>
@@ -976,7 +976,7 @@
                                 <DataTemplate x:DataType="models:SubsystemItemViewModel">
                                     <Border Padding="8,10" CornerRadius="6" Margin="0,0,0,2"
                                             Background="{DynamicResource ThemeSurfaceElevatedBrush}">
-                                        <Grid ColumnDefinitions="24,*,100,100,100,100">
+                                        <Grid ColumnDefinitions="24,*,80,60,180,100">
                                             <!-- Status dot (green=active, gray=idle/stopped) -->
                                             <Panel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center">
                                                 <Ellipse Width="8" Height="8"

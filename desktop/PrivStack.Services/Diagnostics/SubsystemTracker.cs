@@ -34,6 +34,9 @@ public sealed class SubsystemTracker
     /// <summary>
     /// Run an async action tagged with the given subsystem ID.
     /// Tracks active task count and managed allocation delta.
+    /// For long-running tasks, call ReportAllocations() periodically from within
+    /// the action to update the allocation counter (since the finally block
+    /// only runs on task completion).
     /// </summary>
     public Task RunTagged(string subsystemId, Func<Task> action)
     {

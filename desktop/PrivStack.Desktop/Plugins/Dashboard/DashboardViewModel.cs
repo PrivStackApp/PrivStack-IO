@@ -539,18 +539,19 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
 
             var snapshots = _subsystemTracker.GetSnapshots();
 
-            // Summary cards
+            // Summary cards — use process-level metrics for accuracy
             var totalThreads = snapshots.Sum(s => s.ActiveTaskCount);
-            var totalManaged = GC.GetTotalMemory(false);
-            var totalNative = snapshots.Sum(s => Math.Max(0, s.NativeBytes));
+            var gcHeap = GC.GetTotalMemory(false);
+            var workingSet = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64;
+            var nativeEstimate = workingSet - gcHeap;
             var activeCount = snapshots.Count(s => s.ActiveTaskCount > 0);
 
             SubsystemThreadCount = totalThreads.ToString();
-            SubsystemManagedHeap = SystemMetricsHelper.FormatBytes(totalManaged);
-            SubsystemNativeTotal = SystemMetricsHelper.FormatBytes(totalNative);
+            SubsystemManagedHeap = SystemMetricsHelper.FormatBytes(gcHeap);
+            SubsystemNativeTotal = SystemMetricsHelper.FormatBytes(Math.Max(0, nativeEstimate));
             ActiveSubsystemCount = activeCount;
 
-            // Update or create items
+            // Update or create items (sorted: active first, then by category)
             foreach (var snap in snapshots)
             {
                 var existing = SubsystemItems.FirstOrDefault(i => i.Id == snap.Id);
@@ -569,11 +570,19 @@ public partial class DashboardViewModel : PrivStack.Sdk.ViewModelBase
                 existing.NativeBytes = snap.NativeBytes;
                 existing.ManagedAllocBytes = snap.ManagedAllocBytes;
 
-                // Format display strings
-                var totalMem = Math.Max(0, snap.NativeBytes) + snap.ManagedAllocBytes;
-                existing.MemoryDisplay = totalMem > 0
-                    ? SystemMetricsHelper.FormatBytes(totalMem)
-                    : "—";
+                // Format memory display: show Rust-tracked native bytes if available,
+                // or managed alloc bytes from completed scopes
+                var rustBytes = Math.Max(0, snap.NativeBytes);
+                var managedBytes = snap.ManagedAllocBytes;
+                if (rustBytes > 0 && managedBytes > 0)
+                    existing.MemoryDisplay = $"{SystemMetricsHelper.FormatBytes(rustBytes)} native + {SystemMetricsHelper.FormatBytes(managedBytes)} managed";
+                else if (rustBytes > 0)
+                    existing.MemoryDisplay = $"{SystemMetricsHelper.FormatBytes(rustBytes)} native";
+                else if (managedBytes > 0)
+                    existing.MemoryDisplay = SystemMetricsHelper.FormatBytes(managedBytes);
+                else
+                    existing.MemoryDisplay = "—";
+
                 existing.AllocRateDisplay = snap.ManagedAllocRate > 0
                     ? $"{SystemMetricsHelper.FormatBytes(snap.ManagedAllocRate)}/s"
                     : "—";
