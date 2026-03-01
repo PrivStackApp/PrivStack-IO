@@ -4712,9 +4712,8 @@ name = "privstack-storage"
 version = "1.15.3"
 dependencies = [
  "chrono",
- "duckdb",
  "privstack-crdt",
- "privstack-crypto",
+ "privstack-db",
  "privstack-model",
  "privstack-types",
  "serde",
@@ -4722,7 +4721,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
- "uuid",
 ]
 
 [[package]]
@@ -4772,14 +4770,13 @@ name = "privstack-vault"
 version = "1.15.3"
 dependencies = [
  "chrono",
- "duckdb",
  "privstack-crypto",
+ "privstack-db",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
  "thiserror 2.0.18",
- "uuid",
 ]
 
 [[package]]

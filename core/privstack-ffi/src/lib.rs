@@ -524,10 +524,7 @@ pub fn init_core(path: &str) -> PrivStackError {
         Path::new(path).with_extension("blobs.duckdb")
     };
     ffi_debug!("[FFI] Opening blob store: {}", blob_db_path.display());
-    let blob_store = match BlobStore::open_with_encryptor(
-        &blob_db_path,
-        vault_manager.clone() as Arc<dyn privstack_crypto::DataEncryptor>,
-    ) {
+    let blob_store = match BlobStore::open(&blob_db_path) {
         Ok(bs) => {
             ffi_debug!("[FFI] Blob store opened OK");
             bs
@@ -545,10 +542,7 @@ pub fn init_core(path: &str) -> PrivStackError {
         Path::new(path).with_extension("entities.duckdb")
     };
     ffi_debug!("[FFI] Opening entity store: {}", entity_path.display());
-    let entity_store = match EntityStore::open_with_encryptor(
-        &entity_path,
-        vault_manager.clone() as Arc<dyn privstack_crypto::DataEncryptor>,
-    ) {
+    let entity_store = match EntityStore::open(&entity_path) {
         Ok(s) => {
             ffi_debug!("[FFI] Entity store opened OK");
             s
@@ -694,10 +688,7 @@ where
         Path::new(path).with_extension("blobs.duckdb")
     };
     ffi_debug!("[FFI] Opening blob store: {}", blob_db_path.display());
-    let blob_store = match BlobStore::open_with_encryptor(
-        &blob_db_path,
-        vault_manager.clone() as Arc<dyn privstack_crypto::DataEncryptor>,
-    ) {
+    let blob_store = match BlobStore::open(&blob_db_path) {
         Ok(bs) => {
             ffi_debug!("[FFI] Blob store opened OK");
             bs
@@ -715,10 +706,7 @@ where
         Path::new(path).with_extension("entities.duckdb")
     };
     ffi_debug!("[FFI] Opening entity store: {}", entity_path.display());
-    let entity_store = match EntityStore::open_with_encryptor(
-        &entity_path,
-        vault_manager.clone() as Arc<dyn privstack_crypto::DataEncryptor>,
-    ) {
+    let entity_store = match EntityStore::open(&entity_path) {
         Ok(s) => {
             ffi_debug!("[FFI] Entity store opened OK");
             s
@@ -952,9 +940,7 @@ pub unsafe extern "C" fn privstack_auth_initialize(
 
     match handle.vault_manager.initialize("default", password) {
         Ok(_) => {
-            // Migrate any pre-existing unencrypted data
-            let _ = handle.entity_store.migrate_unencrypted();
-            let _ = handle.blob_store.migrate_unencrypted();
+            // Encryption is now handled at the database level (SQLCipher)
             PrivStackError::Ok
         }
         Err(privstack_vault::VaultError::PasswordTooShort) => PrivStackError::PasswordTooShort,
@@ -990,9 +976,7 @@ pub unsafe extern "C" fn privstack_auth_unlock(
 
     match handle.vault_manager.unlock_all(password) {
         Ok(_) => {
-            // Migrate any pre-existing unencrypted data to encrypted form
-            let _ = handle.entity_store.migrate_unencrypted();
-            let _ = handle.blob_store.migrate_unencrypted();
+            // Encryption is now handled at the database level (SQLCipher)
             PrivStackError::Ok
         }
         Err(_) => PrivStackError::AuthError,
@@ -1045,18 +1029,12 @@ pub unsafe extern "C" fn privstack_auth_change_password(
         None => return PrivStackError::NotInitialized,
     };
 
-    // Capture old key bytes before password change for re-encryption
-    let old_key_bytes = handle.vault_manager.default_key_bytes();
+    // Old key bytes no longer needed — re-encryption is handled at the SQLCipher level
+    let _old_key_bytes = handle.vault_manager.default_key_bytes();
 
     match handle.vault_manager.change_password_all(old_pwd, new_pwd) {
         Ok(_) => {
-            // Re-encrypt entity and blob stores with new key
-            if let (Some(old_kb), Some(new_kb)) =
-                (old_key_bytes, handle.vault_manager.default_key_bytes())
-            {
-                let _ = handle.entity_store.re_encrypt_all(&old_kb, &new_kb);
-                let _ = handle.blob_store.re_encrypt_all(&old_kb, &new_kb);
-            }
+            // Re-encryption is handled at the database level (SQLCipher rekey)
             PrivStackError::Ok
         }
         Err(_) => PrivStackError::AuthError,
@@ -1152,10 +1130,8 @@ pub unsafe extern "C" fn privstack_auth_reset_with_recovery(
         .vault_manager
         .reset_password_with_recovery("default", mnemonic_str, new_pwd)
     {
-        Ok((old_kb, new_kb)) => {
-            // Re-encrypt entity and blob stores with new key
-            let _ = handle.entity_store.re_encrypt_all(&old_kb, &new_kb);
-            let _ = handle.blob_store.re_encrypt_all(&old_kb, &new_kb);
+        Ok((_old_kb, _new_kb)) => {
+            // Re-encryption is handled at the database level (SQLCipher rekey)
             PrivStackError::Ok
         }
         Err(privstack_vault::VaultError::RecoveryNotConfigured) => {
@@ -1208,10 +1184,8 @@ pub unsafe extern "C" fn privstack_auth_reset_with_unified_recovery(
         .vault_manager
         .reset_password_with_recovery("default", mnemonic_str, new_pwd)
     {
-        Ok((old_kb, new_kb)) => {
-            // Re-encrypt entity and blob stores with new key
-            let _ = handle.entity_store.re_encrypt_all(&old_kb, &new_kb);
-            let _ = handle.blob_store.re_encrypt_all(&old_kb, &new_kb);
+        Ok((_old_kb, _new_kb)) => {
+            // Re-encryption is handled at the database level (SQLCipher rekey)
         }
         Err(privstack_vault::VaultError::RecoveryNotConfigured) => {
             return PrivStackError::RecoveryNotConfigured;
@@ -5695,7 +5669,7 @@ pub unsafe extern "C" fn privstack_delete_orphan_entities(
 /// Returns diagnostics for ALL DuckDB files as JSON. Caller must free with `privstack_free_string`.
 #[unsafe(no_mangle)]
 pub extern "C" fn privstack_db_diagnostics() -> *mut c_char {
-    use privstack_storage::entity_store::scan_duckdb_file;
+    use privstack_storage::scan_db_file;
 
     let handle = HANDLE.lock().unwrap();
     match handle.as_ref() {
@@ -5726,7 +5700,7 @@ pub extern "C" fn privstack_db_diagnostics() -> *mut c_char {
             ];
 
             for (label, path) in &siblings {
-                if let Some(diag) = scan_duckdb_file(&path) {
+                if let Some(diag) = scan_db_file(&path) {
                     all_dbs.insert(label.to_string(), diag);
                 }
             }
@@ -5741,7 +5715,7 @@ pub extern "C" fn privstack_db_diagnostics() -> *mut c_char {
 /// Returns JSON with per-database before/after sizes. Caller must free with `privstack_free_string`.
 #[unsafe(no_mangle)]
 pub extern "C" fn privstack_compact_databases() -> *mut c_char {
-    use privstack_storage::compact_duckdb_file;
+    use privstack_storage::compact_db_file;
 
     let handle = HANDLE.lock().unwrap();
     match handle.as_ref() {
@@ -5774,7 +5748,7 @@ pub extern "C" fn privstack_compact_databases() -> *mut c_char {
 
             for (label, path) in &siblings {
                 if path.exists() {
-                    match compact_duckdb_file(path) {
+                    match compact_db_file(path) {
                         Some((before, after)) => {
                             results.insert((*label).into(), serde_json::json!({
                                 "before": before, "after": after,

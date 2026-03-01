@@ -1,5 +1,8 @@
 use privstack_model::{Entity, EntitySchema, FieldType, IndexedField, MergeStrategy};
 use privstack_storage::EntityStore;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 fn test_schema() -> EntitySchema {
     EntitySchema {
@@ -14,8 +17,9 @@ fn test_schema() -> EntitySchema {
 }
 
 fn test_entity(title: &str) -> Entity {
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     Entity {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: format!("test-entity-{id}"),
         entity_type: "bookmark".into(),
         data: serde_json::json!({
             "title": title,
@@ -210,13 +214,13 @@ fn search_entities() {
     let schema = test_schema();
 
     let e1 = Entity {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: format!("search-{}", NEXT_ID.fetch_add(1, Ordering::Relaxed)),
         entity_type: "bookmark".into(),
         data: serde_json::json!({"title": "Rust Programming", "url": "https://rust-lang.org", "tags": ["rust"]}),
         created_at: 1000, modified_at: 1000, created_by: "test".into(),
     };
     let e2 = Entity {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: format!("search-{}", NEXT_ID.fetch_add(1, Ordering::Relaxed)),
         entity_type: "bookmark".into(),
         data: serde_json::json!({"title": "Python Docs", "url": "https://python.org", "tags": ["python"]}),
         created_at: 1001, modified_at: 1001, created_by: "test".into(),
@@ -600,114 +604,11 @@ fn save_entity_with_body_field() {
     assert_eq!(results.len(), 1);
 }
 
-// ── Encryption failure paths ─────────────────────────────────────
-
-/// A mock encryptor that fails on encrypt.
-struct FailingEncryptor;
-
-impl privstack_crypto::DataEncryptor for FailingEncryptor {
-    fn encrypt_bytes(&self, _entity_id: &str, _data: &[u8]) -> privstack_crypto::EncryptorResult<Vec<u8>> {
-        Err(privstack_crypto::EncryptorError::Crypto("simulated encrypt failure".into()))
-    }
-    fn decrypt_bytes(&self, _data: &[u8]) -> privstack_crypto::EncryptorResult<Vec<u8>> {
-        Err(privstack_crypto::EncryptorError::Crypto("simulated decrypt failure".into()))
-    }
-    fn reencrypt_bytes(&self, _data: &[u8], _old: &[u8], _new: &[u8]) -> privstack_crypto::EncryptorResult<Vec<u8>> {
-        Err(privstack_crypto::EncryptorError::Crypto("simulated reencrypt failure".into()))
-    }
-    fn is_available(&self) -> bool {
-        true
-    }
-}
-
-/// Encryptor that is not available (simulates locked vault).
-struct UnavailableEncryptor;
-
-impl privstack_crypto::DataEncryptor for UnavailableEncryptor {
-    fn encrypt_bytes(&self, _entity_id: &str, _data: &[u8]) -> privstack_crypto::EncryptorResult<Vec<u8>> {
-        Err(privstack_crypto::EncryptorError::Unavailable)
-    }
-    fn decrypt_bytes(&self, _data: &[u8]) -> privstack_crypto::EncryptorResult<Vec<u8>> {
-        Err(privstack_crypto::EncryptorError::Unavailable)
-    }
-    fn reencrypt_bytes(&self, _data: &[u8], _old: &[u8], _new: &[u8]) -> privstack_crypto::EncryptorResult<Vec<u8>> {
-        Err(privstack_crypto::EncryptorError::Unavailable)
-    }
-    fn is_available(&self) -> bool {
-        false
-    }
-}
-
-#[test]
-fn save_entity_raw_with_encryption_failure() {
-    let store = EntityStore::open_with_encryptor(
-        std::path::Path::new(":memory:"),
-        std::sync::Arc::new(FailingEncryptor),
-    );
-    // open_with_encryptor may not support :memory: — use tempfile if needed
-    // The FailingEncryptor will cause encrypt_data_json to fail
-    if let Ok(store) = store {
-        let entity = Entity {
-            id: "fail-1".into(),
-            entity_type: "note".into(),
-            data: serde_json::json!({"content": "hello"}),
-            created_at: 100,
-            modified_at: 200,
-            created_by: "peer1".into(),
-        };
-        let result = store.save_entity_raw(&entity);
-        assert!(result.is_err());
-    }
-}
-
-#[test]
-fn save_entity_with_encryption_failure() {
-    let dir = tempfile::tempdir().unwrap();
-    let db_path = dir.path().join("enc_fail.db");
-    let store = EntityStore::open_with_encryptor(
-        &db_path,
-        std::sync::Arc::new(FailingEncryptor),
-    ).unwrap();
-    let schema = test_schema();
-    let entity = test_entity("Enc Fail");
-    let result = store.save_entity(&entity, &schema);
-    assert!(result.is_err());
-}
-
-#[test]
-fn decrypt_failure_returns_error_for_corrupted_data() {
-    // Store with passthrough, then manually corrupt and try to read
-    // with a failing encryptor — the decrypt_data_json path for base64 decode
-    let store = EntityStore::open_in_memory().unwrap();
-    let entity = test_entity("Corrupt Test");
-    let schema = test_schema();
-    store.save_entity(&entity, &schema).unwrap();
-    // The passthrough stores plaintext JSON, so decryption works via fast path.
-    // This test verifies the happy path still works (plaintext JSON fast path).
-    let retrieved = store.get_entity(&entity.id).unwrap().unwrap();
-    assert_eq!(retrieved.get_str("/title"), Some("Corrupt Test"));
-}
-
 // ── Query with multiple filters ─────────────────────────────────
-
-/// Helper: create a store with unavailable encryptor so data_json stays plaintext.
-/// This is needed for query_entities with filters since json_extract_string
-/// only works on plaintext JSON in data_json.
-fn store_with_plaintext_data() -> EntityStore {
-    let dir = tempfile::tempdir().unwrap();
-    let db_path = dir.path().join("plaintext.db");
-    let store = EntityStore::open_with_encryptor(
-        &db_path,
-        std::sync::Arc::new(UnavailableEncryptor),
-    ).unwrap();
-    // Leak the tempdir so it persists for the store's lifetime
-    std::mem::forget(dir);
-    store
-}
 
 #[test]
 fn query_entities_with_single_filter() {
-    let store = store_with_plaintext_data();
+    let store = EntityStore::open_in_memory().unwrap();
     let schema = test_schema();
 
     let e1 = Entity {
@@ -733,7 +634,7 @@ fn query_entities_with_single_filter() {
 
 #[test]
 fn query_entities_with_multiple_filters_empty_result() {
-    let store = store_with_plaintext_data();
+    let store = EntityStore::open_in_memory().unwrap();
     let schema = test_schema();
 
     let e1 = Entity {
@@ -756,7 +657,7 @@ fn query_entities_with_multiple_filters_empty_result() {
 
 #[test]
 fn query_entities_with_numeric_filter() {
-    let store = store_with_plaintext_data();
+    let store = EntityStore::open_in_memory().unwrap();
     let schema = EntitySchema {
         entity_type: "item".into(),
         indexed_fields: vec![
@@ -784,7 +685,7 @@ fn query_entities_with_numeric_filter() {
 
 #[test]
 fn query_entities_excludes_trashed() {
-    let store = store_with_plaintext_data();
+    let store = EntityStore::open_in_memory().unwrap();
     let schema = test_schema();
     let entity = Entity {
         id: "qt-1".into(),
@@ -833,80 +734,6 @@ fn search_with_empty_entity_types_filter() {
     // Empty types slice — no entity_type filter applied
     let results = store.search("Findable", Some(&[]), 10).unwrap();
     assert_eq!(results.len(), 1);
-}
-
-// ── migrate_unencrypted ──────────────────────────────────────────
-
-#[test]
-fn migrate_unencrypted_with_unavailable_encryptor_fails() {
-    let dir = tempfile::tempdir().unwrap();
-    let db_path = dir.path().join("migrate_fail.db");
-    let store = EntityStore::open_with_encryptor(
-        &db_path,
-        std::sync::Arc::new(UnavailableEncryptor),
-    ).unwrap();
-    let result = store.migrate_unencrypted();
-    assert!(result.is_err());
-}
-
-#[test]
-fn migrate_unencrypted_skips_already_encrypted_rows() {
-    // With passthrough encryptor, data is stored as plaintext JSON.
-    // migrate_unencrypted should see it as JSON and try to encrypt,
-    // but since passthrough returns identical data, encrypted == raw, so 0 migrated.
-    let store = EntityStore::open_in_memory().unwrap();
-    let schema = test_schema();
-    store.save_entity(&test_entity("Already enc"), &schema).unwrap();
-
-    let migrated = store.migrate_unencrypted().unwrap();
-    assert_eq!(migrated, 0); // passthrough returns same data
-}
-
-#[test]
-fn migrate_unencrypted_on_empty_store() {
-    let store = EntityStore::open_in_memory().unwrap();
-    let migrated = store.migrate_unencrypted().unwrap();
-    assert_eq!(migrated, 0);
-}
-
-// ── re_encrypt_all ───────────────────────────────────────────────
-
-#[test]
-fn re_encrypt_all_with_no_rows() {
-    let store = EntityStore::open_in_memory().unwrap();
-    let count = store.re_encrypt_all(b"old_key_material", b"new_key_material").unwrap();
-    assert_eq!(count, 0);
-}
-
-#[test]
-fn re_encrypt_all_processes_encrypted_rows() {
-    // With passthrough (is_available=true), data is base64-encoded.
-    // re_encrypt_all should process non-JSON (base64) rows.
-    let store = EntityStore::open_in_memory().unwrap();
-    let schema = test_schema();
-    store.save_entity(&test_entity("Enc1"), &schema).unwrap();
-    store.save_entity(&test_entity("Enc2"), &schema).unwrap();
-
-    // PassthroughEncryptor.reencrypt_bytes returns data unchanged
-    let count = store.re_encrypt_all(b"old", b"new").unwrap();
-    assert_eq!(count, 2); // base64-encoded rows are processed
-}
-
-#[test]
-fn re_encrypt_all_skips_plaintext_rows() {
-    // Store with unavailable encryptor so data stays as plaintext JSON
-    let dir = tempfile::tempdir().unwrap();
-    let db_path = dir.path().join("reenc_plain.db");
-    let store = EntityStore::open_with_encryptor(
-        &db_path,
-        std::sync::Arc::new(UnavailableEncryptor),
-    ).unwrap();
-    let schema = test_schema();
-    store.save_entity(&test_entity("Plain"), &schema).unwrap();
-    store.save_entity(&test_entity("Plain2"), &schema).unwrap();
-
-    let count = store.re_encrypt_all(b"old", b"new").unwrap();
-    assert_eq!(count, 0); // all are plaintext JSON, skipped
 }
 
 // ── Vector extraction dimension mismatch ─────────────────────────

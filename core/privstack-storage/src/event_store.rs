@@ -1,7 +1,7 @@
 //! Generic event store — persists sync events for entity replication.
 
 use crate::error::StorageResult;
-use duckdb::{params, Connection};
+use privstack_db::rusqlite::{params, Connection};
 use privstack_types::{EntityId, Event, EventId, HybridTimestamp, PeerId};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -15,7 +15,8 @@ pub struct EventStore {
 impl EventStore {
     /// Opens or creates an event store at the given path.
     pub fn open(path: &Path) -> StorageResult<Self> {
-        let conn = crate::open_duckdb_with_wal_recovery(path, "128MB", 1)?;
+        let conn = privstack_db::open_db_unencrypted(path)
+            .map_err(|e| crate::StorageError::Db(e))?;
         initialize_event_schema(&conn)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
@@ -24,17 +25,28 @@ impl EventStore {
 
     /// Opens an in-memory event store (for testing).
     pub fn open_in_memory() -> StorageResult<Self> {
-        let conn = Connection::open_in_memory()?;
+        let conn = privstack_db::open_in_memory()
+            .map_err(|e| crate::StorageError::Db(e))?;
         initialize_event_schema(&conn)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
         })
     }
 
+    /// Creates an event store from a shared connection.
+    pub fn open_with_conn(conn: Arc<Mutex<Connection>>) -> StorageResult<Self> {
+        {
+            let c = conn.lock().unwrap();
+            initialize_event_schema(&c)?;
+        }
+        Ok(Self { conn })
+    }
+
     /// Flushes the WAL to the main database file.
     pub fn checkpoint(&self) -> StorageResult<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute_batch("CHECKPOINT;")?;
+        privstack_db::checkpoint(&conn)
+            .map_err(|e| crate::StorageError::Db(e))?;
         Ok(())
     }
 
@@ -129,13 +141,13 @@ impl EventStore {
 
         match result {
             Ok(ts) => Ok(Some(ts)),
-            Err(duckdb::Error::QueryReturnedNoRows) => Ok(None),
+            Err(privstack_db::rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
         }
     }
 }
 
-fn row_to_event(row: &duckdb::Row<'_>) -> duckdb::Result<Event> {
+fn row_to_event(row: &privstack_db::rusqlite::Row<'_>) -> privstack_db::rusqlite::Result<Event> {
     let id_str: String = row.get(0)?;
     let entity_id_str: String = row.get(1)?;
     let peer_id_str: String = row.get(2)?;
@@ -170,10 +182,10 @@ fn initialize_event_schema(conn: &Connection) -> StorageResult<()> {
     conn.execute_batch(
         r#"
         CREATE TABLE IF NOT EXISTS events (
-            id VARCHAR PRIMARY KEY,
-            entity_id VARCHAR NOT NULL,
-            peer_id VARCHAR NOT NULL,
-            timestamp_wall BIGINT NOT NULL,
+            id TEXT PRIMARY KEY,
+            entity_id TEXT NOT NULL,
+            peer_id TEXT NOT NULL,
+            timestamp_wall INTEGER NOT NULL,
             timestamp_logical INTEGER NOT NULL,
             payload_json TEXT NOT NULL,
             dependencies_json TEXT NOT NULL DEFAULT '[]'
@@ -183,10 +195,10 @@ fn initialize_event_schema(conn: &Connection) -> StorageResult<()> {
         CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp_wall, timestamp_logical);
 
         CREATE TABLE IF NOT EXISTS sync_state (
-            peer_id VARCHAR PRIMARY KEY,
-            last_seen_wall BIGINT NOT NULL,
+            peer_id TEXT PRIMARY KEY,
+            last_seen_wall INTEGER NOT NULL,
             last_seen_logical INTEGER NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at INTEGER DEFAULT (strftime('%s','now'))
         );
         "#,
     )?;

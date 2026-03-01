@@ -1,8 +1,8 @@
-//! DuckDB storage layer for PrivStack.
+//! SQLite storage layer for PrivStack.
 //!
-//! Provides persistent storage for generic entities using DuckDB.
-//! DuckDB is chosen for its analytical query capabilities which support
-//! AI features like semantic search and embeddings.
+//! Provides persistent storage for generic entities using SQLite (via privstack-db).
+//! SQLite with custom functions supports AI features like semantic search
+//! and embeddings via the `cosine_similarity()` function.
 //!
 //! # Architecture
 //!
@@ -15,59 +15,6 @@ mod error;
 pub mod entity_store;
 mod event_store;
 
-pub use entity_store::{EntityStore, scan_duckdb_file, scan_duckdb_connection, compact_duckdb_file};
+pub use entity_store::{EntityStore, scan_db_file, scan_db_connection, compact_db_file};
 pub use event_store::EventStore;
 pub use error::{StorageError, StorageResult};
-
-/// Open a DuckDB connection with stale WAL recovery and resource limits.
-///
-/// If the initial open fails and a `.wal` file exists alongside the database,
-/// it is removed and the open is retried once. This handles the common case
-/// where an unclean shutdown leaves a WAL file that prevents reopening.
-///
-/// `memory_limit` and `threads` cap per-database resource usage (DuckDB defaults
-/// to ~80% of system RAM and all cores, which is far too aggressive when multiple
-/// databases are open concurrently).
-pub fn open_duckdb_with_wal_recovery(
-    path: &std::path::Path,
-    memory_limit: &str,
-    threads: u32,
-) -> StorageResult<duckdb::Connection> {
-    let conn = match duckdb::Connection::open(path) {
-        Ok(c) => c,
-        Err(first_err) => {
-            let wal_path = path.with_extension(
-                path.extension()
-                    .map(|ext| format!("{}.wal", ext.to_string_lossy()))
-                    .unwrap_or_else(|| "wal".to_string()),
-            );
-            if wal_path.exists() {
-                eprintln!(
-                    "[WARN] DuckDB open failed, removing stale WAL and retrying: {}",
-                    wal_path.display()
-                );
-                if std::fs::remove_file(&wal_path).is_ok() {
-                    let c = duckdb::Connection::open(path)?;
-                    apply_resource_limits(&c, memory_limit, threads)?;
-                    return Ok(c);
-                }
-            }
-            return Err(first_err.into());
-        }
-    };
-    apply_resource_limits(&conn, memory_limit, threads)?;
-    Ok(conn)
-}
-
-/// Apply memory and thread limits to a DuckDB connection.
-fn apply_resource_limits(
-    conn: &duckdb::Connection,
-    memory_limit: &str,
-    threads: u32,
-) -> StorageResult<()> {
-    conn.execute_batch(&format!(
-        "PRAGMA memory_limit='{}'; PRAGMA threads={};",
-        memory_limit, threads
-    ))?;
-    Ok(())
-}

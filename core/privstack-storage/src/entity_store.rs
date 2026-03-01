@@ -1,96 +1,59 @@
 //! Generic entity store — stores any entity type as JSON with indexed fields.
-//!
-//! When an encryptor is provided, `data_json` is stored as encrypted ciphertext.
-//! Indexed columns (title, body, tags, search_text, booleans) remain plaintext
-//! so that search/filter queries continue to work without decryption.
 
 use crate::error::{StorageError, StorageResult};
-use duckdb::{params, Connection};
-use privstack_crypto::DataEncryptor;
+use privstack_db::rusqlite::{params, Connection};
 use privstack_model::{Entity, EntitySchema, FieldType, IndexedField};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-/// Generic entity store backed by DuckDB.
+/// Generic entity store backed by SQLite.
 ///
 /// Stores entities of any type in a single `entities` table with
 /// schema-driven field extraction for indexing and search.
 #[derive(Clone)]
 pub struct EntityStore {
     conn: Arc<Mutex<Connection>>,
-    encryptor: Arc<dyn DataEncryptor>,
 }
 
 impl EntityStore {
-    /// Opens or creates an entity store at the given path (no encryption).
+    /// Opens or creates an entity store at the given path.
     pub fn open(path: &Path) -> StorageResult<Self> {
-        let conn = crate::open_duckdb_with_wal_recovery(path, "256MB", 2)?;
+        let conn = privstack_db::open_db_unencrypted(path)
+            .map_err(StorageError::Db)?;
+        privstack_db::register_custom_functions(&conn)
+            .map_err(StorageError::Db)?;
         initialize_entity_schema(&conn)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
-            encryptor: Arc::new(privstack_crypto::PassthroughEncryptor),
         })
     }
 
     /// Opens an in-memory entity store (for testing).
     pub fn open_in_memory() -> StorageResult<Self> {
-        let conn = Connection::open_in_memory()?;
+        let conn = privstack_db::open_in_memory()
+            .map_err(StorageError::Db)?;
+        privstack_db::register_custom_functions(&conn)
+            .map_err(StorageError::Db)?;
         initialize_entity_schema(&conn)?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
-            encryptor: Arc::new(privstack_crypto::PassthroughEncryptor),
         })
     }
 
-    /// Opens an entity store with an encryptor for at-rest encryption of `data_json`.
-    pub fn open_with_encryptor(
-        path: &Path,
-        encryptor: Arc<dyn DataEncryptor>,
-    ) -> StorageResult<Self> {
-        let conn = crate::open_duckdb_with_wal_recovery(path, "256MB", 2)?;
-        initialize_entity_schema(&conn)?;
-        Ok(Self {
-            conn: Arc::new(Mutex::new(conn)),
-            encryptor,
-        })
-    }
-
-    /// Encrypt raw JSON bytes through the encryptor, returning a base64 string
-    /// suitable for storage in the TEXT column.
-    fn encrypt_data_json(&self, entity_id: &str, json_bytes: &[u8]) -> StorageResult<String> {
-        if !self.encryptor.is_available() {
-            // Encryptor not ready — store plaintext (pre-unlock state)
-            return Ok(String::from_utf8_lossy(json_bytes).into_owned());
+    /// Creates an entity store from a shared connection.
+    pub fn open_with_conn(conn: Arc<Mutex<Connection>>) -> StorageResult<Self> {
+        {
+            let c = conn.lock().unwrap();
+            privstack_db::register_custom_functions(&c)
+                .map_err(StorageError::Db)?;
+            initialize_entity_schema(&c)?;
         }
-        let ciphertext = self
-            .encryptor
-            .encrypt_bytes(entity_id, json_bytes)
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
-        Ok(base64_encode(&ciphertext))
-    }
-
-    /// Decrypt `data_json` from the database.  Handles both encrypted (base64)
-    /// and legacy plaintext rows transparently.
-    fn decrypt_data_json(&self, raw: &str) -> StorageResult<serde_json::Value> {
-        // Fast path: if it parses as JSON directly, it's unencrypted (legacy or passthrough)
-        if let Ok(val) = serde_json::from_str::<serde_json::Value>(raw) {
-            return Ok(val);
-        }
-        // Otherwise treat as base64-encoded ciphertext
-        let ciphertext = base64_decode(raw)
-            .map_err(|e| StorageError::Encryption(format!("base64 decode: {e}")))?;
-        let plaintext = self
-            .encryptor
-            .decrypt_bytes(&ciphertext)
-            .map_err(|e| StorageError::Encryption(e.to_string()))?;
-        let val: serde_json::Value = serde_json::from_slice(&plaintext)?;
-        Ok(val)
+        Ok(Self { conn })
     }
 
     /// Save (upsert) an entity with schema-driven field extraction.
     pub fn save_entity(&self, entity: &Entity, schema: &EntitySchema) -> StorageResult<()> {
         let conn = self.conn.lock().unwrap();
-        let data_json_raw = serde_json::to_vec(&entity.data)?;
 
         let title = extract_field(&entity.data, &schema.indexed_fields, FieldType::Text, "/title");
         let body = extract_field(&entity.data, &schema.indexed_fields, FieldType::Text, "/body");
@@ -98,8 +61,7 @@ impl EntityStore {
         let tags_str: Option<String> = if tags.is_empty() {
             None
         } else {
-            // DuckDB array literal
-            Some(format!("[{}]", tags.iter().map(|t| format!("'{}'", t.replace('\'', "''"))).collect::<Vec<_>>().join(",")))
+            Some(serde_json::to_string(&tags).unwrap_or_default())
         };
 
         let search_text = build_search_text(&title, &body, &tags);
@@ -110,11 +72,7 @@ impl EntityStore {
         // Auto-index Vector fields into entity_vectors
         extract_vectors(&conn, entity, &schema.indexed_fields)?;
 
-        // Encrypt data_json (encryptor decides whether to actually encrypt)
-        // Must drop conn before calling encrypt_data_json since it doesn't need conn
-        drop(conn);
-        let data_json = self.encrypt_data_json(&entity.id, &data_json_raw)?;
-        let conn = self.conn.lock().unwrap();
+        let data_json = serde_json::to_string(&entity.data)?;
 
         conn.execute(
             r#"
@@ -146,8 +104,7 @@ impl EntityStore {
 
     /// Save an entity without a schema (no field extraction, just raw JSON).
     pub fn save_entity_raw(&self, entity: &Entity) -> StorageResult<()> {
-        let data_json_raw = serde_json::to_vec(&entity.data)?;
-        let data_json = self.encrypt_data_json(&entity.id, &data_json_raw)?;
+        let data_json = serde_json::to_string(&entity.data)?;
 
         let conn = self.conn.lock().unwrap();
         conn.execute(
@@ -196,8 +153,7 @@ impl EntityStore {
 
         match result {
             Ok((id, entity_type, data_json, created_at, modified_at, created_by, is_trashed)) => {
-                drop(conn);
-                let mut data = self.decrypt_data_json(&data_json)?;
+                let mut data = serde_json::from_str::<serde_json::Value>(&data_json)?;
                 // Patch is_trashed from the authoritative DB column
                 if let Some(obj) = data.as_object_mut() {
                     obj.insert("is_trashed".into(), serde_json::Value::Bool(is_trashed));
@@ -211,7 +167,7 @@ impl EntityStore {
                     created_by,
                 }))
             }
-            Err(duckdb::Error::QueryReturnedNoRows) => Ok(None),
+            Err(privstack_db::rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
         }
     }
@@ -230,7 +186,7 @@ impl EntityStore {
             "SELECT id, entity_type, data_json, created_at, modified_at, created_by, is_trashed FROM entities WHERE entity_type = ?"
         );
         if !include_trashed {
-            sql.push_str(" AND is_trashed = FALSE");
+            sql.push_str(" AND is_trashed = 0");
         }
         sql.push_str(" ORDER BY modified_at DESC");
         if let Some(lim) = limit {
@@ -256,14 +212,10 @@ impl EntityStore {
             .filter_map(|r| r.ok())
             .collect();
 
-        drop(stmt);
-        drop(conn);
-
         let mut entities = Vec::with_capacity(rows.len());
         for (id, entity_type, data_json, created_at, modified_at, created_by, is_trashed) in rows {
-            if let Ok(mut data) = self.decrypt_data_json(&data_json) {
-                // Patch is_trashed from the authoritative DB column (trash_entity
-                // only updates the column, not data_json)
+            if let Ok(mut data) = serde_json::from_str::<serde_json::Value>(&data_json) {
+                // Patch is_trashed from the authoritative DB column
                 if let Some(obj) = data.as_object_mut() {
                     obj.insert("is_trashed".into(), serde_json::Value::Bool(is_trashed));
                 }
@@ -289,22 +241,20 @@ impl EntityStore {
     /// Soft-delete (trash) an entity.
     pub fn trash_entity(&self, id: &str) -> StorageResult<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute("UPDATE entities SET is_trashed = TRUE WHERE id = ?", params![id])?;
+        conn.execute("UPDATE entities SET is_trashed = 1 WHERE id = ?", params![id])?;
         Ok(())
     }
 
     /// Restore a trashed entity.
     pub fn restore_entity(&self, id: &str) -> StorageResult<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute("UPDATE entities SET is_trashed = FALSE WHERE id = ?", params![id])?;
+        conn.execute("UPDATE entities SET is_trashed = 0 WHERE id = ?", params![id])?;
         Ok(())
     }
 
-    /// Query entities by field filters applied against decrypted JSON data.
+    /// Query entities by field filters applied against JSON data.
     ///
-    /// Because `data_json` is encrypted at rest, SQL-level JSON extraction
-    /// cannot operate on ciphertext.  Instead we fetch all rows for the
-    /// entity type, decrypt each one, and apply the field filters in Rust.
+    /// Fetches all rows for the entity type and applies field filters in Rust.
     pub fn query_entities(
         &self,
         entity_type: &str,
@@ -312,7 +262,7 @@ impl EntityStore {
         include_trashed: bool,
         limit: Option<usize>,
     ) -> StorageResult<Vec<Entity>> {
-        // No filters → delegate to list_entities (avoids duplicated SQL)
+        // No filters -> delegate to list_entities (avoids duplicated SQL)
         if filters.is_empty() {
             return self.list_entities(entity_type, include_trashed, limit, None);
         }
@@ -324,7 +274,7 @@ impl EntityStore {
              FROM entities WHERE entity_type = ?"
         );
         if !include_trashed {
-            sql.push_str(" AND is_trashed = FALSE");
+            sql.push_str(" AND is_trashed = 0");
         }
         let sql = sql + " ORDER BY modified_at DESC";
 
@@ -344,18 +294,15 @@ impl EntityStore {
             .filter_map(|r| r.ok())
             .collect();
 
-        drop(stmt);
-        drop(conn);
-
         let mut entities = Vec::new();
         for (id, entity_type, data_json, created_at, modified_at, created_by, is_trashed) in rows {
-            if let Ok(mut data) = self.decrypt_data_json(&data_json) {
+            if let Ok(mut data) = serde_json::from_str::<serde_json::Value>(&data_json) {
                 // Patch is_trashed from the authoritative DB column
                 if let Some(obj) = data.as_object_mut() {
                     obj.insert("is_trashed".into(), serde_json::Value::Bool(is_trashed));
                 }
 
-                // Apply every filter against the decrypted JSON
+                // Apply every filter against the JSON data
                 let matches = filters.iter().all(|(field_path, expected)| {
                     let pointer = if field_path.starts_with('/') {
                         field_path.clone()
@@ -393,7 +340,7 @@ impl EntityStore {
 
         let pattern = format!("%{query}%");
         let mut sql = String::from(
-            "SELECT id, entity_type, data_json, created_at, modified_at, created_by FROM entities WHERE is_trashed = FALSE AND (LOWER(search_text) LIKE LOWER(?) OR LOWER(title) LIKE LOWER(?))"
+            "SELECT id, entity_type, data_json, created_at, modified_at, created_by FROM entities WHERE is_trashed = 0 AND (search_text LIKE ? OR title LIKE ?)"
         );
 
         if let Some(types) = entity_types {
@@ -420,12 +367,9 @@ impl EntityStore {
             .filter_map(|r| r.ok())
             .collect();
 
-        drop(stmt);
-        drop(conn);
-
         let mut entities = Vec::with_capacity(rows.len());
         for (id, entity_type, data_json, created_at, modified_at, created_by) in rows {
-            if let Ok(data) = self.decrypt_data_json(&data_json) {
+            if let Ok(data) = serde_json::from_str::<serde_json::Value>(&data_json) {
                 entities.push(Entity { id, entity_type, data, created_at, modified_at, created_by });
             }
         }
@@ -436,7 +380,7 @@ impl EntityStore {
     /// Used by the sync orchestrator on first sync with a new peer.
     pub fn list_all_entity_ids(&self) -> StorageResult<Vec<String>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT id FROM entities WHERE is_trashed = FALSE")?;
+        let mut stmt = conn.prepare("SELECT id FROM entities WHERE is_trashed = 0")?;
         let ids: Vec<String> = stmt
             .query_map([], |row| row.get::<_, String>(0))?
             .filter_map(|r| r.ok())
@@ -444,19 +388,16 @@ impl EntityStore {
         Ok(ids)
     }
 
-    // ── Sync Ledger ──────────────────────────────────────────────
+    // -- Sync Ledger --
 
     /// Returns entity IDs that need syncing with a specific peer.
-    /// An entity needs syncing if:
-    ///   1. It has no ledger entry for this peer (never synced), OR
-    ///   2. It was modified after the last sync with this peer.
     pub fn entities_needing_sync(&self, peer_id: &str) -> StorageResult<Vec<String>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT e.id FROM entities e \
              LEFT JOIN sync_ledger sl ON e.id = sl.entity_id AND sl.peer_id = ? \
-             WHERE e.is_trashed = FALSE \
-               AND e.local_only = FALSE \
+             WHERE e.is_trashed = 0 \
+               AND e.local_only = 0 \
                AND (sl.entity_id IS NULL OR e.modified_at > sl.synced_at) \
              ORDER BY e.modified_at ASC"
         )?;
@@ -511,7 +452,7 @@ impl EntityStore {
         let sql = if include_trashed {
             "SELECT COUNT(*) FROM entities WHERE entity_type = ?"
         } else {
-            "SELECT COUNT(*) FROM entities WHERE entity_type = ? AND is_trashed = FALSE"
+            "SELECT COUNT(*) FROM entities WHERE entity_type = ? AND is_trashed = 0"
         };
 
         let count: i64 = conn.query_row(sql, params![entity_type], |row| row.get(0))?;
@@ -519,7 +460,6 @@ impl EntityStore {
     }
 
     /// Estimate storage bytes used by entities of a given type.
-    /// Returns the sum of data_json column lengths for the specified entity type.
     pub fn estimate_storage_bytes(&self, entity_type: &str) -> StorageResult<usize> {
         let conn = self.conn.lock().unwrap();
         let sql = "SELECT COALESCE(SUM(LENGTH(data_json)), 0) FROM entities WHERE entity_type = ?";
@@ -528,7 +468,6 @@ impl EntityStore {
     }
 
     /// Estimate storage bytes for multiple entity types at once.
-    /// Returns a Vec of (entity_type, count, bytes) tuples.
     pub fn estimate_storage_by_types(&self, entity_types: &[&str]) -> StorageResult<Vec<(String, usize, usize)>> {
         let conn = self.conn.lock().unwrap();
         let mut results = Vec::with_capacity(entity_types.len());
@@ -614,84 +553,6 @@ impl EntityStore {
         Ok(links)
     }
 
-    /// Migrate unencrypted rows: detects plaintext `data_json` and encrypts them.
-    /// Idempotent — already-encrypted rows (non-JSON base64) are skipped.
-    pub fn migrate_unencrypted(&self) -> StorageResult<usize> {
-        if !self.encryptor.is_available() {
-            return Err(StorageError::Encryption(
-                "encryptor unavailable — vault must be unlocked before migration".into(),
-            ));
-        }
-
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id, data_json FROM entities"
-        )?;
-        let rows: Vec<(String, String)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
-            .filter_map(|r| r.ok())
-            .collect();
-        drop(stmt);
-        drop(conn);
-
-        let mut migrated = 0usize;
-        for (id, raw) in &rows {
-            // If it parses as valid JSON, it's unencrypted — encrypt it
-            if serde_json::from_str::<serde_json::Value>(raw).is_ok() {
-                let encrypted = self.encrypt_data_json(id, raw.as_bytes())?;
-                // Only update if encryption actually changed the value
-                if encrypted != *raw {
-                    let conn = self.conn.lock().unwrap();
-                    conn.execute(
-                        "UPDATE entities SET data_json = ? WHERE id = ?",
-                        params![encrypted, id],
-                    )?;
-                    drop(conn);
-                    migrated += 1;
-                }
-            }
-        }
-        Ok(migrated)
-    }
-
-    /// Re-encrypt all rows with new key material after a password change.
-    /// The encryptor's `reencrypt_bytes` re-wraps per-entity keys without
-    /// touching content — O(n) rows but only ~100 bytes of crypto per row.
-    pub fn re_encrypt_all(
-        &self,
-        old_key_bytes: &[u8],
-        new_key_bytes: &[u8],
-    ) -> StorageResult<usize> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT id, data_json FROM entities")?;
-        let rows: Vec<(String, String)> = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
-            .filter_map(|r| r.ok())
-            .collect();
-        drop(stmt);
-
-        let mut count = 0usize;
-        for (id, raw) in &rows {
-            // Skip plaintext rows (they haven't been encrypted yet)
-            if serde_json::from_str::<serde_json::Value>(raw).is_ok() {
-                continue;
-            }
-            let ciphertext = base64_decode(raw)
-                .map_err(|e| StorageError::Encryption(format!("base64 decode: {e}")))?;
-            let re = self
-                .encryptor
-                .reencrypt_bytes(&ciphertext, old_key_bytes, new_key_bytes)
-                .map_err(|e| StorageError::Encryption(e.to_string()))?;
-            let encoded = base64_encode(&re);
-            conn.execute(
-                "UPDATE entities SET data_json = ? WHERE id = ?",
-                params![encoded, id],
-            )?;
-            count += 1;
-        }
-        Ok(count)
-    }
-
     // =========================================================================
     // Plugin Fuel History Methods
     // =========================================================================
@@ -705,14 +566,12 @@ impl EntityStore {
             .map(|d| d.as_millis() as i64)
             .unwrap_or(0);
 
-        // Insert new record
         conn.execute(
             "INSERT INTO plugin_fuel_history (plugin_id, fuel_consumed, recorded_at) VALUES (?, ?, ?)",
             params![plugin_id, fuel_consumed as i64, now],
         )?;
 
         // Prune old records - keep only the most recent 1000 per plugin
-        // First get the count, then delete if over limit
         let count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM plugin_fuel_history WHERE plugin_id = ?",
             params![plugin_id],
@@ -720,7 +579,6 @@ impl EntityStore {
         )?;
 
         if count > 1000 {
-            // Delete oldest records beyond the 1000 limit
             conn.execute(
                 r#"
                 DELETE FROM plugin_fuel_history
@@ -774,7 +632,7 @@ impl EntityStore {
         Ok(())
     }
 
-    // ── Cloud Sync Cursor Persistence ──
+    // -- Cloud Sync Cursor Persistence --
 
     /// Saves a cloud sync cursor value (e.g. per-entity cursor position or last_sync_at).
     pub fn save_cloud_cursor(&self, key: &str, value: i64) -> StorageResult<()> {
@@ -813,16 +671,13 @@ impl EntityStore {
     }
 
     /// Flushes the WAL to the main database file.
-    /// Call on graceful shutdown to avoid stale WAL files on next startup.
     pub fn checkpoint(&self) -> StorageResult<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute_batch("CHECKPOINT;")?;
+        privstack_db::checkpoint(&conn).map_err(StorageError::Db)?;
         Ok(())
     }
 
-    /// Runs database maintenance: purge orphaned/transient data, then checkpoint to reclaim space.
-    /// Only cleans auxiliary tables — never touches real entity data.
-    /// Note: DuckDB's VACUUM does NOT reclaim space. CHECKPOINT is the correct approach.
+    /// Runs database maintenance: purge orphaned/transient data, then checkpoint.
     pub fn run_maintenance(&self) -> StorageResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute_batch(
@@ -833,30 +688,24 @@ impl EntityStore {
                 OR target_id NOT IN (SELECT id FROM entities);
              -- Transient data that rebuilds automatically on next sync
              DELETE FROM cloud_sync_cursors;
-             DELETE FROM plugin_fuel_history;
-             CHECKPOINT;"
+             DELETE FROM plugin_fuel_history;"
         )?;
+        privstack_db::checkpoint(&conn).map_err(StorageError::Db)?;
         Ok(())
     }
 
     /// Finds orphan entities whose entity_type doesn't match any known plugin schema.
-    /// Returns JSON array of orphan summaries.
-    /// `valid_types` is a list of (plugin_id, entity_type) pairs from registered plugins.
-    /// NOTE: Only `entity_type` is checked — `created_by` is a peer ID (device UUID),
-    /// not a plugin ID, so it cannot be used for ownership matching.
     pub fn find_orphan_entities(
         &self,
         valid_types: &[(String, String)],
     ) -> StorageResult<Vec<serde_json::Value>> {
         let conn = self.conn.lock().unwrap();
 
-        // Collect all known entity_type values
         let known_types: std::collections::HashSet<&str> = valid_types
             .iter()
             .map(|(_, etype)| etype.as_str())
             .collect();
 
-        // Get all distinct entity_type combos in the DB
         let mut stmt = conn.prepare(
             "SELECT entity_type, COUNT(*) as cnt
              FROM entities
@@ -886,9 +735,6 @@ impl EntityStore {
     }
 
     /// Deletes orphan entities whose entity_type doesn't match any known plugin schema.
-    /// Also cascades to auxiliary tables. Returns count of deleted entities.
-    /// NOTE: Only `entity_type` is checked — `created_by` is a peer ID (device UUID),
-    /// not a plugin ID, so it cannot be used for ownership matching.
     pub fn delete_orphan_entities(
         &self,
         valid_types: &[(String, String)],
@@ -899,7 +745,6 @@ impl EntityStore {
             return Ok(0);
         }
 
-        // Build WHERE clause to exclude known entity types
         let known_types: Vec<String> = valid_types
             .iter()
             .map(|(_, etype)| format!("'{}'", etype.replace('\'', "''")))
@@ -922,7 +767,6 @@ impl EntityStore {
             return Ok(0);
         }
 
-        // Delete from auxiliary tables first, then entities
         let id_list: Vec<String> = orphan_ids.iter().map(|id| {
             format!("'{}'", id.replace('\'', "''"))
         }).collect();
@@ -938,22 +782,13 @@ impl EntityStore {
         Ok(orphan_ids.len())
     }
 
-    /// Returns diagnostics for the entity store's own DuckDB connection.
+    /// Returns diagnostics for the entity store's SQLite connection.
     pub fn db_diagnostics(&self) -> StorageResult<serde_json::Value> {
         let conn = self.conn.lock().unwrap();
-        Ok(scan_duckdb_connection(&conn))
+        Ok(scan_db_connection(&conn))
     }
 
-    /// Compacts the database by copying all data to a fresh file and swapping it in.
-    ///
-    /// DuckDB's CHECKPOINT reclaims some space but cannot free allocated-but-empty blocks.
-    /// `COPY FROM DATABASE` creates a minimal file with only live data, then we atomically
-    /// swap it into place. The connection is replaced in-place behind the Mutex so all
-    /// existing `Arc<EntityStore>` references remain valid.
-    ///
-    /// Strategy: close the managed connection first to release file locks, then open a
-    /// fresh standalone connection for the copy. This avoids catalog state issues that
-    /// can occur after maintenance operations on a long-lived connection.
+    /// Compacts the database using VACUUM INTO, then swaps the file.
     ///
     /// Returns `(size_before, size_after)` in bytes.
     pub fn compact(&self, db_path: &Path) -> StorageResult<(u64, u64)> {
@@ -961,81 +796,53 @@ impl EntityStore {
 
         let size_before = std::fs::metadata(db_path).map(|m| m.len()).unwrap_or(0);
 
-        // 1. Checkpoint to flush WAL, then close the managed connection
-        conn_guard.execute_batch("CHECKPOINT;")?;
+        // Checkpoint to flush WAL first
+        privstack_db::checkpoint(&conn_guard).map_err(StorageError::Db)?;
+
+        // Close the managed connection by replacing with in-memory
         let old_conn = std::mem::replace(
             &mut *conn_guard,
-            Connection::open_in_memory().map_err(StorageError::from)?,
+            privstack_db::open_in_memory().map_err(StorageError::Db)?,
         );
+
+        // Compact via VACUUM INTO + swap
+        let compact_result = privstack_db::compact(&old_conn, db_path);
         drop(old_conn);
 
-        // 2. Open a fresh connection for the copy operation
-        let compact_path = db_path.with_extension("duckdb.compact");
-        let _ = std::fs::remove_file(&compact_path);
+        match compact_result {
+            Ok((_, size_after)) => {
+                // Reopen the connection
+                let new_conn = privstack_db::open_db_unencrypted(db_path)
+                    .map_err(StorageError::Db)?;
+                privstack_db::register_custom_functions(&new_conn)
+                    .map_err(StorageError::Db)?;
+                *conn_guard = new_conn;
 
-        let fresh_conn = Connection::open(db_path)?;
-        let db_name = get_default_db_name(&fresh_conn);
-        let compact_str = compact_path.to_string_lossy();
-        let copy_result = fresh_conn.execute_batch(&format!(
-            "ATTACH '{}' AS compact_db;
-             COPY FROM DATABASE \"{}\" TO compact_db;
-             DETACH compact_db;",
-            compact_str, db_name,
-        ));
-        drop(fresh_conn);
+                eprintln!(
+                    "[compact] {} -> {} ({:.1}% reduction)",
+                    format_bytes_log(size_before),
+                    format_bytes_log(size_after),
+                    if size_before > 0 {
+                        (1.0 - size_after as f64 / size_before as f64) * 100.0
+                    } else {
+                        0.0
+                    }
+                );
 
-        if let Err(e) = copy_result {
-            // Copy failed — reopen original and bail
-            let _ = std::fs::remove_file(&compact_path);
-            let restored = crate::open_duckdb_with_wal_recovery(db_path, "256MB", 2)?;
-            *conn_guard = restored;
-            return Err(e.into());
-        }
-
-        // 3. Atomic swap: original → backup, compact → original
-        let backup_path = db_path.with_extension("duckdb.backup");
-        let _ = std::fs::remove_file(&backup_path);
-
-        if let Err(e) = std::fs::rename(db_path, &backup_path) {
-            let _ = std::fs::remove_file(&compact_path);
-            let restored = crate::open_duckdb_with_wal_recovery(db_path, "256MB", 2)?;
-            *conn_guard = restored;
-            return Err(e.into());
-        }
-
-        if let Err(e) = std::fs::rename(&compact_path, db_path) {
-            let _ = std::fs::rename(&backup_path, db_path);
-            let restored = crate::open_duckdb_with_wal_recovery(db_path, "256MB", 2)?;
-            *conn_guard = restored;
-            return Err(e.into());
-        }
-
-        // 4. Clean up WAL and backup
-        let wal_path = db_path.with_extension("duckdb.wal");
-        let _ = std::fs::remove_file(&wal_path);
-        let _ = std::fs::remove_file(&backup_path);
-
-        // 5. Reopen the connection at the original path
-        let new_conn = crate::open_duckdb_with_wal_recovery(db_path, "256MB", 2)?;
-        *conn_guard = new_conn;
-
-        let size_after = std::fs::metadata(db_path).map(|m| m.len()).unwrap_or(0);
-
-        eprintln!(
-            "[compact] {} -> {} ({:.1}% reduction)",
-            format_bytes_log(size_before),
-            format_bytes_log(size_after),
-            if size_before > 0 {
-                (1.0 - size_after as f64 / size_before as f64) * 100.0
-            } else {
-                0.0
+                Ok((size_before, size_after))
             }
-        );
-
-        Ok((size_before, size_after))
+            Err(e) => {
+                // Reopen original on failure
+                if let Ok(restored) = privstack_db::open_db_unencrypted(db_path) {
+                    let _ = privstack_db::register_custom_functions(&restored);
+                    *conn_guard = restored;
+                }
+                Err(StorageError::Db(e))
+            }
+        }
     }
 
-    // ── RAG Vector Index ──
+    // -- RAG Vector Index --
 
     /// Upsert a RAG vector entry (INSERT OR REPLACE).
     pub fn rag_upsert(
@@ -1053,22 +860,17 @@ impl EntityStore {
         chunk_text: &str,
     ) -> StorageResult<()> {
         let conn = self.conn.lock().unwrap();
-        let components: Vec<String> = embedding.iter().map(|f| f.to_string()).collect();
-        let array_literal = format!("[{}]", components.join(","));
+        let embedding_json = serde_json::to_string(embedding)?;
         conn.execute(
-            &format!(
-                "INSERT OR REPLACE INTO rag_vectors \
-                 (entity_id, chunk_path, plugin_id, entity_type, content_hash, dim, embedding, title, link_type, indexed_at, chunk_text) \
-                 VALUES (?, ?, ?, ?, ?, ?, {}::DOUBLE[], ?, ?, ?, ?)",
-                array_literal
-            ),
-            params![entity_id, chunk_path, plugin_id, entity_type, content_hash, dim, title, link_type, indexed_at, chunk_text],
+            "INSERT OR REPLACE INTO rag_vectors \
+             (entity_id, chunk_path, plugin_id, entity_type, content_hash, dim, embedding, title, link_type, indexed_at, chunk_text) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params![entity_id, chunk_path, plugin_id, entity_type, content_hash, dim, embedding_json, title, link_type, indexed_at, chunk_text],
         )?;
         Ok(())
     }
 
     /// Search RAG vectors by cosine similarity to a query embedding.
-    /// Returns JSON array of results with score, ordered descending.
     pub fn rag_search(
         &self,
         query_embedding: &[f64],
@@ -1076,39 +878,33 @@ impl EntityStore {
         entity_types: Option<&[&str]>,
     ) -> StorageResult<Vec<serde_json::Value>> {
         let conn = self.conn.lock().unwrap();
-        let components: Vec<String> = query_embedding.iter().map(|f| f.to_string()).collect();
-        let array_literal = format!("[{}]", components.join(","));
+        let query_json = serde_json::to_string(query_embedding)?;
 
-        let (type_filter, type_params) = if let Some(types) = entity_types {
-            let placeholders: Vec<&str> = types.iter().map(|_| "?").collect();
-            (
-                format!("WHERE entity_type IN ({})", placeholders.join(",")),
-                types.to_vec(),
-            )
-        } else {
-            (String::new(), vec![])
-        };
-
-        let sql = format!(
+        let mut sql = String::from(
             "SELECT entity_id, entity_type, plugin_id, chunk_path, title, link_type, \
-             list_cosine_similarity(embedding, {}::DOUBLE[]) AS score, \
+             cosine_similarity(embedding, ?) AS score, \
              chunk_text \
-             FROM rag_vectors {} \
-             ORDER BY score DESC LIMIT ?",
-            array_literal, type_filter
+             FROM rag_vectors"
         );
 
-        let mut stmt = conn.prepare(&sql)?;
+        let mut param_values: Vec<Box<dyn privstack_db::rusqlite::types::ToSql>> = Vec::new();
+        param_values.push(Box::new(query_json));
 
-        // Build params: type filters + limit
-        let limit_i64 = limit as i64;
-        let mut param_values: Vec<Box<dyn duckdb::ToSql>> = Vec::new();
-        for t in &type_params {
-            param_values.push(Box::new(t.to_string()));
+        if let Some(types) = entity_types {
+            if !types.is_empty() {
+                let placeholders: Vec<&str> = types.iter().map(|_| "?").collect();
+                sql.push_str(&format!(" WHERE entity_type IN ({})", placeholders.join(",")));
+                for t in types {
+                    param_values.push(Box::new(t.to_string()));
+                }
+            }
         }
-        param_values.push(Box::new(limit_i64));
 
-        let param_refs: Vec<&dyn duckdb::ToSql> = param_values.iter().map(|b| b.as_ref()).collect();
+        sql.push_str(" ORDER BY score DESC LIMIT ?");
+        param_values.push(Box::new(limit as i64));
+
+        let mut stmt = conn.prepare(&sql)?;
+        let param_refs: Vec<&dyn privstack_db::rusqlite::types::ToSql> = param_values.iter().map(|b| b.as_ref()).collect();
 
         let rows: Vec<serde_json::Value> = stmt
             .query_map(param_refs.as_slice(), |row| {
@@ -1147,7 +943,6 @@ impl EntityStore {
     }
 
     /// Get content hashes for all chunks of given entity types (for incremental skip).
-    /// Returns (entity_id, chunk_path, content_hash) tuples.
     pub fn rag_get_hashes(
         &self,
         entity_types: Option<&[&str]>,
@@ -1171,11 +966,11 @@ impl EntityStore {
         };
 
         let mut stmt = conn.prepare(&sql)?;
-        let mut param_values: Vec<Box<dyn duckdb::ToSql>> = Vec::new();
+        let mut param_values: Vec<Box<dyn privstack_db::rusqlite::types::ToSql>> = Vec::new();
         for t in &type_params {
             param_values.push(Box::new(t.to_string()));
         }
-        let param_refs: Vec<&dyn duckdb::ToSql> = param_values.iter().map(|b| b.as_ref()).collect();
+        let param_refs: Vec<&dyn privstack_db::rusqlite::types::ToSql> = param_values.iter().map(|b| b.as_ref()).collect();
 
         let rows: Vec<(String, String, String)> = stmt
             .query_map(param_refs.as_slice(), |row| {
@@ -1192,8 +987,6 @@ impl EntityStore {
     }
 
     /// Fetch all RAG vector entries with their embeddings for visualization.
-    /// Returns JSON objects with entity_id, entity_type, plugin_id, title, link_type,
-    /// chunk_text, and the raw embedding array.
     pub fn rag_fetch_all(
         &self,
         entity_types: Option<&[&str]>,
@@ -1213,7 +1006,7 @@ impl EntityStore {
 
         let sql = format!(
             "SELECT entity_id, entity_type, plugin_id, chunk_path, title, link_type, \
-             CAST(embedding AS VARCHAR), chunk_text \
+             embedding, chunk_text \
              FROM rag_vectors {} LIMIT ?",
             type_filter
         );
@@ -1221,17 +1014,17 @@ impl EntityStore {
         let mut stmt = conn.prepare(&sql)?;
 
         let limit_i64 = limit as i64;
-        let mut param_values: Vec<Box<dyn duckdb::ToSql>> = Vec::new();
+        let mut param_values: Vec<Box<dyn privstack_db::rusqlite::types::ToSql>> = Vec::new();
         for t in &type_params {
             param_values.push(Box::new(t.to_string()));
         }
         param_values.push(Box::new(limit_i64));
-        let param_refs: Vec<&dyn duckdb::ToSql> = param_values.iter().map(|b| b.as_ref()).collect();
+        let param_refs: Vec<&dyn privstack_db::rusqlite::types::ToSql> = param_values.iter().map(|b| b.as_ref()).collect();
 
         let rows: Vec<serde_json::Value> = stmt
             .query_map(param_refs.as_slice(), |row| {
                 let emb_str: String = row.get::<_, String>(6)?;
-                let embedding: Vec<f64> = parse_duckdb_array(&emb_str);
+                let embedding: Vec<f64> = parse_json_array(&emb_str);
                 Ok(serde_json::json!({
                     "entity_id": row.get::<_, String>(0)?,
                     "entity_type": row.get::<_, String>(1)?,
@@ -1250,30 +1043,10 @@ impl EntityStore {
     }
 }
 
-/// Parses a DuckDB `CAST(DOUBLE[] AS VARCHAR)` result like `[0.1, 0.2, 0.3]`
-/// into a `Vec<f64>`. Returns empty vec on parse failure.
-fn parse_duckdb_array(s: &str) -> Vec<f64> {
-    let trimmed = s.trim().trim_start_matches('[').trim_end_matches(']');
-    if trimmed.is_empty() {
-        return vec![];
-    }
-    trimmed
-        .split(',')
-        .filter_map(|v| v.trim().parse::<f64>().ok())
-        .collect()
-}
-
-/// Returns the name of the primary database on this connection.
-/// In newer DuckDB the default database is named after the file stem (e.g. "data"),
-/// not necessarily "main". Uses pragma_database_size() which returns (database_name, ...).
-fn get_default_db_name(conn: &Connection) -> String {
-    // pragma_database_size() returns the database name as the first column
-    let name = conn
-        .prepare("SELECT database_name FROM pragma_database_size() LIMIT 1")
-        .and_then(|mut s| s.query_row([], |r| r.get::<_, String>(0)))
-        .unwrap_or_else(|_| "main".to_string());
-    eprintln!("[compact] detected database name: \"{}\"", name);
-    name
+/// Parses a JSON array string like `[0.1, 0.2, 0.3]` into a `Vec<f64>`.
+/// Returns empty vec on parse failure.
+fn parse_json_array(s: &str) -> Vec<f64> {
+    serde_json::from_str::<Vec<f64>>(s).unwrap_or_default()
 }
 
 fn format_bytes_log(bytes: u64) -> String {
@@ -1286,99 +1059,65 @@ fn format_bytes_log(bytes: u64) -> String {
     }
 }
 
-/// Scans a DuckDB connection and returns diagnostics: all tables, views, indexes, block info.
-pub fn scan_duckdb_connection(conn: &duckdb::Connection) -> serde_json::Value {
+/// Scans a SQLite connection and returns diagnostics: all tables, indexes, db size.
+pub fn scan_db_connection(conn: &privstack_db::rusqlite::Connection) -> serde_json::Value {
     let mut tables = Vec::new();
 
-    if let Ok(mut stmt) = conn.prepare(
-        "SELECT schema_name, table_name, estimated_size, column_count FROM duckdb_tables()"
-    ) {
-        let rows: Vec<(String, String, i64, i64)> = stmt
-            .query_map([], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, i64>(2)?,
-                    row.get::<_, i64>(3)?,
-                ))
-            })
-            .ok()
-            .map(|iter| iter.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default();
-
-        for (schema, name, estimated_size, column_count) in &rows {
-            let qualified = if schema == "main" {
-                format!("\"{}\"", name)
-            } else {
-                format!("\"{}\".\"{}\"", schema, name)
-            };
+    if let Ok(table_names) = privstack_db::list_tables(conn) {
+        for name in &table_names {
             let row_count: i64 = conn
-                .prepare(&format!("SELECT COUNT(*) FROM {}", qualified))
+                .prepare(&format!("SELECT COUNT(*) FROM \"{}\"", name))
                 .and_then(|mut s| s.query_row([], |r| r.get(0)))
                 .unwrap_or(0);
 
-            let display_name = if schema == "main" {
-                name.clone()
-            } else {
-                format!("{}.{}", schema, name)
-            };
+            // Get column count via PRAGMA table_info
+            let column_count: i64 = conn
+                .prepare(&format!("PRAGMA table_info('{}')", name))
+                .and_then(|mut s| {
+                    let cols: Vec<()> = s.query_map([], |_| Ok(()))?.filter_map(|r| r.ok()).collect();
+                    Ok(cols.len() as i64)
+                })
+                .unwrap_or(0);
 
             tables.push(serde_json::json!({
-                "table": display_name,
-                "schema": schema,
+                "table": name,
                 "row_count": row_count,
-                "estimated_size": estimated_size,
                 "column_count": column_count,
             }));
         }
     }
 
-    // Block-level allocation
-    let mut db_sizes = Vec::new();
-    if let Ok(mut size_stmt) = conn.prepare("SELECT * FROM pragma_database_size()") {
-        db_sizes = size_stmt
-            .query_map([], |row| {
-                Ok(serde_json::json!({
-                    "database_name": row.get::<_, String>(0).unwrap_or_default(),
-                    "database_size": row.get::<_, String>(1).unwrap_or_default(),
-                    "block_size": row.get::<_, i64>(2).unwrap_or(0),
-                    "total_blocks": row.get::<_, i64>(3).unwrap_or(0),
-                    "used_blocks": row.get::<_, i64>(4).unwrap_or(0),
-                    "free_blocks": row.get::<_, i64>(5).unwrap_or(0),
-                    "wal_size": row.get::<_, String>(6).unwrap_or_default(),
-                }))
-            })
-            .ok()
-            .map(|iter| iter.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default();
+    // Database size via page_count * page_size
+    let db_size = privstack_db::db_size(conn).unwrap_or(0);
+
+    // Indexes: collect per table
+    let mut indexes = Vec::new();
+    if let Ok(table_names) = privstack_db::list_tables(conn) {
+        for table_name in &table_names {
+            if let Ok(mut stmt) = conn.prepare(&format!("PRAGMA index_list('{}')", table_name)) {
+                let idx_rows: Vec<serde_json::Value> = stmt
+                    .query_map([], |row| {
+                        Ok(serde_json::json!({
+                            "table": table_name,
+                            "index": row.get::<_, String>(1).unwrap_or_default(),
+                            "unique": row.get::<_, i32>(2).unwrap_or(0) == 1,
+                        }))
+                    })
+                    .ok()
+                    .map(|iter| iter.filter_map(|r| r.ok()).collect())
+                    .unwrap_or_default();
+                indexes.extend(idx_rows);
+            }
+        }
     }
 
     // Views
     let mut views = Vec::new();
-    if let Ok(mut stmt) = conn.prepare("SELECT schema_name, view_name FROM duckdb_views()") {
+    if let Ok(mut stmt) = conn.prepare("SELECT name FROM sqlite_master WHERE type='view' ORDER BY name") {
         views = stmt
             .query_map([], |row| {
                 Ok(serde_json::json!({
-                    "schema": row.get::<_, String>(0).unwrap_or_default(),
-                    "view": row.get::<_, String>(1).unwrap_or_default(),
-                }))
-            })
-            .ok()
-            .map(|iter| iter.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default();
-    }
-
-    // Indexes
-    let mut indexes = Vec::new();
-    if let Ok(mut stmt) = conn.prepare(
-        "SELECT schema_name, table_name, index_name FROM duckdb_indexes()"
-    ) {
-        indexes = stmt
-            .query_map([], |row| {
-                Ok(serde_json::json!({
-                    "schema": row.get::<_, String>(0).unwrap_or_default(),
-                    "table": row.get::<_, String>(1).unwrap_or_default(),
-                    "index": row.get::<_, String>(2).unwrap_or_default(),
+                    "view": row.get::<_, String>(0).unwrap_or_default(),
                 }))
             })
             .ok()
@@ -1388,103 +1127,59 @@ pub fn scan_duckdb_connection(conn: &duckdb::Connection) -> serde_json::Value {
 
     serde_json::json!({
         "tables": tables,
-        "databases": db_sizes,
+        "db_size_bytes": db_size,
         "views": views,
         "indexes": indexes,
     })
 }
 
-/// Opens a DuckDB file read-only and returns diagnostics.
+/// Opens a SQLite file and returns diagnostics.
 /// Returns None if the file doesn't exist or can't be opened.
-pub fn scan_duckdb_file(path: &std::path::Path) -> Option<serde_json::Value> {
+pub fn scan_db_file(path: &std::path::Path) -> Option<serde_json::Value> {
     if !path.exists() {
         return None;
     }
     let file_size = std::fs::metadata(path).map(|m| m.len() as i64).unwrap_or(0);
-    let conn = duckdb::Connection::open_with_flags(
-        path,
-        duckdb::Config::default(),
-    ).ok()?;
+    let conn = privstack_db::open_db_unencrypted(path).ok()?;
 
-    let mut diag = scan_duckdb_connection(&conn);
+    let mut diag = scan_db_connection(&conn);
     if let Some(obj) = diag.as_object_mut() {
         obj.insert("file_size".to_string(), serde_json::json!(file_size));
     }
     Some(diag)
 }
 
-/// Compacts a standalone DuckDB file (not managed by EntityStore) by copying
-/// all data to a fresh file and swapping it in. Returns `(size_before, size_after)`.
-/// Returns None if the file doesn't exist or can't be opened.
-pub fn compact_duckdb_file(path: &std::path::Path) -> Option<(u64, u64)> {
+/// Compacts a standalone SQLite file using VACUUM INTO + swap.
+/// Returns `(size_before, size_after)` or None on failure.
+pub fn compact_db_file(path: &std::path::Path) -> Option<(u64, u64)> {
     if !path.exists() {
         return None;
     }
     let size_before = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
 
-    // Checkpoint first to flush WAL, then close
-    {
-        let conn = duckdb::Connection::open(path).ok()?;
-        conn.execute_batch("CHECKPOINT;").ok()?;
-        // conn dropped here — releases file locks
-    }
+    let conn = privstack_db::open_db_unencrypted(path).ok()?;
+    privstack_db::checkpoint(&conn).ok()?;
 
-    // Open a fresh connection for the copy
-    let compact_path = path.with_extension("duckdb.compact");
-    let _ = std::fs::remove_file(&compact_path);
+    let result = privstack_db::compact(&conn, path);
+    drop(conn);
 
-    let fresh_conn = duckdb::Connection::open(path).ok()?;
-    let db_name = get_default_db_name(&fresh_conn);
-    let compact_str = compact_path.to_string_lossy();
-    let copy_ok = fresh_conn
-        .execute_batch(&format!(
-            "ATTACH '{}' AS compact_db; COPY FROM DATABASE \"{}\" TO compact_db; DETACH compact_db;",
-            compact_str, db_name
-        ))
-        .is_ok();
-    drop(fresh_conn);
-
-    if !copy_ok {
-        let _ = std::fs::remove_file(&compact_path);
-        return None;
-    }
-
-    let backup_path = path.with_extension("duckdb.backup");
-    let _ = std::fs::remove_file(&backup_path);
-
-    if std::fs::rename(path, &backup_path).is_err() {
-        let _ = std::fs::remove_file(&compact_path);
-        return None;
-    }
-
-    if std::fs::rename(&compact_path, path).is_err() {
-        let _ = std::fs::rename(&backup_path, path);
-        return None;
-    }
-
-    // Clean up WAL and backup
-    let wal_ext = path
-        .extension()
-        .map(|ext| format!("{}.wal", ext.to_string_lossy()))
-        .unwrap_or_else(|| "wal".to_string());
-    let _ = std::fs::remove_file(path.with_extension(wal_ext));
-    let _ = std::fs::remove_file(&backup_path);
-
-    let size_after = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
-
-    eprintln!(
-        "[compact] {} : {} -> {} ({:.1}% reduction)",
-        path.file_name().unwrap_or_default().to_string_lossy(),
-        format_bytes_log(size_before),
-        format_bytes_log(size_after),
-        if size_before > 0 {
-            (1.0 - size_after as f64 / size_before as f64) * 100.0
-        } else {
-            0.0
+    match result {
+        Ok((_, size_after)) => {
+            eprintln!(
+                "[compact] {} : {} -> {} ({:.1}% reduction)",
+                path.file_name().unwrap_or_default().to_string_lossy(),
+                format_bytes_log(size_before),
+                format_bytes_log(size_after),
+                if size_before > 0 {
+                    (1.0 - size_after as f64 / size_before as f64) * 100.0
+                } else {
+                    0.0
+                }
+            );
+            Some((size_before, size_after))
         }
-    );
-
-    Some((size_before, size_after))
+        Err(_) => None,
+    }
 }
 
 // -- Field extraction helpers --
@@ -1495,13 +1190,11 @@ fn extract_field(
     target_type: FieldType,
     preferred_path: &str,
 ) -> Option<String> {
-    // First try the preferred path
     if let Some(field) = indexed_fields.iter().find(|f| f.field_path == preferred_path && f.field_type == target_type) {
         if let Some(val) = data.pointer(&field.field_path) {
             return Some(val.as_str().unwrap_or(&val.to_string()).to_string());
         }
     }
-    // Fall back to first field of matching type
     for field in indexed_fields {
         if field.field_type == target_type && field.field_path != preferred_path {
             if let Some(val) = data.pointer(&field.field_path) {
@@ -1536,10 +1229,8 @@ fn extract_relations(
 ) -> StorageResult<()> {
     for field in indexed_fields {
         if field.field_type == FieldType::Relation {
-            // Relation value: a string target entity ID, or an object with {type, id}
             if let Some(val) = entity.data.pointer(&field.field_path) {
                 if let Some(target_id) = val.as_str() {
-                    // Simple string relation — target type is unknown, use "_"
                     conn.execute(
                         "INSERT OR IGNORE INTO entity_links (source_type, source_id, target_type, target_id) VALUES (?, ?, '_', ?)",
                         params![entity.entity_type, entity.id, target_id],
@@ -1565,7 +1256,6 @@ fn extract_vectors(
     entity: &Entity,
     indexed_fields: &[IndexedField],
 ) -> StorageResult<()> {
-    // Clear stale vectors for this entity, then re-insert current ones
     conn.execute(
         "DELETE FROM entity_vectors WHERE entity_id = ?",
         params![entity.id],
@@ -1575,25 +1265,20 @@ fn extract_vectors(
         if field.field_type == FieldType::Vector {
             let dim = field.vector_dim.unwrap_or(0);
             if let Some(arr) = entity.data.pointer(&field.field_path).and_then(|v| v.as_array()) {
-                // Validate dimension matches schema
                 if arr.len() != dim as usize {
                     continue;
                 }
-                // Build DuckDB array literal: [0.1, 0.2, ...]
-                let components: Vec<String> = arr
+                let components: Vec<f64> = arr
                     .iter()
-                    .filter_map(|v| v.as_f64().map(|f| f.to_string()))
+                    .filter_map(|v| v.as_f64())
                     .collect();
                 if components.len() != dim as usize {
                     continue;
                 }
-                let array_literal = format!("[{}]", components.join(","));
+                let embedding_json = serde_json::to_string(&components).unwrap_or_default();
                 conn.execute(
-                    &format!(
-                        "INSERT INTO entity_vectors (entity_id, field_path, dim, embedding) VALUES (?, ?, ?, {}::DOUBLE[])",
-                        array_literal
-                    ),
-                    params![entity.id, field.field_path, dim as i32],
+                    "INSERT INTO entity_vectors (entity_id, field_path, dim, embedding) VALUES (?, ?, ?, ?)",
+                    params![entity.id, field.field_path, dim as i32, embedding_json],
                 )?;
             }
         }
@@ -1618,13 +1303,13 @@ fn build_search_text(title: &Option<String>, body: &Option<String>, tags: &[Stri
     text
 }
 
-/// Compare a decrypted JSON value against a filter value.
+/// Compare a JSON value against a filter value.
 fn match_filter_value(actual: &serde_json::Value, expected: &serde_json::Value) -> bool {
     match (actual, expected) {
         (serde_json::Value::String(a), serde_json::Value::String(e)) => a == e,
         (serde_json::Value::Number(a), serde_json::Value::Number(e)) => a == e,
         (serde_json::Value::Bool(a), serde_json::Value::Bool(e)) => a == e,
-        // Filter value is always a string from the FFI layer — coerce actual to string
+        // Filter value is always a string from the FFI layer -- coerce actual to string
         (_, serde_json::Value::String(e)) => match actual {
             serde_json::Value::Number(n) => n.to_string() == *e,
             serde_json::Value::Bool(b) => b.to_string() == *e,
@@ -1634,124 +1319,39 @@ fn match_filter_value(actual: &serde_json::Value, expected: &serde_json::Value) 
     }
 }
 
-// -- Base64 helpers (avoid pulling in the full `base64` crate in storage) --
-
-fn base64_encode(data: &[u8]) -> String {
-    use std::fmt::Write;
-    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
-    for chunk in data.chunks(3) {
-        let b0 = chunk[0] as u32;
-        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
-        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
-        let n = (b0 << 16) | (b1 << 8) | b2;
-        let _ = write!(out, "{}", CHARS[((n >> 18) & 0x3F) as usize] as char);
-        let _ = write!(out, "{}", CHARS[((n >> 12) & 0x3F) as usize] as char);
-        if chunk.len() > 1 {
-            let _ = write!(out, "{}", CHARS[((n >> 6) & 0x3F) as usize] as char);
-        } else {
-            out.push('=');
-        }
-        if chunk.len() > 2 {
-            let _ = write!(out, "{}", CHARS[(n & 0x3F) as usize] as char);
-        } else {
-            out.push('=');
-        }
-    }
-    out
-}
-
-fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
-    fn val(c: u8) -> Result<u8, String> {
-        match c {
-            b'A'..=b'Z' => Ok(c - b'A'),
-            b'a'..=b'z' => Ok(c - b'a' + 26),
-            b'0'..=b'9' => Ok(c - b'0' + 52),
-            b'+' => Ok(62),
-            b'/' => Ok(63),
-            _ => Err(format!("invalid base64 char: {c}")),
-        }
-    }
-    let bytes: Vec<u8> = input.bytes().filter(|&b| b != b'=' && b != b'\n' && b != b'\r').collect();
-    let mut out = Vec::with_capacity(bytes.len() * 3 / 4);
-    for chunk in bytes.chunks(4) {
-        if chunk.len() < 2 {
-            return Err("truncated base64".into());
-        }
-        let a = val(chunk[0])? as u32;
-        let b = val(chunk[1])? as u32;
-        let c = if chunk.len() > 2 { val(chunk[2])? as u32 } else { 0 };
-        let d = if chunk.len() > 3 { val(chunk[3])? as u32 } else { 0 };
-        let n = (a << 18) | (b << 12) | (c << 6) | d;
-        out.push((n >> 16) as u8);
-        if chunk.len() > 2 {
-            out.push((n >> 8) as u8);
-        }
-        if chunk.len() > 3 {
-            out.push(n as u8);
-        }
-    }
-    Ok(out)
-}
-
 // -- Schema --
 
 fn initialize_entity_schema(conn: &Connection) -> StorageResult<()> {
     // Migration: add local_only column to existing entities table BEFORE the main
     // batch, because CREATE TABLE IF NOT EXISTS won't add new columns to an existing
     // table, but the batch references local_only in a CREATE INDEX statement.
-    let entities_exists: bool = conn
-        .query_row(
-            "SELECT COUNT(*) > 0 FROM information_schema.tables WHERE table_name = 'entities'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap_or(false);
-
-    if entities_exists {
-        let has_local_only = conn
-            .execute("SELECT local_only FROM entities LIMIT 0", [])
-            .is_ok();
-        if !has_local_only {
-            let _ = conn.execute_batch(
-                r#"
-                ALTER TABLE entities ADD COLUMN local_only BOOLEAN DEFAULT FALSE;
-                "#,
-            );
+    if privstack_db::table_exists(conn, "entities").unwrap_or(false) {
+        if !privstack_db::column_exists(conn, "entities", "local_only").unwrap_or(true) {
+            privstack_db::add_column_if_not_exists(conn, "entities", "local_only", "INTEGER DEFAULT 0")?;
         }
     }
 
-    // Migration: add chunk_text column to rag_vectors if missing (stores original text for search result context)
-    {
-        let has_chunk_text: bool = conn
-            .query_row(
-                "SELECT COUNT(*) > 0 FROM information_schema.columns \
-                 WHERE table_name = 'rag_vectors' AND column_name = 'chunk_text'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap_or(false);
-        if !has_chunk_text {
-            conn.execute_batch("ALTER TABLE rag_vectors ADD COLUMN chunk_text TEXT")
-                .ok(); // ok() — table might not exist yet on first run
-        }
+    // Migration: add chunk_text column to rag_vectors if missing
+    if privstack_db::table_exists(conn, "rag_vectors").unwrap_or(false) {
+        privstack_db::add_column_if_not_exists(conn, "rag_vectors", "chunk_text", "TEXT")
+            .ok(); // ok() -- table might not exist yet on first run
     }
 
     conn.execute_batch(
         r#"
         CREATE TABLE IF NOT EXISTS entities (
-            id VARCHAR PRIMARY KEY,
-            entity_type VARCHAR NOT NULL,
+            id TEXT PRIMARY KEY,
+            entity_type TEXT NOT NULL,
             data_json TEXT NOT NULL,
-            title VARCHAR,
+            title TEXT,
             body TEXT,
-            tags VARCHAR[],
-            is_trashed BOOLEAN DEFAULT FALSE,
-            is_favorite BOOLEAN DEFAULT FALSE,
-            local_only BOOLEAN DEFAULT FALSE,
-            created_at BIGINT NOT NULL,
-            modified_at BIGINT NOT NULL,
-            created_by VARCHAR NOT NULL,
+            tags TEXT,
+            is_trashed INTEGER DEFAULT 0,
+            is_favorite INTEGER DEFAULT 0,
+            local_only INTEGER DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            modified_at INTEGER NOT NULL,
+            created_by TEXT NOT NULL,
             search_text TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type);
@@ -1761,60 +1361,57 @@ fn initialize_entity_schema(conn: &Connection) -> StorageResult<()> {
         CREATE INDEX IF NOT EXISTS idx_entities_local_only ON entities(local_only);
 
         CREATE TABLE IF NOT EXISTS entity_links (
-            source_type VARCHAR NOT NULL,
-            source_id VARCHAR NOT NULL,
-            target_type VARCHAR NOT NULL,
-            target_id VARCHAR NOT NULL,
+            source_type TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            target_type TEXT NOT NULL,
+            target_id TEXT NOT NULL,
             PRIMARY KEY (source_type, source_id, target_type, target_id)
         );
 
         CREATE TABLE IF NOT EXISTS entity_vectors (
-            entity_id VARCHAR NOT NULL,
-            field_path VARCHAR NOT NULL,
+            entity_id TEXT NOT NULL,
+            field_path TEXT NOT NULL,
             dim INTEGER NOT NULL,
-            embedding DOUBLE[],
+            embedding TEXT,
             PRIMARY KEY (entity_id, field_path)
         );
 
         -- Sync ledger: tracks which entities have been synced with which peer.
-        -- Used for incremental sync — only entities missing or modified since
-        -- last sync with a specific peer need to be exchanged.
         CREATE TABLE IF NOT EXISTS sync_ledger (
-            peer_id   VARCHAR NOT NULL,
-            entity_id VARCHAR NOT NULL,
-            synced_at BIGINT NOT NULL,
+            peer_id   TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            synced_at INTEGER NOT NULL,
             PRIMARY KEY (peer_id, entity_id)
         );
 
-        -- Cloud sync cursor persistence: stores per-entity cursor positions
-        -- and last_sync_at so the engine resumes where it left off on restart.
+        -- Cloud sync cursor persistence
         CREATE TABLE IF NOT EXISTS cloud_sync_cursors (
-            cursor_key VARCHAR PRIMARY KEY,
-            cursor_value BIGINT NOT NULL,
-            updated_at BIGINT NOT NULL
+            cursor_key TEXT PRIMARY KEY,
+            cursor_value INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
         );
 
         -- Plugin fuel consumption history for metrics tracking
         CREATE TABLE IF NOT EXISTS plugin_fuel_history (
-            plugin_id VARCHAR NOT NULL,
-            fuel_consumed BIGINT NOT NULL,
-            recorded_at BIGINT NOT NULL
+            plugin_id TEXT NOT NULL,
+            fuel_consumed INTEGER NOT NULL,
+            recorded_at INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_plugin_fuel_plugin_id ON plugin_fuel_history(plugin_id);
         CREATE INDEX IF NOT EXISTS idx_plugin_fuel_recorded_at ON plugin_fuel_history(plugin_id, recorded_at DESC);
 
         -- RAG vector index for semantic search across plugin content
         CREATE TABLE IF NOT EXISTS rag_vectors (
-            entity_id VARCHAR NOT NULL,
-            chunk_path VARCHAR NOT NULL,
-            plugin_id VARCHAR NOT NULL,
-            entity_type VARCHAR NOT NULL,
-            content_hash VARCHAR NOT NULL,
+            entity_id TEXT NOT NULL,
+            chunk_path TEXT NOT NULL,
+            plugin_id TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
             dim INTEGER NOT NULL,
-            embedding DOUBLE[],
-            title VARCHAR,
-            link_type VARCHAR,
-            indexed_at BIGINT NOT NULL,
+            embedding TEXT,
+            title TEXT,
+            link_type TEXT,
+            indexed_at INTEGER NOT NULL,
             chunk_text TEXT,
             PRIMARY KEY (entity_id, chunk_path)
         );
@@ -1823,7 +1420,6 @@ fn initialize_entity_schema(conn: &Connection) -> StorageResult<()> {
     )?;
 
     // Migration: drop plugin_fuel_history if it has the old schema with 'id' column
-    // Try a simple insert - if it fails due to 'id' column, recreate the table
     let needs_migration = conn
         .execute(
             "INSERT INTO plugin_fuel_history (plugin_id, fuel_consumed, recorded_at) VALUES ('__migration_test__', 0, 0)",
@@ -1832,21 +1428,19 @@ fn initialize_entity_schema(conn: &Connection) -> StorageResult<()> {
         .is_err();
 
     if needs_migration {
-        // Old schema exists - drop and recreate
         let _ = conn.execute_batch(
             r#"
             DROP TABLE IF EXISTS plugin_fuel_history;
             CREATE TABLE plugin_fuel_history (
-                plugin_id VARCHAR NOT NULL,
-                fuel_consumed BIGINT NOT NULL,
-                recorded_at BIGINT NOT NULL
+                plugin_id TEXT NOT NULL,
+                fuel_consumed INTEGER NOT NULL,
+                recorded_at INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_plugin_fuel_plugin_id ON plugin_fuel_history(plugin_id);
             CREATE INDEX IF NOT EXISTS idx_plugin_fuel_recorded_at ON plugin_fuel_history(plugin_id, recorded_at DESC);
             "#,
         );
     } else {
-        // Clean up test row
         let _ = conn.execute(
             "DELETE FROM plugin_fuel_history WHERE plugin_id = '__migration_test__'",
             [],
