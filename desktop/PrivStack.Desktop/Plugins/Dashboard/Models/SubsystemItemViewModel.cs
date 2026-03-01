@@ -11,8 +11,6 @@ public partial class SubsystemItemViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsActive))]
-    [NotifyPropertyChangedFor(nameof(IsIdle))]
-    [NotifyPropertyChangedFor(nameof(IsStopped))]
     private int _activeTaskCount;
 
     [ObservableProperty]
@@ -22,14 +20,14 @@ public partial class SubsystemItemViewModel : ObservableObject
     private string _allocRateDisplay = "—";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsActive))]
     private long _nativeBytes;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsActive))]
     private long _managedAllocBytes;
 
-    public bool IsActive => ActiveTaskCount > 0;
-    public bool IsIdle => ActiveTaskCount == 0 && (NativeBytes > 0 || ManagedAllocBytes > 0);
-    public bool IsStopped => ActiveTaskCount == 0 && NativeBytes == 0 && ManagedAllocBytes == 0;
+    public bool IsActive => ActiveTaskCount > 0 || NativeBytes > 0 || ManagedAllocBytes > 0;
 }
 
 public partial class SubsystemGroupViewModel : ObservableObject

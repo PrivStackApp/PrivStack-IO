@@ -34,7 +34,7 @@ internal sealed class PluginHost : IPluginHost
         IAudioRecorderService? audioRecorder = null,
         ITranscriptionService? transcription = null)
     {
-        Sdk = sdk;
+        Sdk = new TrackedSdkProxy(sdk, $"plugin.{pluginId}");
         Capabilities = capabilities;
         Settings = new PluginSettingsAdapter(pluginId, appSettings);
         Logger = new SerilogPluginLogger(pluginId);
@@ -186,4 +186,59 @@ internal sealed class NavigationServiceAdapter : INavigationService
 
         _dispatcher.Post(() => host.SelectTab(navItemId));
     }
+}
+
+/// <summary>
+/// Wraps IPrivStackSdk to tag SendAsync calls with a subsystem scope,
+/// so plugin SDK activity shows in the Subsystems tab.
+/// </summary>
+internal sealed class TrackedSdkProxy(IPrivStackSdk inner, string subsystemId) : IPrivStackSdk
+{
+    public bool IsReady => inner.IsReady;
+
+    public Task<SdkResponse<TResult>> SendAsync<TResult>(SdkMessage message, CancellationToken ct = default)
+    {
+        using var _ = Diagnostics.SubsystemTracker.Instance?.EnterScope(subsystemId);
+        return inner.SendAsync<TResult>(message, ct);
+    }
+
+    public Task<SdkResponse> SendAsync(SdkMessage message, CancellationToken ct = default)
+    {
+        using var _ = Diagnostics.SubsystemTracker.Instance?.EnterScope(subsystemId);
+        return inner.SendAsync(message, ct);
+    }
+
+    public Task<int> CountAsync(string pluginId, string entityType, bool includeTrashed = false, CancellationToken ct = default)
+    {
+        using var _ = Diagnostics.SubsystemTracker.Instance?.EnterScope(subsystemId);
+        return inner.CountAsync(pluginId, entityType, includeTrashed, ct);
+    }
+
+    public Task<SdkResponse<TResult>> SearchAsync<TResult>(string query, string[]? entityTypes = null, int limit = 50, CancellationToken ct = default)
+    {
+        using var _ = Diagnostics.SubsystemTracker.Instance?.EnterScope(subsystemId);
+        return inner.SearchAsync<TResult>(query, entityTypes, limit, ct);
+    }
+
+    // Pass-through for non-data operations (no tracking needed)
+    public Task RunDatabaseMaintenance(CancellationToken ct = default) => inner.RunDatabaseMaintenance(ct);
+    public string GetDatabaseDiagnostics() => inner.GetDatabaseDiagnostics();
+    public string FindOrphanEntities(string validTypesJson) => inner.FindOrphanEntities(validTypesJson);
+    public string DeleteOrphanEntities(string validTypesJson) => inner.DeleteOrphanEntities(validTypesJson);
+    public string CompactDatabases() => inner.CompactDatabases();
+
+    public Task<bool> VaultIsInitialized(string vaultId, CancellationToken ct = default) => inner.VaultIsInitialized(vaultId, ct);
+    public Task VaultInitialize(string vaultId, string password, CancellationToken ct = default) => inner.VaultInitialize(vaultId, password, ct);
+    public Task VaultUnlock(string vaultId, string password, CancellationToken ct = default) => inner.VaultUnlock(vaultId, password, ct);
+    public Task VaultLock(string vaultId, CancellationToken ct = default) => inner.VaultLock(vaultId, ct);
+    public Task<bool> VaultIsUnlocked(string vaultId, CancellationToken ct = default) => inner.VaultIsUnlocked(vaultId, ct);
+    public Task<bool> RequestVaultUnlockAsync(string vaultId, CancellationToken ct = default) => inner.RequestVaultUnlockAsync(vaultId, ct);
+
+    public Task VaultBlobStore(string vaultId, string blobId, byte[] data, CancellationToken ct = default) => inner.VaultBlobStore(vaultId, blobId, data, ct);
+    public Task<byte[]> VaultBlobRead(string vaultId, string blobId, CancellationToken ct = default) => inner.VaultBlobRead(vaultId, blobId, ct);
+    public Task VaultBlobDelete(string vaultId, string blobId, CancellationToken ct = default) => inner.VaultBlobDelete(vaultId, blobId, ct);
+
+    public Task BlobStore(string ns, string blobId, byte[] data, string? metadataJson = null, CancellationToken ct = default) => inner.BlobStore(ns, blobId, data, metadataJson, ct);
+    public Task<byte[]> BlobRead(string ns, string blobId, CancellationToken ct = default) => inner.BlobRead(ns, blobId, ct);
+    public Task BlobDelete(string ns, string blobId, CancellationToken ct = default) => inner.BlobDelete(ns, blobId, ct);
 }

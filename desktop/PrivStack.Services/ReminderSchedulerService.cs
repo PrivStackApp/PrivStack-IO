@@ -48,6 +48,12 @@ public sealed class ReminderSchedulerService : IDisposable
     {
         if (_disposed) return;
 
+        if (!_appSettings.Settings.NotificationsEnabled)
+        {
+            _log.Information("ReminderSchedulerService skipped — notifications disabled");
+            return;
+        }
+
         _timer = new System.Timers.Timer(PollInterval.TotalMilliseconds)
         {
             AutoReset = true,
