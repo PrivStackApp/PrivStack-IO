@@ -123,7 +123,7 @@ pub fn create_cloud_sync_engine(
     let (command_tx, command_rx) = mpsc::channel(64);
     let (inbound_tx, inbound_rx) = mpsc::channel(512);
 
-    // Load persisted cursors from DuckDB so the engine resumes where it left off.
+    // Load persisted cursors from SQLite so the engine resumes where it left off.
     let mut cursors = HashMap::new();
     let mut restored_sync_at: Option<DateTime<Utc>> = None;
 

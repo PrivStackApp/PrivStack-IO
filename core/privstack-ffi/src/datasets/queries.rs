@@ -191,7 +191,7 @@ pub unsafe extern "C" fn privstack_dataset_execute_sql(
 
 /// Execute SQL v2: supports `source:` aliases, mutations with dry-run, and SELECT queries.
 ///
-/// Wraps execution in `catch_unwind` to prevent DuckDB panics from aborting the process.
+/// Wraps execution in `catch_unwind` to prevent SQLite panics from aborting the process.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn privstack_dataset_execute_sql_v2(
     request_json: *const c_char,
@@ -205,8 +205,8 @@ pub unsafe extern "C" fn privstack_dataset_execute_sql_v2(
             let page_size = req.page_size.unwrap_or(100);
             let dry_run = req.dry_run.unwrap_or(false);
 
-            // SAFETY: catch_unwind protects the FFI boundary from DuckDB panics
-            // (e.g. DuckDB 1.4.4 panics on stmt.column_count() before execution).
+            // SAFETY: catch_unwind protects the FFI boundary from SQLite panics
+            // (e.g. SQLite 1.4.4 panics on stmt.column_count() before execution).
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 store.execute_sql_v2(&sql, page, page_size, dry_run)
             }));

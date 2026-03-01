@@ -568,7 +568,7 @@ fn json_value_to_sql_string(value: &serde_json::Value) -> String {
     }
 }
 
-/// Normalize DuckDB/generic SQL type names to SQLite-compatible types.
+/// Normalize SQLite/generic SQL type names to SQLite-compatible types.
 fn normalize_sql_type(type_name: &str) -> String {
     let upper = type_name.to_uppercase();
     match upper.as_str() {

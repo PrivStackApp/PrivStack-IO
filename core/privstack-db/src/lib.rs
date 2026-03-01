@@ -1,8 +1,7 @@
 //! SQLCipher database connection management for PrivStack.
 //!
-//! Provides a unified abstraction over `rusqlite` with SQLCipher encryption,
-//! replacing the previous per-crate DuckDB connections. All database access
-//! in PrivStack routes through this module.
+//! Provides a unified abstraction over `rusqlite` with SQLCipher encryption.
+//! All database access in PrivStack routes through this module.
 
 mod error;
 mod functions;

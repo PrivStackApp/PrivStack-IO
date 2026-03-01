@@ -4,7 +4,7 @@ use crate::error::{DatasetError, DatasetResult};
 use crate::types::{DatasetId, PreprocessedSql, StatementType};
 
 /// Preprocess SQL by resolving `source:Name` or `source:"Quoted Name"` aliases
-/// into their actual DuckDB table names (`ds_<uuid>`).
+/// into their actual SQLite table names (`ds_<uuid>`).
 pub fn preprocess_sql(
     raw_sql: &str,
     resolver: impl Fn(&str) -> Option<DatasetId>,

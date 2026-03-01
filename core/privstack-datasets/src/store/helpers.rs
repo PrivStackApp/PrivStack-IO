@@ -89,7 +89,7 @@ pub(crate) fn row_value_to_json(row: &privstack_db::rusqlite::Row<'_>, idx: usiz
 }
 
 /// Build a SELECT clause that quotes all column names.
-/// Unlike DuckDB, SQLite doesn't need temporal casting — text columns store
+/// Unlike SQLite, SQLite doesn't need temporal casting — text columns store
 /// date/timestamp values as ISO strings already.
 pub(crate) fn build_typed_select(columns: &[DatasetColumn]) -> String {
     columns
